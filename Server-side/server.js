@@ -18,6 +18,11 @@ const websocketManager = require('./config/websocket');
 // 导入路由
 const userRoutes = require('./routes/user-routes');
 const authRoutes = require('./routes/auth-routes');
+const roomRoutes = require('./routes/room-routes');
+const expenseRoutes = require('./routes/expense-routes');
+const expenseTypeRoutes = require('./routes/expense-type-routes');
+const billRoutes = require('./routes/bill-routes');
+const statsRoutes = require('./routes/stats-routes');
 
 // 创建Express应用
 const app = express();
@@ -79,6 +84,11 @@ app.get('/health', async (req, res) => {
 // API路由
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/expense-types', expenseTypeRoutes);
+app.use('/api/bills', billRoutes);
+app.use('/api/stats', statsRoutes);
 
 // 主页路由
 app.get('/', (req, res) => {
@@ -114,8 +124,13 @@ async function startServer() {
   }
 }
 
-// 启动服务器
-startServer();
+// 启动服务器（非测试环境）
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
+
+// 导出app对象供测试使用
+module.exports = app;
 
 // 优雅关闭
 process.on('SIGINT', async () => {

@@ -12,27 +12,94 @@
           background-color="#304156"
           text-color="#bfcbd9"
           active-text-color="#409EFF"
+          router
         >
-          <el-menu-item index="1">
+          <el-menu-item index="/">
             <el-icon><House /></el-icon>
             <span>仪表盘</span>
           </el-menu-item>
-          <el-menu-item index="2">
-            <el-icon><User /></el-icon>
-            <span>用户管理</span>
-          </el-menu-item>
-          <el-menu-item index="3">
-            <el-icon><Money /></el-icon>
-            <span>费用管理</span>
-          </el-menu-item>
-          <el-menu-item index="4">
-            <el-icon><PieChart /></el-icon>
-            <span>统计分析</span>
-          </el-menu-item>
-          <el-menu-item index="5">
-            <el-icon><Setting /></el-icon>
-            <span>系统设置</span>
-          </el-menu-item>
+          <el-sub-menu index="docs">
+            <template #title>
+              <el-icon><Document /></el-icon>
+              <span>文档管理</span>
+            </template>
+            <el-menu-item index="/docs">文档概览</el-menu-item>
+            <el-menu-item index="/docs/requirements">需求文档</el-menu-item>
+            <el-menu-item index="/docs/database">数据库设计</el-menu-item>
+            <el-menu-item index="/docs/versions">版本控制</el-menu-item>
+            <el-menu-item index="/docs/system">
+              <el-icon><Tools /></el-icon>
+              <span>系统设计文档</span>
+            </el-menu-item>
+            <el-menu-item index="/docs/versions">
+                    <el-icon><Document /></el-icon>
+                    <span>版本控制</span>
+                  </el-menu-item>
+                  <el-menu-item index="/docs/search">
+                    <el-icon><Search /></el-icon>
+                    <span>文档搜索</span>
+                  </el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="system">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              <span>系统管理</span>
+            </template>
+            <el-menu-item index="/system/users">
+              <el-icon><User /></el-icon>
+              <span>用户管理</span>
+            </el-menu-item>
+            <el-menu-item index="/system/roles">
+              <el-icon><Avatar /></el-icon>
+              <span>角色分配</span>
+            </el-menu-item>
+            <el-menu-item index="/system/dorms">
+              <el-icon><House /></el-icon>
+              <span>寝室管理</span>
+            </el-menu-item>
+            <el-menu-item index="/system/expense">
+              <el-icon><Money /></el-icon>
+              <span>费用监控</span>
+            </el-menu-item>
+            <el-menu-item index="/system/abnormal">
+              <el-icon><Warning /></el-icon>
+              <span>异常费用识别</span>
+            </el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="review">
+            <template #title>
+              <el-icon><View /></el-icon>
+              <span>审核与争议</span>
+            </template>
+            <el-menu-item index="/review/process">审核流程</el-menu-item>
+            <el-menu-item index="/review/disputes">争议管理</el-menu-item>
+            <el-menu-item index="/review/progress">
+              <el-icon><TrendCharts /></el-icon>
+              <span>处理进度跟踪</span>
+            </el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="config">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              <span>系统配置与数据统计</span>
+            </template>
+            <el-menu-item index="/config/system">
+              <el-icon><Setting /></el-icon>
+              <span>系统参数配置</span>
+            </el-menu-item>
+            <el-menu-item index="/config/rules">
+              <el-icon><Tools /></el-icon>
+              <span>分摊规则管理</span>
+            </el-menu-item>
+            <el-menu-item index="/config/templates">
+              <el-icon><Bell /></el-icon>
+              <span>通知模板配置</span>
+            </el-menu-item>
+            <el-menu-item index="/config/statistics">
+              <el-icon><TrendCharts /></el-icon>
+              <span>系统使用统计</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </el-aside>
 
@@ -87,13 +154,25 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   House,
+  Document,
+  Setting,
+  View,
+  Tools,
+  Search,
   User,
+  Avatar,
   Money,
-  PieChart,
-  Setting
+  Warning,
+  Bell,
+  Lock,
+  TrendCharts
 } from '@element-plus/icons-vue'
+
+const router = useRouter()
 
 const logout = () => {
   ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -102,6 +181,8 @@ const logout = () => {
     type: 'warning'
   }).then(() => {
     ElMessage.success('退出成功')
+    // 实际项目中应该清除登录状态并跳转到登录页
+    // router.push('/login')
   }).catch(() => {
     // 取消操作
   })

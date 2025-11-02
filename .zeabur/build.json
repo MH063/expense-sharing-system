@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd Server-side && npm install",
-  "outputDirectory": "Server-side",
-  "installCommand": "cd Server-side && npm install",
-  "startCommand": "cd Server-side && npm start"
+  "buildCommand": "npm run build:all",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "startCommand": "npm run start:prod"
 }

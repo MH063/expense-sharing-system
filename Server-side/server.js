@@ -31,6 +31,20 @@ app.use(cors()); // 跨域支持
 app.use(express.json()); // JSON解析
 app.use(express.urlencoded({ extended: true })); // URL编码解析
 
+// 静态文件服务 - 用于部署前端应用
+app.use(express.static('public'));
+
+// 前端应用路由
+app.use('/client', express.static('../Client application/dist'));
+app.use('/admin', express.static('../Admin panel/dist'));
+
+// 静态文件服务 - 用于部署前端应用
+app.use(express.static('public'));
+
+// 前端应用路由
+app.use('/client', express.static('../Client application/dist'));
+app.use('/admin', express.static('../Admin panel/dist'));
+
 // 创建日志记录器
 const logger = winston.createLogger({
   level: 'info',

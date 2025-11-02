@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 -- Test Database Initialization Script - PostgreSQL Version
 -- Create test database (In PostgreSQL, you need to create the database first, then connect)
 -- Note: In PostgreSQL, you need to manually create the database first, then execute this script
@@ -7,6 +8,17 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users table
+=======
+-- 测试数据库初始化脚本 - PostgreSQL版本
+-- 创建测试数据库（PostgreSQL中需要先创建数据库，然后连接）
+-- 注意：PostgreSQL中需要先手动创建数据库，然后执行此脚本
+-- 创建数据库命令：CREATE DATABASE test_expense_system;
+
+-- 启用UUID扩展
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 用户表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -15,14 +27,22 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(100) NOT NULL,
     avatar_url VARCHAR(500),
+<<<<<<< HEAD
     role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('system_admin', 'admin', 'room_owner', 'payer', 'user')),
+=======
+    role VARCHAR(20) DEFAULT '普通用户' CHECK (role IN ('系统管理员', '管理员', '寝室长', '缴费人', '普通用户')),
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
     last_login_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Rooms table
+=======
+-- 寝室表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS rooms (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
@@ -35,7 +55,11 @@ CREATE TABLE IF NOT EXISTS rooms (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- User-room relations table
+=======
+-- 用户寝室关联表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS user_room_relations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -49,7 +73,11 @@ CREATE TABLE IF NOT EXISTS user_room_relations (
     UNIQUE(user_id, room_id)
 );
 
+<<<<<<< HEAD
 -- Expense types table
+=======
+-- 费用类型表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS expense_types (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) NOT NULL,
@@ -62,7 +90,11 @@ CREATE TABLE IF NOT EXISTS expense_types (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Expenses table
+=======
+-- 费用表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -83,7 +115,11 @@ CREATE TABLE IF NOT EXISTS expenses (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Expense splits table
+=======
+-- 费用分摊明细表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS expense_splits (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
@@ -97,7 +133,11 @@ CREATE TABLE IF NOT EXISTS expense_splits (
     UNIQUE(expense_id, user_id)
 );
 
+<<<<<<< HEAD
 -- Bills table
+=======
+-- 账单表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS bills (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -113,7 +153,11 @@ CREATE TABLE IF NOT EXISTS bills (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Bill-expenses relation table
+=======
+-- 账单费用关联表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS bill_expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     bill_id UUID NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
@@ -122,7 +166,11 @@ CREATE TABLE IF NOT EXISTS bill_expenses (
     UNIQUE(expense_id)
 );
 
+<<<<<<< HEAD
 -- User QR codes table
+=======
+-- 用户收款码表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS user_qr_codes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -134,7 +182,11 @@ CREATE TABLE IF NOT EXISTS user_qr_codes (
     UNIQUE(user_id, qr_type)
 );
 
+<<<<<<< HEAD
 -- Payments table
+=======
+-- 支付记录表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     bill_id UUID NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
@@ -152,7 +204,11 @@ CREATE TABLE IF NOT EXISTS payments (
     CONSTRAINT check_payer_not_payee CHECK (user_id != payer_id)
 );
 
+<<<<<<< HEAD
 -- Invitation codes table
+=======
+-- 邀请码表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS invitation_codes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code VARCHAR(4) UNIQUE NOT NULL,
@@ -166,7 +222,11 @@ CREATE TABLE IF NOT EXISTS invitation_codes (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Invitation usage records table
+=======
+-- 邀请码使用记录表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS invitation_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invitation_code_id UUID NOT NULL REFERENCES invitation_codes(id) ON DELETE CASCADE,
@@ -174,7 +234,11 @@ CREATE TABLE IF NOT EXISTS invitation_usage (
     used_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Split rules table
+=======
+-- 分摊规则表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS split_rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -189,7 +253,11 @@ CREATE TABLE IF NOT EXISTS split_rules (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Recommendation configs table
+=======
+-- 智能推荐配置表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS recommendation_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -203,23 +271,39 @@ CREATE TABLE IF NOT EXISTS recommendation_configs (
     UNIQUE(room_id, config_type, config_key)
 );
 
+<<<<<<< HEAD
 -- Expense reviews table
+=======
+-- 费用审核表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS expense_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
     submitted_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     reason TEXT,
+<<<<<<< HEAD
     current_level VARCHAR(20) NOT NULL CHECK (current_level IN ('room_owner', 'payer', 'system_auto_review')),
+=======
+    current_level VARCHAR(20) NOT NULL CHECK (current_level IN ('寝室长', '缴费人', '系统自动审核')),
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
     status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'escalated')),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Review chain records table
 CREATE TABLE IF NOT EXISTS review_chain_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     review_id UUID NOT NULL REFERENCES expense_reviews(id) ON DELETE CASCADE,
     level VARCHAR(20) NOT NULL CHECK (level IN ('room_owner', 'payer', 'system_auto_review')),
+=======
+-- 审核链记录表
+CREATE TABLE IF NOT EXISTS review_chain_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    review_id UUID NOT NULL REFERENCES expense_reviews(id) ON DELETE CASCADE,
+    level VARCHAR(20) NOT NULL CHECK (level IN ('寝室长', '缴费人', '系统自动审核')),
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
     reviewer_id UUID REFERENCES users(id) ON DELETE RESTRICT,
     reviewer_name VARCHAR(100) NOT NULL,
     decision VARCHAR(20) NOT NULL CHECK (decision IN ('approved', 'rejected', 'escalated')),
@@ -227,7 +311,11 @@ CREATE TABLE IF NOT EXISTS review_chain_records (
     reviewed_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Expense disputes table
+=======
+-- 费用争议表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS expense_disputes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
@@ -241,7 +329,11 @@ CREATE TABLE IF NOT EXISTS expense_disputes (
     resolved_at TIMESTAMP
 );
 
+<<<<<<< HEAD
 -- Audit logs table
+=======
+-- 审计日志表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -255,7 +347,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- System operation logs table
+=======
+-- 系统操作日志表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS system_operation_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     operator_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -268,7 +364,11 @@ CREATE TABLE IF NOT EXISTS system_operation_logs (
     operation_time TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- System configs table
+=======
+-- 系统配置表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS system_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     config_key VARCHAR(100) UNIQUE NOT NULL,
@@ -281,7 +381,11 @@ CREATE TABLE IF NOT EXISTS system_configs (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Notification configs table
+=======
+-- 通知配置表
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE TABLE IF NOT EXISTS notification_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -293,6 +397,7 @@ CREATE TABLE IF NOT EXISTS notification_configs (
     UNIQUE(user_id, notification_type, event_type)
 );
 
+<<<<<<< HEAD
 -- Insert system default expense types
 INSERT INTO expense_types (id, name, description, calculation_method, unit, is_system_default, sort_order) VALUES
 ('11111111-1111-1111-1111-111111111111', 'Water Fee', 'Living water expenses', 'reading', 'ton', TRUE, 1),
@@ -308,6 +413,23 @@ INSERT INTO system_configs (id, config_key, config_value, config_type, descripti
 ('33333333-3333-3333-3333-333333333333', 'payment.timeout', '1800', 'number', 'Payment timeout (seconds)', FALSE, '11111111-1111-1111-1111-111111111111');
 
 -- Create indexes
+=======
+-- 插入系统默认费用类型
+INSERT INTO expense_types (id, name, description, calculation_method, unit, is_system_default, sort_order) VALUES
+('11111111-1111-1111-1111-111111111111', '水费', '生活用水费用', 'reading', '吨', TRUE, 1),
+('22222222-2222-2222-2222-222222222222', '电费', '生活用电费用', 'reading', '度', TRUE, 2),
+('33333333-3333-3333-3333-333333333333', '房租', '住房租金', 'amount', '元', TRUE, 3),
+('44444444-4444-4444-4444-444444444444', '网络费', '宽带网络费用', 'amount', '元', TRUE, 4),
+('55555555-5555-5555-5555-555555555555', '燃气费', '厨房燃气费用', 'reading', '立方米', TRUE, 5);
+
+-- 插入系统默认配置
+INSERT INTO system_configs (id, config_key, config_value, config_type, description, is_public, created_by) VALUES
+('11111111-1111-1111-1111-111111111111', 'system.name', '"记账系统"', 'string', '系统名称', TRUE, '11111111-1111-1111-1111-111111111111'),
+('22222222-2222-2222-2222-222222222222', 'system.version', '"1.0.0"', 'string', '系统版本', TRUE, '11111111-1111-1111-1111-111111111111'),
+('33333333-3333-3333-3333-333333333333', 'payment.timeout', '1800', 'number', '支付超时时间(秒)', FALSE, '11111111-1111-1111-1111-111111111111');
+
+-- 创建索引
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);

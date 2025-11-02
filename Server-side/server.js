@@ -4,10 +4,16 @@ const helmet = require('helmet');
 const winston = require('winston');
 const http = require('http');
 
+<<<<<<< HEAD
 // 加载环境变量配置文件
 const path = require('path');
 const env = process.env.NODE_ENV || 'development';
 require('dotenv').config({ path: path.resolve(__dirname, `.env.${env}`) });
+=======
+// 根据环境变量加载对应的环境配置文件
+const env = process.env.NODE_ENV || 'development';
+require('dotenv').config({ path: `.env.${env}` });
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 
 // 导入数据库配置
 const { pool, testConnection } = require('./config/db');
@@ -15,9 +21,12 @@ const { pool, testConnection } = require('./config/db');
 // 导入WebSocket管理器
 const websocketManager = require('./config/websocket');
 
+<<<<<<< HEAD
 // 导入路由
 const userRoutes = require('./routes/user-routes');
 
+=======
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 // 创建Express应用
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -31,6 +40,7 @@ app.use(cors()); // 跨域支持
 app.use(express.json()); // JSON解析
 app.use(express.urlencoded({ extended: true })); // URL编码解析
 
+<<<<<<< HEAD
 // 静态文件服务 - 用于部署前端应用
 app.use(express.static('public'));
 
@@ -45,6 +55,8 @@ app.use(express.static('public'));
 app.use('/client', express.static('../Client application/dist'));
 app.use('/admin', express.static('../Admin panel/dist'));
 
+=======
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 // 创建日志记录器
 const logger = winston.createLogger({
   level: 'info',
@@ -82,9 +94,12 @@ app.get('/health', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // API路由
 app.use('/api/users', userRoutes);
 
+=======
+>>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 // 主页路由
 app.get('/', (req, res) => {
   res.json({

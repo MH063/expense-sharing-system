@@ -12,14 +12,16 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@element-plus/icons-vue": "^2.1.0",
+    "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.4.0",
     "echarts": "^6.0.0",
     "element-plus": "^2.3.8",
+    "js-base64": "^3.7.8",
     "pinia": "^2.1.6",
     "qrcode": "^1.5.3",
     "vue": "^3.3.4",
-    "vue-router": "^4.2.4"
+    "vue-router": "^4.2.4",
+    "vuex": "^4.0.2"
   },
   "devDependencies": {
     "@pinia/testing": "^0.1.3",
@@ -31,8 +33,8 @@
     "eslint": "^8.45.0",
     "eslint-plugin-vue": "^9.15.1",
     "jsdom": "^23.0.0",
-    "vitest": "^0.34.6",
-    "vite": "^4.4.5"
+    "vite": "^4.4.5",
+    "vitest": "^0.34.6"
   },
   "keywords": [
     "vue3",

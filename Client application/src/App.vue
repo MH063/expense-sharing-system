@@ -1,11 +1,24 @@
 <template>
   <div id="app">
-    <router-view />
+    <!-- 根据路由meta信息选择布局 -->
+    <AppLayout v-if="!isAuthPage" />
+    <AuthLayout v-else />
   </div>
 </template>
 
 <script setup>
-// 基础App组件，使用路由视图
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import AppLayout from '@/components/AppLayout.vue'
+import AuthLayout from '@/components/AuthLayout.vue'
+
+// 获取当前路由
+const route = useRoute()
+
+// 判断是否为认证页面
+const isAuthPage = computed(() => {
+  return route.meta.layout === 'auth'
+})
 </script>
 
 <style>

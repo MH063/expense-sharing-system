@@ -1,12 +1,9 @@
 const { Pool } = require('pg');
 
-<<<<<<< HEAD
-=======
 // 根据环境变量加载对应的环境配置文件
 const env = process.env.NODE_ENV || 'development';
 require('dotenv').config({ path: `.env.${env}` });
 
->>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
 // PostgreSQL数据库连接配置
 const dbConfig = {
   host: process.env.DB_HOST,
@@ -26,7 +23,6 @@ const pool = new Pool(dbConfig);
 // 测试数据库连接
 async function testConnection() {
   try {
-<<<<<<< HEAD
     // 调试：检查环境变量是否加载
     console.log('数据库配置检查:', {
       host: process.env.DB_HOST,
@@ -39,20 +35,11 @@ async function testConnection() {
     const client = await pool.connect();
     const result = await client.query('SELECT version()');
     console.log(`PostgreSQL数据库连接成功 (${process.env.NODE_ENV || 'development'} 环境):`, process.env.DB_NAME);
-=======
-    const client = await pool.connect();
-    const result = await client.query('SELECT version()');
-    console.log(`PostgreSQL数据库连接成功 (${env} 环境):`, process.env.DB_NAME);
->>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
     console.log(`PostgreSQL版本:`, result.rows[0].version);
     client.release();
     return true;
   } catch (error) {
-<<<<<<< HEAD
     console.error(`PostgreSQL数据库连接失败 (${process.env.NODE_ENV || 'development'} 环境):`, error.message);
-=======
-    console.error(`PostgreSQL数据库连接失败 (${env} 环境):`, error.message);
->>>>>>> b2ae16c66f4fdccf7304d941685ac589bde1ee08
     return false;
   }
 }

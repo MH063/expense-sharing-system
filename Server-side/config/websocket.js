@@ -71,6 +71,14 @@ class WebSocketManager {
     if (!ws) return;
     
     switch (data.type) {
+      case 'auth':
+        // 处理认证消息
+        this.handleAuth(clientId, data.token);
+        break;
+      case 'heartbeat':
+        // 处理心跳消息
+        this.handleHeartbeat(clientId, data.timestamp);
+        break;
       case 'subscribe':
         // 订阅特定事件
         this.subscribeToEvents(clientId, data.events);
@@ -86,6 +94,59 @@ class WebSocketManager {
           message: `未知的消息类型: ${data.type}`
         }));
     }
+  }
+  
+  // 处理认证消息
+  handleAuth(clientId, token) {
+    const ws = this.clients.get(clientId);
+    if (!ws) return;
+    
+    try {
+      // 验证JWT token
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      
+      // 存储用户信息到客户端连接
+      ws.userId = decoded.sub;
+      ws.username = decoded.username;
+      ws.roles = decoded.roles || [];
+      ws.authenticated = true;
+      
+      this.logger.info(`WebSocket客户端认证成功: ${clientId}, 用户: ${decoded.username}`);
+      
+      // 发送认证成功响应
+      ws.send(JSON.stringify({
+        type: 'auth',
+        success: true,
+        message: '认证成功',
+        userId: decoded.sub,
+        username: decoded.username,
+        timestamp: new Date().toISOString()
+      }));
+    } catch (error) {
+      this.logger.error(`WebSocket认证失败 (${clientId}): ${error.message}`);
+      
+      // 发送认证失败响应
+      ws.send(JSON.stringify({
+        type: 'auth',
+        success: false,
+        message: '认证失败: ' + error.message,
+        timestamp: new Date().toISOString()
+      }));
+    }
+  }
+  
+  // 处理心跳消息
+  handleHeartbeat(clientId, timestamp) {
+    const ws = this.clients.get(clientId);
+    if (!ws) return;
+    
+    // 发送心跳响应
+    ws.send(JSON.stringify({
+      type: 'heartbeat_response',
+      timestamp: timestamp || Date.now(),
+      serverTimestamp: new Date().toISOString()
+    }));
   }
   
   // 订阅事件

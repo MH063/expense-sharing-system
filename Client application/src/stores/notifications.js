@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import websocketClient from '@/utils/websocket-client'
+import { useAuthStore } from '@/stores/auth'
 
 const MAX_NOTIFICATIONS = 50
 
@@ -10,6 +11,7 @@ export const useNotificationStore = defineStore('notifications', () => {
   const channels = ref(new Set())
   const connectionAttempts = ref(0)
   const lastError = ref(null)
+  const isReconnecting = ref(false)
 
   const orderedNotifications = computed(() => notifications.value)
   const unreadCount = computed(() => orderedNotifications.value.filter(item => !item.read).length)
@@ -39,6 +41,10 @@ export const useNotificationStore = defineStore('notifications', () => {
     })
   }
 
+  const markAllAsRead = () => {
+    notifications.value = notifications.value.map(item => ({ ...item, read: true }))
+  }
+
   const clearAll = () => {
     notifications.value = []
   }
@@ -48,11 +54,17 @@ export const useNotificationStore = defineStore('notifications', () => {
       return
     }
 
+    const authStore = useAuthStore()
+
     try {
+      // WebSocket连接事件处理
       websocketClient.on('connected', () => {
         isConnected.value = true
         connectionAttempts.value = 0
         lastError.value = null
+        isReconnecting.value = false
+        
+        // 重新订阅之前订阅的事件
         if (channels.value.size > 0) {
           websocketClient.subscribe([...channels.value])
         }
@@ -60,6 +72,15 @@ export const useNotificationStore = defineStore('notifications', () => {
 
       websocketClient.on('disconnected', () => {
         isConnected.value = false
+      })
+
+      websocketClient.on('reconnecting', () => {
+        isReconnecting.value = true
+      })
+
+      websocketClient.on('reconnect_failed', () => {
+        isReconnecting.value = false
+        lastError.value = new Error('WebSocket重连失败，已达到最大重试次数')
       })
 
       websocketClient.on('error', (error) => {
@@ -97,7 +118,12 @@ export const useNotificationStore = defineStore('notifications', () => {
         })
       })
 
-      websocketClient.connect()
+      // 使用认证令牌连接WebSocket
+      websocketClient.connect(authStore.accessToken).catch(error => {
+        console.error('WebSocket连接失败:', error)
+        lastError.value = error
+        connectionAttempts.value += 1
+      })
     } catch (error) {
       lastError.value = error
       connectionAttempts.value += 1
@@ -107,6 +133,7 @@ export const useNotificationStore = defineStore('notifications', () => {
   const disconnect = () => {
     websocketClient.disconnect()
     isConnected.value = false
+    isReconnecting.value = false
   }
 
   const subscribeChannels = (newChannels) => {
@@ -125,18 +152,32 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
+  const retryConnection = () => {
+    const authStore = useAuthStore()
+    connectionAttempts.value = 0
+    lastError.value = null
+    websocketClient.connect(authStore.accessToken).catch(error => {
+      console.error('WebSocket重连失败:', error)
+      lastError.value = error
+      connectionAttempts.value += 1
+    })
+  }
+
   return {
     isConnected,
     notifications,
     orderedNotifications,
     unreadCount,
     lastError,
+    isReconnecting,
     connect,
     disconnect,
     addNotification,
     markAsRead,
+    markAllAsRead,
     clearAll,
     subscribeChannels,
-    unsubscribeChannels
+    unsubscribeChannels,
+    retryConnection
   }
 })

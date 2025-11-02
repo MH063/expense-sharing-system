@@ -6,15 +6,15 @@
   "scripts": {
     "install:all": "npm run install:server && npm run install:client && npm run install:admin",
     "install:server": "cd Server-side && npm install",
-    "install:client": "cd Client\ application && npm install",
-    "install:admin": "cd Admin\ panel && npm install",
+    "install:client": "cd \"Client application\" && npm install",
+    "install:admin": "cd \"Admin panel\" && npm install",
     "build:all": "npm run build:client && npm run build:admin",
-    "build:client": "cd Client\ application && npm run build",
-    "build:admin": "cd Admin\ panel && npm run build",
+    "build:client": "cd \"Client application\" && npm run build",
+    "build:admin": "cd \"Admin panel\" && npm run build",
     "start:prod": "cd Server-side && npm run prod",
     "zeabur:init": "cd Server-side && npm run zeabur:init",
     "zeabur:deploy": "npm run zeabur:init && npm run start:prod",
-    "dev": "concurrently \"cd Server-side && npm run dev\" \"cd Client\ application && npm run dev\" \"cd Admin\ panel && npm run dev\""
+    "dev": "concurrently \"cd Server-side && npm run dev\" \"cd \"Client application\" && npm run dev\" \"cd \"Admin panel\" && npm run dev\""
   },
   "devDependencies": {
     "codebuddy": "^1.0.0",

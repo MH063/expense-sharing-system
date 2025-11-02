@@ -4,7 +4,7 @@ import NotFound from '@/views/NotFound.vue'
 import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
 import Profile from '@/views/auth/Profile.vue'
-import Notifications from '@/views/notifications/NotificationCenter.vue'
+import Notifications from '@/views/NotificationsPage.vue'
 import RoomDashboard from '@/views/rooms/RoomDashboard.vue'
 import RoomDetail from '@/views/rooms/RoomDetail.vue'
 import RoomInvitations from '@/views/rooms/RoomInvitations.vue'
@@ -14,13 +14,18 @@ import ExpenseCreate from '@/views/expenses/ExpenseCreate.vue'
 import BillDashboard from '@/views/bills/BillDashboard.vue'
 import BillDetail from '@/views/bills/BillDetail.vue'
 import BillPayment from '@/views/bills/BillPayment.vue'
+import BillList from '@/views/bills/BillList.vue'
+import BillForm from '@/views/bills/BillForm.vue'
 import ReviewDashboard from '@/views/reviews/ReviewDashboard.vue'
 import ReviewDetail from '@/views/reviews/ReviewDetail.vue'
 import DisputeDashboard from '@/views/disputes/DisputeDashboard.vue'
 import DisputeDetail from '@/views/disputes/DisputeDetail.vue'
 import AnalyticsDashboard from '@/views/analytics/AnalyticsDashboard.vue'
 import Forbidden from '@/views/Forbidden.vue'
+import PermissionTest from '@/views/admin/PermissionTest.vue'
 import { createAuthGuard } from './guards'
+import { createPermissionGuard } from './permissionGuard'
+import { PERMISSIONS, ROLES } from '@/utils/permissions'
 
 const routes = [
   {
@@ -32,129 +37,224 @@ const routes = [
     path: '/auth/login',
     name: 'Login',
     component: Login,
-    meta: { layout: 'auth' }
+    meta: { 
+      layout: 'auth',
+      requiresGuest: true // 只有未登录用户可以访问
+    }
   },
   {
     path: '/auth/register',
     name: 'Register',
     component: Register,
-    meta: { layout: 'auth' }
+    meta: { 
+      layout: 'auth',
+      requiresGuest: true // 只有未登录用户可以访问
+    }
   },
   {
     path: '/profile',
     name: 'Profile',
     component: Profile,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.PROFILE_VIEW
+    }
   },
   {
     path: '/notifications',
     name: 'Notifications',
     component: Notifications,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true
+    }
   },
   {
     path: '/rooms',
     name: 'RoomDashboard',
     component: RoomDashboard,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.ROOM_VIEW
+    }
   },
   {
     path: '/rooms/:roomId',
     name: 'RoomDetail',
     component: RoomDetail,
-    meta: { requiresAuth: true },
+    meta: { 
+      requiresAuth: true,
+      requiresRoomPermission: PERMISSIONS.ROOM_VIEW
+    },
     props: true
   },
   {
     path: '/rooms/:roomId/invitations',
     name: 'RoomInvitations',
     component: RoomInvitations,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresRoomPermission: PERMISSIONS.ROOM_INVITE
+    }
   },
   {
     path: '/expenses',
     name: 'ExpenseDashboard',
     component: ExpenseDashboard,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.EXPENSE_VIEW
+    }
   },
   {
     path: '/expenses/create',
     name: 'ExpenseCreate',
     component: ExpenseCreate,
-qମ meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.EXPENSE_CREATE
+    }
   },
   {
     path: '/expenses/:expenseId',
     name: 'ExpenseDetail',
     component: ExpenseDetail,
-    meta: { requiresAuth: true },
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.EXPENSE_VIEW
+    },
     props: true
   },
   {
     path: '/bills',
     name: 'BillDashboard',
     component: BillDashboard,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_VIEW
+    }
+  },
+  {
+    path: '/bills/list',
+    name: 'BillList',
+    component: BillList,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_VIEW
+    }
+  },
+  {
+    path: '/bills/create',
+    name: 'BillCreate',
+    component: BillForm,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_CREATE
+    }
   },
   {
     path: '/bills/:billId',
     name: 'BillDetail',
     component: BillDetail,
-    meta: { requiresAuth: true },
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_VIEW
+    },
+    props: true
+  },
+  {
+    path: '/bills/:billId/edit',
+    name: 'BillEdit',
+    component: BillForm,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_EDIT
+    },
     props: true
   },
   {
     path: '/bills/:billId/payment',
     name: 'BillPayment',
     component: BillPayment,
-    meta: { requiresAuth: true },
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_PAY
+    },
     props: true
   },
   {
     path: '/reviews',
     name: 'ReviewDashboard',
     component: ReviewDashboard,
-    meta: { requiresAuth: true, allowedRoles: ['admin', 'room_leader', 'payer'] }
+    meta: { 
+      requiresAuth: true, 
+      requiresRole: [ROLES.ADMIN, ROLES.ROOM_OWNER]
+    }
   },
   {
     path: '/reviews/:reviewId',
     name: 'ReviewDetail',
     component: ReviewDetail,
-    meta: { requiresAuth: true, allowedRoles: ['admin', 'room_leader', 'payer'] },
+    meta: { 
+      requiresAuth: true, 
+      requiresRole: [ROLES.ADMIN, ROLES.ROOM_OWNER]
+    },
     props: true
   },
   {
     path: '/disputes',
     name: 'DisputeDashboard',
     component: DisputeDashboard,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.EXPENSE_VIEW
+    }
   },
   {
     path: '/disputes/:disputeId',
     name: 'DisputeDetail',
     component: DisputeDetail,
-    meta: { requiresAuth: true },
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.EXPENSE_VIEW
+    },
     props: true
   },
   {
     path: '/analytics',
     name: 'AnalyticsDashboard',
     component: AnalyticsDashboard,
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.EXPENSE_VIEW
+    }
+  },
+  {
+    path: '/admin/permissions',
+    name: 'PermissionTest',
+    component: PermissionTest,
+    meta: {
+      title: '权限测试',
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.SYSTEM_ADMIN
+    }
   },
   {
     path: '/403',
     name: 'Forbidden',
-    component: Forbidden
-  },
-  {
-    path: '/404',
-    name: 'NotFound',
-    component: NotFound
+    component: Forbidden,
+    meta: {
+      title: '访问被拒绝',
+      requiresAuth: false
+    }
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/404'
+    name: 'NotFound',
+    component: NotFound,
+    meta: {
+      title: '页面未找到',
+      requiresAuth: false
+    }
   }
 ]
 
@@ -163,6 +263,22 @@ const router = createRouter({
   routes
 })
 
+// 设置路由守卫的store
+let authStore = null
+
+export function setRouterStore(store) {
+  authStore = store
+}
+
+// 创建认证守卫
 createAuthGuard(router)
+
+// 创建权限守卫
+createPermissionGuard(router, authStore)
+
+// 导出获取当前store的方法
+export function getCurrentAuthStore() {
+  return authStore
+}
 
 export default router

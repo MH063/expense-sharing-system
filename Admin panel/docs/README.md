@@ -146,10 +146,10 @@ npm run init:proddb
 
 ## 技术栈
 
-- **前端**: Vue 3.3.4 + Composition API + Element Plus 2.3.8 + Vite
+- **前端**: Vue 3.3.4 + Composition API + Element Plus 2.3.8 + Vite 4.4.5
 - **后端**: Node.js + Express + PostgreSQL + Redis
 - **数据库**: PostgreSQL 13.0+ (主数据库), Redis 6.0+ (缓存数据库)
-- **实时通信**: WebSocket
+- **实时通信**: WebSocket (Socket.IO)
 - **构建工具**: Vite + ESLint + Prettier
 - **部署平台**: Zeabur
 

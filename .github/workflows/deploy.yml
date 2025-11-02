@@ -1,0 +1,50 @@
+name: Deploy to Zeabur
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: Server-side/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd Server-side
+        npm ci
+    
+    - name: Run tests
+      run: |
+        cd Server-side
+        npm test
+      env:
+        NODE_ENV: test
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Deploy to Zeabur
+      run: |
+        npm install -g @zeabur/cli
+        zeabur deploy
+      env:
+        ZEABUR_TOKEN: ${{ secrets.ZEABUR_TOKEN }}

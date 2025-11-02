@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd Server-side && npm install",
+  "outputDirectory": "Server-side",
+  "installCommand": "cd Server-side && npm install",
+  "startCommand": "cd Server-side && npm start"
+}

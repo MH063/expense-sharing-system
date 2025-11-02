@@ -1,0 +1,44 @@
+{
+  "name": "expense-sharing-system",
+  "version": "1.0.0",
+  "description": "寝室费用分摊记账系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "cross-env NODE_ENV=development nodemon server.js",
+    "prod": "cross-env NODE_ENV=production node server.js",
+    "test": "cross-env NODE_ENV=development mocha tests/**/*.test.js",
+    "init:testdb": "psql -U postgres -d test_expense_system -f scripts/init-test-database.sql",
+    "init:proddb": "psql -U postgres -d prod_expense_system -f scripts/init-prod-database.sql",
+    "zeabur:init": "node scripts/zeabur-init.js",
+    "zeabur:deploy": "npm run zeabur:init && npm start"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.0.0",
+    "jsonwebtoken": "^9.0.1",
+    "multer": "^2.0.2",
+    "pg": "^8.11.3",
+    "redis": "^4.6.7",
+    "winston": "^3.10.0",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "cross-env": "^10.1.0",
+    "mocha": "^10.2.0",
+    "nodemon": "^3.0.1",
+    "supertest": "^6.3.3"
+  },
+  "keywords": [
+    "expense",
+    "sharing",
+    "dormitory",
+    "accounting"
+  ],
+  "author": "Expense Sharing System Team",
+  "license": "MIT"
+}

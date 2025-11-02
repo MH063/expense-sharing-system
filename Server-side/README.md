@@ -19,8 +19,8 @@
 
 - **运行环境**: Node.js 16.x+
 - **Web框架**: Express.js
-- **数据库**: MySQL 8.0+
-- **缓存**: Redis (可选)
+- **数据库**: PostgreSQL 14+
+- **缓存**: Redis 6+ (可选)
 - **认证**: JWT (JSON Web Tokens)
 - **实时通信**: Socket.IO
 - **测试框架**: Jest
@@ -98,7 +98,7 @@ Server-side/
 
 - Node.js 16.x 或更高版本
 - npm 8.x 或更高版本
-- MySQL 8.0 或更高版本
+- PostgreSQL 14+ 或更高版本
 - Redis 6.0 或更高版本 (可选)
 
 ### 安装步骤
@@ -123,12 +123,12 @@ cp .env.example .env
 
 4. 创建数据库
 ```sql
-CREATE DATABASE room_expense_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE room_expense_db;
 ```
 
 5. 导入数据库结构
 ```bash
-mysql -u your_username -p room_expense_db < database/schema.sql
+psql -U your_username -d room_expense_db -f database/schema.sql
 ```
 
 6. 启动服务器

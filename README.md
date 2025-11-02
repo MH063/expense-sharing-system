@@ -1,14 +1,18 @@
 # 寝室费用分摊记账系统
 
-一个简单易用的寝室费用分摊记账系统，帮助室友间公平分摊日常开销。
+一个基于Node.js + Express + PostgreSQL + React的现代化寝室费用分摊记账系统，帮助室友间公平分摊日常开销。
 
 ## 🚀 功能特性
 
 - ✅ 用户注册与登录
-- ✅ 费用记录与管理
-- ✅ 费用分摊计算
-- ✅ 实时通知提醒
+- ✅ 寝室创建与管理
+- ✅ 费用记录与分类管理
+- ✅ 多种费用分摊方式（平均、自定义、百分比）
+- ✅ 账单生成与支付确认
+- ✅ 实时通知提醒（WebSocket）
+- ✅ 费用统计与趋势分析
 - ✅ 多设备同步
+- ✅ 响应式设计，支持移动端
 
 ## 🛠️ 技术栈
 
@@ -17,36 +21,73 @@
 - PostgreSQL 数据库
 - JWT 身份认证
 - WebSocket 实时通信
+- Jest 测试框架
 
 ### 前端
 - React + Vite
 - 响应式设计
 - 现代化UI界面
 
+### 管理后台
+- Vue.js
+- Element Plus UI组件库
+
 ## 📦 快速开始
 
 ### 环境要求
-- Node.js 18+
+- Node.js 16+
 - PostgreSQL 14+
+- Redis 6+ (可选)
 
 ### 本地开发
 
 1. 克隆项目
 ```bash
-git clone https://github.com/your-username/expense-sharing-system.git
+git clone https://github.com/MH063/expense-sharing-system.git
 cd expense-sharing-system
 ```
 
-2. 安装依赖
+2. 安装后端依赖
 ```bash
 cd Server-side
 npm install
 ```
 
-3. 配置环境变量
-复制 `.env.example` 为 `.env` 并配置数据库连接
+3. 配置后端环境变量
+```bash
+cp .env.development.example .env.development
+```
+编辑 `.env.development` 文件，配置数据库连接和其他环境变量。
 
-4. 启动服务
+4. 初始化数据库
+```bash
+psql -U postgres -c "CREATE DATABASE test_expense_system;"
+psql -U postgres -d test_expense_system -f scripts/init-test-database.sql
+```
+
+5. 启动后端服务
+```bash
+npm run dev
+```
+
+6. 安装前端依赖
+```bash
+cd ../Client\ application
+npm install
+```
+
+7. 启动前端应用
+```bash
+npm run dev
+```
+
+8. 安装管理后台依赖（可选）
+```bash
+cd ../Admin\ panel
+npm install
+```
+
+9. 启动管理后台
 ```bash
 npm run dev
 ```
@@ -67,8 +108,22 @@ npm run dev
 ```
 记账系统/
 ├── Server-side/          # 后端服务
-├── Client application/    # 前端应用
+│   ├── controllers/      # 控制器
+│   ├── routes/          # 路由
+│   ├── middleware/      # 中间件
+│   ├── config/          # 配置文件
+│   ├── services/        # 业务逻辑服务
+│   └── tests/           # 测试文件
+├── Client application/   # 前端应用
+│   ├── src/
+│   │   ├── components/  # 组件
+│   │   ├── views/       # 页面
+│   │   ├── api/         # API调用
+│   │   └── store/       # 状态管理
 ├── Admin panel/          # 管理后台
+│   └── src/
+│       ├── views/       # 页面
+│       └── components/  # 组件
 └── .github/workflows/    # CI/CD配置
 ```
 
@@ -79,9 +134,17 @@ npm run dev
 
 ## 📄 文档
 
-- [API文档](./docs/api.md)
-- [部署指南](./docs/deployment.md)
-- [用户手册](./docs/user-guide.md)
+- [API文档](./Server-side/docs/API.md)
+- [部署指南](./Server-side/docs/DEPLOYMENT.md)
+- [技术问题记录](./Server-side/docs/TECHNICAL_ISSUES.md)
+
+## 🧪 测试
+
+运行测试：
+```bash
+cd Server-side
+npm test
+```
 
 ## 🤝 贡献
 
@@ -98,3 +161,5 @@ MIT License
 - React
 - Vite
 - PostgreSQL
+- Vue.js
+- Element Plus

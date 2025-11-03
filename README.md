@@ -266,6 +266,25 @@ expense-sharing-system/
 - `GET /api/stats/expenses` - 获取费用统计
 - `GET /api/stats/users` - 获取用户统计
 
+#### 收款码管理（已实现）
+- `POST /api/qr-codes/upload` - 上传收款码（表单字段：qr_image；Body 字段：qr_type=wechat|alipay）
+- `GET /api/qr-codes` - 获取当前用户的收款码列表
+- `PATCH /api/qr-codes/:id/status` - 激活/停用收款码（Body：{ is_active: true|false }）
+- `PATCH /api/qr-codes/:id/default` - 设置默认收款码
+- `GET /api/qr-codes/default?qr_type=wechat|alipay` - 获取默认收款码
+- `DELETE /api/qr-codes/:id` - 删除收款码
+
+#### 支付流程（已实现，含离线支付能力）
+- `GET /api/payments/bills/:billId/qr-code?qr_type=wechat|alipay` - 获取账单收款码与支付信息
+- `POST /api/payments/bills/:billId/confirm` - 付款人确认支付（Body：{ payment_method, transaction_id, payment_time }）
+- `GET /api/payments/bills/:billId/status` - 查询账单支付状态
+- `POST /api/payments/offline` - 创建离线支付记录
+- `POST /api/payments/:paymentId/sync` - 同步离线支付凭证
+- `GET /api/payments/offline` - 获取用户离线支付记录
+- `GET /api/payments/offline/pending-sync` - 获取待同步的离线支付
+- `PATCH /api/payments/:paymentId/sync-failed` - 标记离线支付同步失败
+- `POST /api/payments/:paymentId/retry-sync` - 重试同步失败的离线支付
+
 ### 数据库设计
 
 #### 主要表结构

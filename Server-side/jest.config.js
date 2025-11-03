@@ -1,20 +1,11 @@
 module.exports = {
   testEnvironment: 'node',
-  roots: ['<rootDir>/tests'],
-  testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
-  collectCoverageFrom: [
-    'controllers/**/*.js',
-    'middleware/**/*.js',
-    'routes/**/*.js',
-    'services/**/*.js',
-    '!**/node_modules/**',
-    '!**/tests/**'
-  ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  // 确保在测试文件加载前就把 .env.test 注入 process.env
+  setupFiles: ['<rootDir>/tests/setup/load-env.js'],
+  // 然后在测试生命周期中做真实数据库的初始化/清理
   setupFilesAfterEnv: ['<rootDir>/tests/setup/jest.setup.js'],
-  testTimeout: 30000,
+  testMatch: ['<rootDir>/tests/**/*.test.js'],
   verbose: true,
-  // 确保在测试前加载环境变量
-  setupFiles: ['<rootDir>/tests/setup/load-env.js']
+  maxWorkers: 1, // 串行，避免连接池竞争
+  testTimeout: 30000,
 };

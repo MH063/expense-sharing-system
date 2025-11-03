@@ -9,6 +9,9 @@ router.post('/', authenticateToken, roomController.createRoom);
 // 获取寝室列表
 router.get('/', authenticateToken, roomController.getRooms);
 
+// 获取用户所属的寝室列表
+router.get('/my-rooms', authenticateToken, roomController.getMyRooms);
+
 // 获取寝室详情
 router.get('/:id', authenticateToken, roomController.getRoomById);
 

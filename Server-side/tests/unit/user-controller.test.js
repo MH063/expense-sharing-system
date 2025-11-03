@@ -7,17 +7,8 @@ const jwt = require('jsonwebtoken');
 const { register, login, refreshToken, getProfile, updateProfile, changePassword, getUsers, assignUserRole } = UserController;
 
 // 模拟数据库连接
-jest.mock('pg', () => {
-  const mockPool = {
-    query: jest.fn(),
-    connect: jest.fn(),
-    end: jest.fn()
-  };
-  
-  return {
-    Pool: jest.fn(() => mockPool)
-  };
-});
+// 强制使用真实数据库，禁止 mock pg
+// jest.mock('pg', ...) 已移除
 
 // 模拟bcrypt
 jest.mock('bcryptjs', () => ({
@@ -244,7 +235,7 @@ describe('UserController单元测试', () => {
           id: 1,
           username: 'testuser',
           email: 'test@example.com',
-          password_hash: 'hashedPassword',
+          password: 'hashedPassword',
           name: 'Test User'
         }]
       });
@@ -347,11 +338,11 @@ describe('UserController单元测试', () => {
       
       // 模拟数据库查询结果 - 用户存在
       mockPool.query.mockResolvedValueOnce({
-        rows: [{
-          id: 1,
-          username: 'testuser',
-          password_hash: 'hashedPassword'
-        }]
+       rows: [{
+            id: 1,
+            username: 'testuser',
+            password: 'hashedPassword'
+          }]
       });
       
       // 模拟密码验证失败
@@ -623,7 +614,7 @@ describe('UserController单元测试', () => {
       // 模拟数据库查询结果
       mockPool.query
         .mockResolvedValueOnce({
-          rows: [{ id: 1, password_hash: 'hashedCurrentPassword' }]
+          rows: [{ id: 1, password: 'hashedCurrentPassword' }]
         }) // 获取用户当前密码
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // 更新密码成功
       
@@ -662,7 +653,7 @@ describe('UserController单元测试', () => {
       
       // 模拟数据库查询结果
       mockPool.query.mockResolvedValueOnce({
-        rows: [{ id: 1, password_hash: 'hashedCurrentPassword' }]
+        rows: [{ id: 1, password: 'hashedCurrentPassword' }]
       });
       
       // 模拟密码验证失败

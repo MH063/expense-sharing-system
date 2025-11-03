@@ -277,3 +277,6 @@ export const expenseApi = {
   uploadExpenseReceipt,
   deleteExpenseReceipt
 }
+
+// 导出expensesApi对象
+export const expensesApi = expenseApi;

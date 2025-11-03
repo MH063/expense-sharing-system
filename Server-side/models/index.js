@@ -4,6 +4,12 @@
  */
 
 const { Sequelize, DataTypes } = require('sequelize');
+const path = require('path');
+
+// 确保环境变量已加载
+const env = process.env.NODE_ENV || 'development';
+require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
+
 const sequelize = require('../config/database');
 
 // 定义用户模型

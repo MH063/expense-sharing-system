@@ -73,7 +73,7 @@ class RoomController {
         // 更新创建者的角色为寝室长
         await client.query(
           'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
-          ['room_owner', creatorId]
+          ['寝室长', creatorId]
         );
 
         await client.query('COMMIT');
@@ -172,6 +172,44 @@ class RoomController {
 
     } catch (error) {
       logger.error('获取寝室列表失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '服务器内部错误'
+      });
+    }
+  }
+
+  // 获取用户所属的寝室列表
+  async getMyRooms(req, res) {
+    try {
+      const userId = req.user.sub; // 从认证中间件获取用户ID
+
+      // 查询用户所属的寝室
+      const roomsQuery = `
+        SELECT r.id, r.name, r.description, r.code, r.max_members, r.status, r.created_at,
+               u.username as creator_username, u.name as creator_name,
+               urr.relation_type as user_relation_type,
+               (SELECT COUNT(*) FROM user_room_relations urr2 WHERE urr2.room_id = r.id AND urr2.is_active = TRUE) as current_members
+        FROM rooms r
+        JOIN users u ON r.creator_id = u.id
+        JOIN user_room_relations urr ON r.id = urr.room_id
+        WHERE urr.user_id = $1 AND urr.is_active = TRUE
+        ORDER BY urr.join_date
+      `;
+
+      const roomsResult = await pool.query(roomsQuery, [userId]);
+      const rooms = roomsResult.rows;
+
+      logger.info(`获取用户寝室列表成功，用户ID: ${userId}, 共 ${rooms.length} 条记录`);
+
+      res.status(200).json({
+        success: true,
+        message: '获取用户寝室列表成功',
+        data: rooms
+      });
+
+    } catch (error) {
+      logger.error('获取用户寝室列表失败:', error);
       res.status(500).json({
         success: false,
         message: '服务器内部错误'

@@ -310,6 +310,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ElMessage } from 'element-plus'
+import billAPI from '@/api/bill-api'
 
 // 路由和状态管理
 const router = useRouter()
@@ -323,6 +325,7 @@ const showParticipantSelector = ref(false)
 const showReceiptModal = ref(false)
 const participantSearchQuery = ref('')
 const fileInput = ref(null)
+const uploading = ref(false)
 
 // 表单数据
 const form = ref({
@@ -332,6 +335,7 @@ const form = ref({
   dueDate: '',
   description: '',
   receipt: '',
+  receipt_url: '', // 用于存储后端返回的URL
   splitType: 'equal',
   participants: []
 })
@@ -396,13 +400,13 @@ const handleFileChange = (event) => {
   
   // 检查文件类型
   if (!file.type.startsWith('image/')) {
-    alert('请选择图片文件')
+    ElMessage.error('请选择图片文件')
     return
   }
   
   // 检查文件大小（限制为5MB）
   if (file.size > 5 * 1024 * 1024) {
-    alert('图片大小不能超过5MB')
+    ElMessage.error('图片大小不能超过5MB')
     return
   }
   
@@ -412,6 +416,9 @@ const handleFileChange = (event) => {
     form.value.receipt = e.target.result
   }
   reader.readAsDataURL(file)
+  
+  // 上传收据到后端
+  uploadReceipt(event)
 }
 
 const viewReceipt = () => {
@@ -420,6 +427,7 @@ const viewReceipt = () => {
 
 const removeReceipt = () => {
   form.value.receipt = ''
+  form.value.receipt_url = ''
 }
 
 const isParticipantSelected = (participantId) => {
@@ -524,39 +532,46 @@ const handleSubmit = async () => {
       category: form.value.category,
       dueDate: form.value.dueDate,
       description: form.value.description,
-      receipt: form.value.receipt,
-      splitType: form.value.splitType,
+      receipt_url: form.value.receipt_url, // 使用后端返回的URL
+      split_type: form.value.splitType, // 使用下划线命名以匹配后端
       participants: selectedParticipants.value.map(participant => ({
-        id: participant.id,
-        name: participant.name,
+        user_id: participant.id, // 使用下划线命名以匹配后端
         share: form.value.splitType === 'equal' 
           ? getParticipantShare(participant)
           : parseFloat(participant.customShare || 0)
       }))
     }
     
+    let response;
     if (isEditing.value) {
       // 编辑账单
-      // await api.updateBill(route.params.id, billData)
-      console.log('更新账单:', billData)
+      response = await billAPI.updateBill(route.params.id, billData)
+      console.log('更新账单:', response)
     } else {
       // 创建账单
-      // await api.createBill(billData)
-      console.log('创建账单:', billData)
+      response = await billAPI.createBill(billData)
+      console.log('创建账单:', response)
     }
     
-    // 跳转到账单详情页
-    if (isEditing.value) {
-      router.push(`/bills/${route.params.id}`)
+    // 检查响应是否成功
+    if (response.success) {
+      ElMessage.success(isEditing.value ? '账单更新成功' : '账单创建成功')
+      
+      // 跳转到账单详情页
+      if (isEditing.value) {
+        router.push(`/bills/${route.params.id}`)
+      } else {
+        // 使用返回的账单ID
+        const newBillId = response.data.id || `bill-${Date.now()}`
+        router.push(`/bills/${newBillId}`)
+      }
     } else {
-      // 模拟返回的账单ID
-      const newBillId = `bill-${Date.now()}`
-      router.push(`/bills/${newBillId}`)
+      ElMessage.error(response.message || '操作失败')
     }
     
   } catch (error) {
     console.error('保存账单失败:', error)
-    // 显示错误提示
+    ElMessage.error('保存账单失败，请稍后再试')
   } finally {
     isSubmitting.value = false
   }
@@ -566,63 +581,82 @@ const loadBillDetail = async () => {
   if (!isEditing.value) return
   
   try {
-    // const bill = await api.getBill(route.params.id)
+    const response = await billAPI.getBillById(route.params.id)
     
-    // 模拟账单详情数据
-    const bill = {
-      id: route.params.id,
-      title: '11月水电费',
-      amount: 156.50,
-      category: 'utilities',
-      dueDate: '2023-11-30',
-      status: 'pending',
-      creatorId: 'user-1',
-      creatorName: '张三',
-      description: '11月份的水电费账单，包含水费和电费',
-      receipt: 'https://picsum.photos/seed/bill123/400/600.jpg',
-      splitType: 'equal',
-      participants: [
-        {
-          id: 'user-1',
-          name: '张三',
-          share: 52.17
-        },
-        {
-          id: 'user-2',
-          name: '李四',
-          share: 52.17
-        },
-        {
-          id: 'user-3',
-          name: '王五',
-          share: 52.16
-        }
-      ]
+    if (response.success) {
+      const bill = response.data
+      
+      // 填充表单
+      form.value = {
+        title: bill.title,
+        amount: bill.amount.toString(),
+        category: bill.category,
+        dueDate: bill.due_date, // 使用下划线命名以匹配后端
+        description: bill.description || '',
+        receipt: bill.receipt_url || '', // 使用后端返回的URL
+        receipt_url: bill.receipt_url || '',
+        splitType: bill.split_type || 'equal', // 使用下划线命名以匹配后端
+        participants: []
+      }
+      
+      // 设置参与者
+      selectedParticipants.value = bill.participants.map(p => ({
+        id: p.user_id, // 使用下划线命名以匹配后端
+        name: p.user_name,
+        customShare: p.share.toString()
+      }))
+      
+      // 初始化临时选中的参与者
+      tempSelectedParticipants.value = [...selectedParticipants.value]
+    } else {
+      ElMessage.error(response.message || '加载账单详情失败')
     }
-    
-    // 填充表单
-    form.value = {
-      title: bill.title,
-      amount: bill.amount.toString(),
-      category: bill.category,
-      dueDate: bill.dueDate,
-      description: bill.description,
-      receipt: bill.receipt,
-      splitType: bill.splitType,
-      participants: []
-    }
-    
-    // 设置参与者
-    selectedParticipants.value = bill.participants.map(p => ({
-      ...p,
-      customShare: p.share.toString()
-    }))
     
   } catch (error) {
     console.error('加载账单详情失败:', error)
-    // 显示错误提示
+    ElMessage.error('加载账单详情失败，请稍后再试')
   }
 }
+
+// 上传收据
+const uploadReceipt = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // 检查文件大小 (5MB限制)
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('文件大小不能超过5MB');
+    return;
+  }
+
+  // 检查文件类型
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+  if (!allowedTypes.includes(file.type)) {
+    ElMessage.error('只支持JPG、PNG、GIF图片和PDF文件');
+    return;
+  }
+
+  try {
+    uploading.value = true;
+    const formData = new FormData();
+    formData.append('receipt', file);
+
+    // 调用后端API上传收据
+    const response = await billAPI.uploadReceipt(formData);
+    
+    if (response.success) {
+      form.value.receipt_url = response.data.fileUrl;
+      ElMessage.success('收据上传成功');
+    } else {
+      ElMessage.error(response.message || '上传失败');
+    }
+  } catch (error) {
+    console.error('上传收据失败:', error);
+    ElMessage.error('上传收据失败');
+  } finally {
+    uploading.value = false;
+  }
+};
 
 // 监听器
 watch(() => form.value.splitType, (newType) => {
@@ -693,6 +727,13 @@ onMounted(() => {
   font-weight: 600;
   color: #333;
   margin: 0;
+  flex: 1;
+}
+
+.auto-save-status {
+  font-size: 14px;
+  color: #4caf50;
+  font-weight: 500;
 }
 
 .form-content {
@@ -716,6 +757,12 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
+.form-group.has-error input,
+.form-group.has-error select,
+.form-group.has-error textarea {
+  border-color: #f44336;
+}
+
 .form-group label {
   display: block;
   font-size: 16px;
@@ -734,6 +781,7 @@ onMounted(() => {
   font-size: 16px;
   color: #333;
   background-color: white;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .form-group input:focus,
@@ -745,7 +793,7 @@ onMounted(() => {
 }
 
 .error-message {
-  color: #d32f2f;
+  color: #f44336;
   font-size: 14px;
   margin-top: 4px;
 }
@@ -998,7 +1046,7 @@ onMounted(() => {
 
 .remove-participant-button:hover {
   background-color: #ffebee;
-  color: #d32f2f;
+  color: #f44336;
 }
 
 .custom-share-summary {
@@ -1016,7 +1064,7 @@ onMounted(() => {
 }
 
 .summary-row.error {
-  color: #d32f2f;
+  color: #f44336;
 }
 
 .summary-label {
@@ -1031,7 +1079,7 @@ onMounted(() => {
 }
 
 .summary-value.error {
-  color: #d32f2f;
+  color: #f44336;
 }
 
 .form-actions {

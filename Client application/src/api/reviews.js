@@ -183,3 +183,6 @@ export const reviewApi = {
     })
   }
 }
+
+// 导出reviewsApi对象
+export const reviewsApi = reviewApi;

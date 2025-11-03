@@ -290,7 +290,6 @@ onMounted(() => {
   paymentManager.value = new PaymentFlowManager();
 });
 </script>
-</script>
 
 <style scoped>
 .payment-modal {

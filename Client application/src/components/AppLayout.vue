@@ -127,52 +127,39 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useStore } from 'vuex'
 import { useAuthStore } from '@/stores/auth'
 import NotificationsContainer from '@/components/NotificationsContainer.vue'
 
 // 响应式数据
 const showUserMenu = ref(false)
 const authStore = useAuthStore()
-const store = useStore()
 const router = useRouter()
 
 // 计算属性
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const currentUser = computed(() => authStore.currentUser)
-const currentRole = computed(() => store.getters['permissions/currentRole'])
+const currentRole = computed(() => authStore.roles?.[0] || 'guest')
 const userAvatar = computed(() => {
   return currentUser.value?.avatar || `https://picsum.photos/seed/${currentUser.value?.id || 'default'}/40/40.jpg`
 })
 const userRoleText = computed(() => {
-  // 使用权限模块的角色信息
-  if (currentRole.value) {
-    const roleMap = {
-      'admin': '管理员',
-      'room_owner': '寝室长',
-      'room_member': '寝室成员',
-      'guest': '访客'
-    }
-    return roleMap[currentRole.value] || '未知角色'
-  }
-  
-  // 回退到原始角色信息
-  if (!currentUser.value?.roles || currentUser.value.roles.length === 0) {
-    return '普通用户'
-  }
-  
+  // 使用认证store的角色信息
+  const role = currentRole.value
   const roleMap = {
     'admin': '管理员',
+    'room_owner': '寝室长',
+    'room_member': '寝室成员',
+    'guest': '访客',
     'dormitory_admin': '寝室管理员',
     'user': '普通用户'
   }
   
-  return currentUser.value.roles.map(role => roleMap[role] || role).join(', ')
+  return roleMap[role] || '未知角色'
 })
 
 // 权限检查
 const hasPermission = (permission) => {
-  return store.getters['permissions/hasPermission'](permission)
+  return authStore.hasPermission(permission)
 }
 
 // 方法

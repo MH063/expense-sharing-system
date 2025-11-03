@@ -106,14 +106,14 @@ export const useAuthStore = defineStore('auth', () => {
     isRefreshing.value = true
     
     try {
-      refreshPromise.value = http.post('/auth/refresh', {
+      refreshPromise.value = http.post('/api/auth/refresh', {
         refreshToken: refreshToken.value
       })
       
       const response = await refreshPromise.value
       
-      if (response.data.success) {
-        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data
+      if (response.success) {
+        const { token: newAccessToken, refreshToken: newRefreshToken } = response.data
         
         // 更新Token管理器
         tokenManager.setToken(newAccessToken)
@@ -131,7 +131,7 @@ export const useAuthStore = defineStore('auth', () => {
         
         // 更新WebSocket认证令牌
         if (websocketClient.isConnected) {
-          websocketClient.updateAuthToken(newToken)
+          websocketClient.updateAuthToken(newAccessToken)
         }
         
         console.log('Token刷新成功')
@@ -188,10 +188,10 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const login = async (credentials) => {
     try {
-      const response = await http.post('/users/login', credentials)
+      const response = await http.post('/api/users/login', credentials)
       
-      if (response.data.success) {
-        const { accessToken: token, refreshToken: refreshTkn, user: userData } = response.data.data
+      if (response.success) {
+        const { token, refreshToken: refreshTkn, user: userData } = response.data
         
         // 存储Token到Token管理器
         tokenManager.setToken(token)
@@ -228,7 +228,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // 通知服务器登出
       if (accessToken.value) {
-        await http.post('/users/logout')
+        await http.post('/api/users/logout')
       }
     } catch (error) {
       console.error('服务器登出失败:', error)
@@ -244,13 +244,13 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser.value = user
     
     if (tokens) {
-      accessToken.value = tokens.accessToken || null
+      accessToken.value = tokens.token || null
       refreshToken.value = tokens.refreshToken || null
       tokenExpiry.value = tokens.accessTokenExpiresAt || null
       
       // 存储Token到Token管理器
-      if (tokens.accessToken) {
-        tokenManager.setToken(tokens.accessToken)
+      if (tokens.token) {
+        tokenManager.setToken(tokens.token)
       }
       if (tokens.refreshToken) {
         tokenManager.setRefreshToken(tokens.refreshToken)

@@ -235,7 +235,7 @@ export default {
       try {
         processing.value = true
         
-        const response = await axios.post(`/api/bills/${props.billId}/pay`, {
+        const response = await axios.post(`/api/bills/${props.billId}/payment`, {
           paymentMethod: selectedPaymentMethod.value
         })
         

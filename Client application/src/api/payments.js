@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: process.env.VUE_APP_API_URL || 'http://localhost:4000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -83,5 +83,8 @@ export const paymentApi = {
     return api.get('/payments/user', { params });
   }
 };
+
+// 导出paymentsApi对象
+export const paymentsApi = paymentApi;
 
 export default paymentApi;

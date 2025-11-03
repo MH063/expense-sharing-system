@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken, removeToken } from '@/utils/token-manager';
+import { tokenManager } from '@/utils/token-manager';
 
 // 创建axios实例
 const apiClient = axios.create({
@@ -13,7 +13,7 @@ const apiClient = axios.create({
 // 请求拦截器 - 添加认证token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = getToken();
+    const token = tokenManager.getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -32,7 +32,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Token过期或无效，移除本地token并跳转到登录页
-      removeToken();
+      tokenManager.removeToken();
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -95,3 +95,6 @@ const inviteCodeApi = {
 };
 
 export default inviteCodeApi;
+
+// 命名导出
+export const inviteCodesApi = inviteCodeApi;

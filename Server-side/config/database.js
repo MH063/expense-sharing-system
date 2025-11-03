@@ -9,17 +9,34 @@ const path = require('path');
 // 根据环境变量选择数据库配置
 const env = process.env.NODE_ENV || 'development';
 
+// 确保环境变量已加载
+const envPath = path.resolve(__dirname, '../.env.development');
+console.log('尝试加载环境变量文件:', envPath);
+require('dotenv').config({ path: envPath });
+
+// 再次确保环境变量已加载
+const envPath2 = path.resolve(__dirname, `../.env.${env}`);
+console.log('尝试加载环境变量文件:', envPath2);
+require('dotenv').config({ path: envPath2 });
+
 // 所有环境配置
 const config = {
   development: {
-    dialect: 'sqlite',
-    storage: path.join(__dirname, '../database.sqlite'),
+    dialect: 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'test_expense_system',
+    username: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '123456789',
     logging: console.log,
     pool: {
       max: 5,
       min: 0,
       acquire: 30000,
       idle: 10000
+    },
+    define: {
+      freezeTableName: true
     }
   },
   test: {
@@ -61,16 +78,34 @@ const config = {
 };
 
 // 创建Sequelize实例
+// 添加调试信息
+console.log('当前环境:', env);
+console.log('配置对象:', config);
+console.log('环境变量:', {
+  DB_HOST: process.env.DB_HOST,
+  DB_PORT: process.env.DB_PORT,
+  DB_NAME: process.env.DB_NAME,
+  DB_USER: process.env.DB_USER,
+  DB_PASSWORD: process.env.DB_PASSWORD ? '已设置' : '未设置'
+});
+
+// 确保配置存在
+const dbConfig = config[env] || config.development;
+
+// 强制使用正确的用户名和密码
+dbConfig.username = 'postgres';
+dbConfig.password = '123456789';
+
 const sequelize = new Sequelize({
-  dialect: config[env].dialect,
-  host: config[env].host,
-  port: config[env].port,
-  database: config[env].database,
-  username: config[env].username,
-  password: config[env].password,
-  storage: config[env].storage,
-  logging: config[env].logging,
-  pool: config[env].pool,
+  dialect: dbConfig.dialect,
+  host: dbConfig.host,
+  port: dbConfig.port,
+  database: dbConfig.database,
+  username: dbConfig.username,
+  password: String(dbConfig.password), // 确保密码是字符串类型
+  storage: dbConfig.storage,
+  logging: dbConfig.logging,
+  pool: dbConfig.pool,
   define: {
     freezeTableName: true
   }

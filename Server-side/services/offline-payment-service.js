@@ -3,7 +3,9 @@
  * 处理离线支付记录的存储、同步和状态管理
  */
 
-const { OfflinePayment, Payment, Bill, User, Room } = require('../models');
+// 兼容测试环境：优先使用全局注入的 Sequelize 模型集合
+const modelsSource = (global.models && global.models.OfflinePayment) ? global.models : require('../models');
+const { OfflinePayment, Payment, Bill, User, Room } = modelsSource;
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 

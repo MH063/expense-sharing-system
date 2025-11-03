@@ -3,17 +3,8 @@ const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 
 // 模拟数据库连接
-jest.mock('pg', () => {
-  const mockPool = {
-    query: jest.fn(),
-    connect: jest.fn(),
-    end: jest.fn()
-  };
-  
-  return {
-    Pool: jest.fn(() => mockPool)
-  };
-});
+// 强制使用真实数据库，禁止 mock pg
+// jest.mock('pg', ...) 已移除
 
 // 模拟WebSocket事件
 jest.mock('../../services/websocket-events', () => ({

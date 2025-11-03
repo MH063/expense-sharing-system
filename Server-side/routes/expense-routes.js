@@ -24,4 +24,16 @@ router.post('/splits/:id/confirm', authenticateToken, expenseController.confirmS
 // 智能分摊计算
 router.post('/calculate-split', authenticateToken, expenseController.calculateSmartSplit);
 
+// 获取费用收款码
+router.get('/:expenseId/qr-code', authenticateToken, expenseController.getExpenseQrCode);
+
+// 确认费用支付
+router.post('/:expenseId/payments/confirm', authenticateToken, expenseController.confirmExpensePayment);
+
+// 获取费用支付状态
+router.get('/:expenseId/payment-status', authenticateToken, expenseController.getExpensePaymentStatus);
+
+// 获取用户费用支付记录
+router.get('/payments/user', authenticateToken, expenseController.getUserExpensePayments);
+
 module.exports = router;

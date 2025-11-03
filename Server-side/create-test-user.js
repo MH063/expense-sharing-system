@@ -13,7 +13,7 @@ const createTestUser = async () => {
     const hash = await bcrypt.hash(password, saltRounds);
     
     // 插入用户
-    const query = 'INSERT INTO users (username, email, name, password_hash) VALUES ($1, $2, $3, $4) RETURNING id';
+    const query = 'INSERT INTO users (username, email, name, password) VALUES ($1, $2, $3, $4) RETURNING id';
     const values = [username, email, name, hash];
     
     const result = await pool.query(query, values);

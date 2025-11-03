@@ -121,7 +121,7 @@
 
 <script>
 import { mapGetters } from 'vuex';
-import api from '@/api';
+import { billApi } from '@/api';
 
 export default {
   name: 'SpecialPaymentRules',
@@ -173,7 +173,7 @@ export default {
     async fetchRules() {
       this.loading = true;
       try {
-        const response = await api.get(`/special-payments/rooms/${this.roomId}/rules`);
+        const response = await billApi.getSpecialPaymentRules(this.roomId);
         if (response.data.success) {
           this.rules = response.data.data.rules;
         }
@@ -186,7 +186,7 @@ export default {
     },
     async fetchExpenseTypes() {
       try {
-        const response = await api.get(`/expense-types?room_id=${this.roomId}`);
+        const response = await billApi.getExpenseTypes(this.roomId);
         if (response.data.success) {
           this.expenseTypes = response.data.data.expenseTypes;
         }
@@ -208,7 +208,7 @@ export default {
     },
     async toggleRuleStatus(rule) {
       try {
-        await api.put(`/special-payments/rules/${rule.id}`, {
+        await billApi.updateSpecialPaymentRule(rule.id, {
           is_active: rule.is_active
         });
         this.$message.success('规则状态更新成功');
@@ -243,7 +243,7 @@ export default {
           type: 'warning'
         });
         
-        await api.delete(`/special-payments/rules/${rule.id}`);
+        await billApi.deleteSpecialPaymentRule(rule.id);
         this.$message.success('规则删除成功');
         this.fetchRules();
       } catch (error) {
@@ -260,10 +260,10 @@ export default {
             const data = { ...this.ruleForm };
             
             if (this.isEditing) {
-              await api.put(`/special-payments/rules/${this.currentRuleId}`, data);
+              await billApi.updateSpecialPaymentRule(this.currentRuleId, data);
               this.$message.success('规则更新成功');
             } else {
-              await api.post(`/special-payments/rooms/${this.roomId}/rules`, data);
+              await billApi.createSpecialPaymentRule(this.roomId, data);
               this.$message.success('规则创建成功');
             }
             

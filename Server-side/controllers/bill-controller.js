@@ -1,6 +1,8 @@
-const { Pool } = require('pg');
+const { pool } = require('../config/db');
 const winston = require('winston');
 const { authenticateToken, requireRole } = require('../middleware/auth-middleware');
+const fs = require('fs');
+const path = require('path');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -22,10 +24,7 @@ const logger = winston.createLogger({
  */
 class BillController {
   constructor() {
-    this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
+    this.pool = pool;
   }
 
   /**
@@ -33,8 +32,8 @@ class BillController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async createBill(req, res) {
-    const client = await this.pool.connect();
+  createBill = async (req, res) => {
+    const client = await pool.connect();
     try {
       const { 
         room_id, 
@@ -42,8 +41,10 @@ class BillController {
         description, 
         total_amount, 
         due_date, 
+        category,
         expense_ids,
-        split_type = 'EQUAL' // EQUAL, CUSTOM, PERCENTAGE
+        split_type = 'EQUAL', // EQUAL, CUSTOM, PERCENTAGE
+        split_details = [] // 自定义分摊详情 [{user_id, amount}]
       } = req.body;
       
       const user_id = req.user.id;
@@ -76,15 +77,49 @@ class BillController {
         }
       }
       
+      // 验证自定义分摊详情
+      if (split_type === 'CUSTOM' && split_details.length > 0) {
+        // 验证分摊成员是否为寝室成员
+        const memberIds = split_details.map(detail => detail.user_id);
+        const memberValidation = await client.query(
+          'SELECT COUNT(*) as count FROM room_members WHERE room_id = $1 AND user_id = ANY($2)',
+          [room_id, memberIds]
+        );
+        
+        if (parseInt(memberValidation.rows[0].count) !== memberIds.length) {
+          return res.status(400).json({
+            success: false,
+            message: '分摊成员包含非寝室成员'
+          });
+        }
+        
+        // 验证分摊金额总和是否等于账单总金额
+        const splitTotal = split_details.reduce((sum, detail) => sum + parseFloat(detail.amount), 0);
+        if (Math.abs(splitTotal - parseFloat(total_amount)) > 0.01) {
+          return res.status(400).json({
+            success: false,
+            message: '分摊金额总和与账单总金额不匹配'
+          });
+        }
+      }
+      
+      // 处理收据上传
+      let receipt_url = null;
+      if (req.file) {
+        // 如果有上传文件，生成文件URL
+        receipt_url = `/uploads/receipts/${req.file.filename}`;
+        logger.info(`收据上传成功: ${receipt_url}`);
+      }
+      
       // 开始事务
       await client.query('BEGIN');
       
       // 创建账单
       const billResult = await client.query(
-        `INSERT INTO bills (room_id, creator_id, title, description, total_amount, due_date, status, split_type)
-         VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7)
+        `INSERT INTO bills (room_id, creator_id, title, description, total_amount, due_date, category, receipt_url, status, split_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9)
          RETURNING *`,
-        [room_id, user_id, title, description, total_amount, due_date, split_type]
+        [room_id, user_id, title, description, total_amount, due_date, category, receipt_url, split_type]
       );
       
       const bill = billResult.rows[0];
@@ -109,26 +144,64 @@ class BillController {
       const memberCount = members.length;
       
       // 创建账单分摊记录
-      for (const member of members) {
-        let amount;
+      if (split_type === 'EQUAL') {
+        // 平均分摊
+        const amount = total_amount / memberCount;
         
-        if (split_type === 'EQUAL') {
-          amount = total_amount / memberCount;
-        } else if (split_type === 'CUSTOM') {
-          // 自定义分摊，需要前端传递具体金额
-          // 这里简化处理，实际应该从请求中获取每个成员的金额
-          amount = total_amount / memberCount;
-        } else if (split_type === 'PERCENTAGE') {
-          // 百分比分摊，需要前端传递具体百分比
-          // 这里简化处理，实际应该从请求中获取每个成员的百分比
-          amount = total_amount / memberCount;
+        for (const member of members) {
+          await client.query(
+            `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+             VALUES ($1, $2, $3, 'PENDING')`,
+            [bill.id, member.user_id, amount]
+          );
         }
-        
-        await client.query(
-          `INSERT INTO bill_splits (bill_id, user_id, amount, status)
-           VALUES ($1, $2, $3, 'PENDING')`,
-          [bill.id, member.user_id, amount]
-        );
+      } else if (split_type === 'CUSTOM') {
+        // 自定义分摊
+        if (split_details.length > 0) {
+          // 使用提供的分摊详情
+          for (const detail of split_details) {
+            await client.query(
+              `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+               VALUES ($1, $2, $3, 'PENDING')`,
+              [bill.id, detail.user_id, detail.amount]
+            );
+          }
+        } else {
+          // 如果没有提供分摊详情，默认平均分摊
+          const amount = total_amount / memberCount;
+          
+          for (const member of members) {
+            await client.query(
+              `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+               VALUES ($1, $2, $3, 'PENDING')`,
+              [bill.id, member.user_id, amount]
+            );
+          }
+        }
+      } else if (split_type === 'PERCENTAGE') {
+        // 百分比分摊
+        if (split_details.length > 0) {
+          // 使用提供的分摊详情
+          for (const detail of split_details) {
+            const amount = (parseFloat(detail.amount) / 100) * total_amount;
+            await client.query(
+              `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+               VALUES ($1, $2, $3, 'PENDING')`,
+              [bill.id, detail.user_id, amount]
+            );
+          }
+        } else {
+          // 如果没有提供分摊详情，默认平均分摊
+          const amount = total_amount / memberCount;
+          
+          for (const member of members) {
+            await client.query(
+              `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+               VALUES ($1, $2, $3, 'PENDING')`,
+              [bill.id, member.user_id, amount]
+            );
+          }
+        }
       }
       
       await client.query('COMMIT');
@@ -160,11 +233,11 @@ class BillController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async getBills(req, res) {
-    const client = await this.pool.connect();
+  getBills = async (req, res) => {
+    const client = await pool.connect();
     try {
       const user_id = req.user.id;
-      const { room_id, status, page = 1, limit = 10 } = req.query;
+      const { room_id, status, category, page = 1, limit = 10 } = req.query;
       
       let query = `
         SELECT b.*, u.username as creator_name, r.name as room_name
@@ -186,6 +259,11 @@ class BillController {
       if (status) {
         query += ` AND b.status = $${paramIndex++}`;
         params.push(status);
+      }
+      
+      if (category) {
+        query += ` AND b.category = $${paramIndex++}`;
+        params.push(category);
       }
       
       query += ` ORDER BY b.created_at DESC`;
@@ -216,6 +294,11 @@ class BillController {
       if (status) {
         countQuery += ` AND b.status = $${countParamIndex++}`;
         countParams.push(status);
+      }
+      
+      if (category) {
+        countQuery += ` AND b.category = $${countParamIndex++}`;
+        countParams.push(category);
       }
       
       const countResult = await client.query(countQuery, countParams);
@@ -250,8 +333,8 @@ class BillController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async getBillById(req, res) {
-    const client = await this.pool.connect();
+  getBillById = async (req, res) => {
+    const client = await pool.connect();
     try {
       const { id } = req.params;
       const user_id = req.user.id;
@@ -342,11 +425,11 @@ class BillController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async updateBill(req, res) {
-    const client = await this.pool.connect();
+  updateBill = async (req, res) => {
+    const client = await pool.connect();
     try {
       const { id } = req.params;
-      const { title, description, total_amount, due_date } = req.body;
+      const { title, description, total_amount, due_date, category } = req.body;
       const user_id = req.user.id;
       
       // 验证用户是否有权限更新该账单（创建者或寝室管理员）
@@ -384,6 +467,24 @@ class BillController {
         });
       }
       
+      // 处理收据上传
+      let receipt_url = bill.receipt_url;
+      if (req.file) {
+        // 如果有上传文件，生成文件URL
+        receipt_url = `/uploads/receipts/${req.file.filename}`;
+        
+        // 如果原来有收据，删除旧文件
+        if (bill.receipt_url) {
+          const oldFilePath = path.join(__dirname, '..', 'public', bill.receipt_url);
+          if (fs.existsSync(oldFilePath)) {
+            fs.unlinkSync(oldFilePath);
+            logger.info(`删除旧收据文件: ${oldFilePath}`);
+          }
+        }
+        
+        logger.info(`收据更新成功: ${receipt_url}`);
+      }
+      
       // 开始事务
       await client.query('BEGIN');
       
@@ -394,12 +495,14 @@ class BillController {
             description = COALESCE($2, description),
             total_amount = COALESCE($3, total_amount),
             due_date = COALESCE($4, due_date),
+            category = COALESCE($5, category),
+            receipt_url = COALESCE($6, receipt_url),
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $5
+        WHERE id = $7
         RETURNING *
       `;
       
-      const result = await client.query(updateQuery, [title, description, total_amount, due_date, id]);
+      const result = await client.query(updateQuery, [title, description, total_amount, due_date, category, receipt_url, id]);
       const updatedBill = result.rows[0];
       
       // 如果总金额发生变化，重新计算分摊金额
@@ -454,8 +557,8 @@ class BillController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async deleteBill(req, res) {
-    const client = await this.pool.connect();
+  deleteBill = async (req, res) => {
+    const client = await pool.connect();
     try {
       const { id } = req.params;
       const user_id = req.user.id;
@@ -512,6 +615,15 @@ class BillController {
       
       await client.query('COMMIT');
       
+      // 删除收据文件（如果有）
+      if (bill.receipt_url) {
+        const filePath = path.join(__dirname, '..', 'public', bill.receipt_url);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          logger.info(`删除收据文件: ${filePath}`);
+        }
+      }
+      
       logger.info(`账单删除成功: ${id}, 删除者: ${user_id}`);
       
       res.status(200).json({
@@ -538,8 +650,8 @@ class BillController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async reviewBill(req, res) {
-    const client = await this.pool.connect();
+  reviewBill = async (req, res) => {
+    const client = await pool.connect();
     try {
       const { id } = req.params;
       const { action, comment } = req.body; // action: APPROVE, REJECT
@@ -633,12 +745,12 @@ class BillController {
   }
 
   /**
-   * 确认支付账单分摊
+   * 确认账单支付
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async confirmBillPayment(req, res) {
-    const client = await this.pool.connect();
+  confirmBillPayment = async (req, res) => {
+    const client = await pool.connect();
     try {
       const { id } = req.params; // 账单ID
       const user_id = req.user.id;
@@ -733,12 +845,12 @@ class BillController {
   }
 
   /**
-   * 获取用户的账单统计
+   * 获取用户账单统计
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async getUserBillStats(req, res) {
-    const client = await this.pool.connect();
+  getUserBillStats = async (req, res) => {
+    const client = await pool.connect();
     try {
       const user_id = req.user.id;
       const { room_id } = req.query;
@@ -816,6 +928,42 @@ class BillController {
       });
     } finally {
       client.release();
+    }
+  }
+
+  /**
+   * 上传收据
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  uploadReceipt = async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: '未上传文件' });
+      }
+    
+      // 构建文件访问URL
+      const fileUrl = `/uploads/receipts/${req.file.filename}`;
+      
+      // 记录上传日志
+      logger.info(`用户 ${req.user.id} 上传收据: ${req.file.originalname} -> ${fileUrl}`);
+      
+      return res.status(200).json({
+        success: true,
+        message: '收据上传成功',
+        data: {
+          fileUrl,
+          fileName: req.file.originalname,
+          fileSize: req.file.size
+        }
+      });
+    } catch (error) {
+      logger.error('上传收据失败:', error);
+      return res.status(500).json({
+        success: false,
+        message: '上传收据失败',
+        error: error.message
+      });
     }
   }
 }

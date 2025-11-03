@@ -236,3 +236,8 @@ export const disputeApi = {
     })
   }
 }
+
+// 导出disputesApi对象
+export const disputesApi = disputeApi;
+
+export default disputeApi;

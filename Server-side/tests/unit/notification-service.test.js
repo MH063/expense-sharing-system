@@ -11,13 +11,11 @@ jest.mock('nodemailer', () => ({
   }))
 }));
 
-jest.mock('twilio', () => ({
-  jest.fn(() => ({
-    messages: {
-      create: jest.fn()
-    }
-  }))
-}));
+jest.mock('twilio', () => jest.fn(() => ({
+  messages: {
+    create: jest.fn()
+  }
+})));
 
 describe('通知服务测试', () => {
   beforeEach(() => {

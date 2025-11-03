@@ -20,7 +20,7 @@ describe('用户管理API集成测试', () => {
     
     // 创建测试用户
     const userResult = await pool.query(
-      'INSERT INTO users (username, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      'INSERT INTO users (username, email, password, name, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       ['testuser', 'test@example.com', hashedPassword, 'Test User', 'user']
     );
     testUserId = userResult.rows[0].id;

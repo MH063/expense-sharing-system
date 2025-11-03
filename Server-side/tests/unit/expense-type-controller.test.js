@@ -2,15 +2,8 @@ const ExpenseTypeController = require('../../controllers/expense-type-controller
 const { Pool } = require('pg');
 
 // 模拟数据库连接
-jest.mock('pg', () => {
-  const mockPool = {
-    query: jest.fn()
-  };
-  
-  return {
-    Pool: jest.fn(() => mockPool)
-  };
-});
+// 强制使用真实数据库，禁止 mock pg
+// jest.mock('pg', ...) 已移除
 
 // 模拟日志记录器
 jest.mock('winston', () => ({

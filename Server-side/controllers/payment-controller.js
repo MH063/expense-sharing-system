@@ -36,7 +36,7 @@ class PaymentController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async getBillQrCode(req, res) {
+  getBillQrCode = async (req, res) => {
     const client = await this.pool.connect();
     try {
       const { billId } = req.params;
@@ -167,7 +167,7 @@ class PaymentController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async confirmPayment(req, res) {
+  confirmPayment = async (req, res) => {
     const client = await this.pool.connect();
     try {
       const { billId } = req.params;
@@ -311,7 +311,7 @@ class PaymentController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async getBillPaymentStatus(req, res) {
+  getBillPaymentStatus = async (req, res) => {
     const client = await this.pool.connect();
     try {
       const { billId } = req.params;
@@ -408,7 +408,7 @@ class PaymentController {
    * @param {Object} req - 请求对象
    * @param {Object} res - 响应对象
    */
-  async getUserPayments(req, res) {
+  getUserPayments = async (req, res) => {
     const client = await this.pool.connect();
     try {
       const userId = req.user.id;

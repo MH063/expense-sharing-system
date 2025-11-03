@@ -5,36 +5,35 @@ const { pool } = require('../../config/db');
 
 describe('UserController API测试', () => {
   let authToken;
+  let refreshToken;
   let testUserId;
 
-  beforeAll(async () => {
-    // 清理可能存在的测试用户
+  beforeEach(async () => {
+    // 确保基础状态：清理可能残留的测试用户，并创建一个基线用户 + 登录获取 token
     await pool.query('DELETE FROM users WHERE username = $1', ['testuser']);
-    
-    // 创建测试用户
+
     const hashedPassword = await bcrypt.hash('testpassword', 10);
     const userResult = await pool.query(
-      `INSERT INTO users (username, password_hash, email, name, created_at, updated_at) 
+      `INSERT INTO users (username, password, email, name, created_at, updated_at)
        VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id`,
       ['testuser', hashedPassword, 'test@example.com', 'Test User']
     );
     testUserId = userResult.rows[0].id;
 
-    // 登录获取token
     const loginResponse = await request(app)
       .post('/api/auth/login')
-      .send({
-        username: 'testuser',
-        password: 'testpassword'
-      });
+      .send({ username: 'testuser', password: 'testpassword' });
+
+    if (loginResponse.status !== 200) {
+      throw new Error('基线登录失败，无法继续用例');
+    }
 
     authToken = loginResponse.body.data.token;
+    refreshToken = loginResponse.body.data.refreshToken;
   });
 
   afterAll(async () => {
-    // 清理测试数据
     await pool.query('DELETE FROM users WHERE username = $1', ['testuser']);
-    await pool.end();
   });
 
   describe('POST /api/users/register', () => {
@@ -54,19 +53,12 @@ describe('UserController API测试', () => {
       expect(response.body.message).toBe('用户注册成功');
       expect(response.body.data).toHaveProperty('username');
       expect(response.body.data).toHaveProperty('email');
-
-      // 清理测试数据
-      await pool.query('DELETE FROM users WHERE username = $1', ['newuser_' + timestamp]);
     });
 
     it('应该在缺少必填字段时返回400错误', async () => {
       const response = await request(app)
         .post('/api/users/register')
-        .send({
-          username: 'incompleteuser',
-          // 缺少password
-          email: 'incomplete@example.com'
-        });
+        .send({ username: 'incompleteuser', email: 'incomplete@example.com' });
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
@@ -76,11 +68,7 @@ describe('UserController API测试', () => {
     it('应该在用户名已存在时返回409错误', async () => {
       const response = await request(app)
         .post('/api/users/register')
-        .send({
-          username: 'testuser', // 已存在的用户名
-          password: 'password123',
-          email: 'another@example.com'
-        });
+        .send({ username: 'testuser', password: 'password123', email: 'another@example.com' });
 
       expect(response.status).toBe(409);
       expect(response.body.success).toBe(false);
@@ -92,10 +80,7 @@ describe('UserController API测试', () => {
     it('应该成功登录并返回token', async () => {
       const response = await request(app)
         .post('/api/auth/login')
-        .send({
-          username: 'testuser',
-          password: 'testpassword'
-        });
+        .send({ username: 'testuser', password: 'testpassword' });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -108,10 +93,7 @@ describe('UserController API测试', () => {
     it('应该在密码错误时返回401错误', async () => {
       const response = await request(app)
         .post('/api/auth/login')
-        .send({
-          username: 'testuser',
-          password: 'wrongpassword'
-        });
+        .send({ username: 'testuser', password: 'wrongpassword' });
 
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
@@ -131,9 +113,7 @@ describe('UserController API测试', () => {
     });
 
     it('应该在未授权时返回401错误', async () => {
-      const response = await request(app)
-        .get('/api/users/profile');
-
+      const response = await request(app).get('/api/users/profile');
       expect(response.status).toBe(401);
     });
   });
@@ -143,10 +123,7 @@ describe('UserController API测试', () => {
       const response = await request(app)
         .put('/api/users/profile')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          name: 'Updated Name',
-          email: 'updated@example.com'
-        });
+        .send({ name: 'Updated Name', email: 'updated@example.com' });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -156,13 +133,9 @@ describe('UserController API测试', () => {
     });
 
     it('没有token时应该无法更新用户资料', async () => {
-      const updateData = {
-        name: '更新后的用户名'
-      };
-
       const response = await request(app)
         .put('/api/users/profile')
-        .send(updateData);
+        .send({ name: '更新后的用户名' });
 
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
@@ -171,20 +144,9 @@ describe('UserController API测试', () => {
 
   describe('POST /api/auth/refresh', () => {
     it('应该成功刷新token', async () => {
-      const loginResponse = await request(app)
-        .post('/api/auth/login')
-        .send({
-          username: 'testuser',
-          password: 'testpassword'
-        });
-
-      const refreshToken = loginResponse.body.data.refreshToken;
-
       const response = await request(app)
         .post('/api/auth/refresh')
-        .send({
-          refreshToken: refreshToken
-        });
+        .send({ refreshToken });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);

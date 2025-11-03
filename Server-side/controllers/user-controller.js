@@ -68,7 +68,7 @@ class UserController {
 
       // 插入用户记录并返回ID
       const result = await pool.query(
-        `INSERT INTO users (username, password_hash, email, name, created_at, updated_at) 
+        `INSERT INTO users (username, password, email, name, created_at, updated_at) 
          VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id`,
         [username, hashedPassword, email, displayName || username]
       );
@@ -102,7 +102,7 @@ class UserController {
   }
 
   // 用户登录
-  async login(req, res) {
+  login = async (req, res) => {
     try {
       const { username, password } = req.body;
 
@@ -130,7 +130,7 @@ class UserController {
       const user = users[0];
 
       // 验证密码
-      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      const isPasswordValid = await bcrypt.compare(password, user.password);
 
       if (!isPasswordValid) {
         return res.status(401).json({
@@ -139,8 +139,8 @@ class UserController {
         });
       }
 
-      // 移除密码哈希字段
-      const { password_hash, ...userWithoutPassword } = user;
+      // 移除密码字段
+      const { password, ...userWithoutPassword } = user;
 
       // 生成JWT token
       const jwt = require('jsonwebtoken');
@@ -471,7 +471,7 @@ class UserController {
       const { role } = req.body;
       
       // 验证角色值
-      const validRoles = ['system_admin', 'admin', 'room_owner', 'payer', 'user'];
+      const validRoles = ['system_admin', 'admin', '寝室长', 'payer', 'user'];
       if (!validRoles.includes(role)) {
         return res.status(400).json({
           success: false,
@@ -678,7 +678,7 @@ class UserController {
       
       // 查询用户
       const userResult = await pool.query(
-        'SELECT id, username, password_hash FROM users WHERE id = $1',
+        'SELECT id, username, password FROM users WHERE id = $1',
         [userId]
       );
       
@@ -692,7 +692,7 @@ class UserController {
       const user = userResult.rows[0];
       
       // 验证当前密码
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
       
       if (!isCurrentPasswordValid) {
         return res.status(400).json({
@@ -707,7 +707,7 @@ class UserController {
       
       // 更新密码
       await pool.query(
-        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
         [hashedNewPassword, userId]
       );
       

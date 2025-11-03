@@ -2,9 +2,13 @@ const express = require('express');
 const router = express.Router();
 const billController = require('../controllers/bill-controller');
 const { authenticateToken, requireRole } = require('../middleware/auth-middleware');
+const { uploadReceipt } = require('../middleware/upload');
 
 // 创建账单
 router.post('/', authenticateToken, billController.createBill);
+
+// 上传账单收据
+router.post('/receipt', authenticateToken, uploadReceipt.single('receipt'), billController.uploadReceipt);
 
 // 获取账单列表
 router.get('/', authenticateToken, billController.getBills);

@@ -29,7 +29,7 @@ describe('统计控制器集成测试', () => {
     
     // 创建测试用户
     const userResult = await pool.query(`
-      INSERT INTO users (username, email, password_hash, name, created_at, updated_at)
+      INSERT INTO users (username, email, password, name, created_at, updated_at)
       VALUES ($1, $2, $3, $4, NOW(), NOW())
       RETURNING id, username, email, name
     `, ['testuser_stats', 'test_stats@example.com', 'hashed_password', 'Test User Stats']);
@@ -370,7 +370,7 @@ describe('统计控制器集成测试', () => {
       });
       
       const userResult = await pool.query(`
-        INSERT INTO users (username, email, password_hash, name, created_at, updated_at)
+        INSERT INTO users (username, email, password, name, created_at, updated_at)
         VALUES ($1, $2, $3, $4, NOW(), NOW())
         RETURNING id, username, email, name
       `, ['otheruser', 'other@example.com', 'hashed_password', 'Other User']);

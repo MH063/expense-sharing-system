@@ -75,3 +75,13 @@ export const getDefaultQrCode = async (qrType) => {
     throw error;
   }
 };
+
+// 导出qrCodesApi对象
+export const qrCodesApi = {
+  getUserQrCodes,
+  uploadQrCode,
+  toggleQrCodeStatus,
+  setDefaultQrCode,
+  deleteQrCode,
+  getDefaultQrCode
+};

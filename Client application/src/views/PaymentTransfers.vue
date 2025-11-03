@@ -139,7 +139,7 @@
 
 <script>
 import { mapGetters } from 'vuex';
-import api from '@/api';
+import { billApi } from '@/api';
 
 export default {
   name: 'PaymentTransfers',
@@ -191,7 +191,7 @@ export default {
   methods: {
     async fetchBillInfo() {
       try {
-        const response = await api.get(`/bills/${this.billId}`);
+        const response = await billApi.getBillById(this.billId);
         if (response.data.success) {
           this.bill = response.data.data.bill;
           // 获取账单分摊用户
@@ -204,7 +204,7 @@ export default {
     },
     async fetchBillUsers() {
       try {
-        const response = await api.get(`/bills/${this.billId}/splits`);
+        const response = await billApi.getBillSplits(this.billId);
         if (response.data.success) {
           this.billUsers = response.data.data.splits.map(split => ({
             user_id: split.user_id,
@@ -220,7 +220,7 @@ export default {
     async fetchTransfers() {
       this.loading = true;
       try {
-        const response = await api.get(`/special-payments/bills/${this.billId}/transfers`);
+        const response = await billApi.getPaymentTransfers(this.billId);
         if (response.data.success) {
           this.transfers = response.data.data.transfers;
         }
@@ -233,7 +233,7 @@ export default {
     },
     async checkPayerToPayerRule() {
       try {
-        const response = await api.get(`/special-payments/bills/${this.billId}/applicable-rules`);
+        const response = await billApi.getApplicableRules(this.billId);
         if (response.data.success) {
           const rules = response.data.data.applicable_rules;
           this.hasPayerToPayerRule = rules.some(rule => rule.rule_type === 'payer_to_payer');
@@ -278,7 +278,7 @@ export default {
       this.$refs.transferForm.validate(async (valid) => {
         if (valid) {
           try {
-            await api.post(`/special-payments/bills/${this.billId}/transfers`, this.transferForm);
+            await billApi.createPaymentTransfer(this.billId, this.transferForm);
             this.$message.success('支付转移记录创建成功');
             this.showTransferDialog = false;
             this.fetchTransfers();

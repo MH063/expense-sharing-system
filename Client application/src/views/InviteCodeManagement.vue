@@ -168,8 +168,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
-import inviteCodeApi from '@/api/invite-codes';
-import roomApi from '@/api/rooms';
+import { inviteCodesApi } from '@/api';
+import { roomsApi } from '@/api';
 
 export default {
   name: 'InviteCodeManagement',
@@ -205,7 +205,7 @@ export default {
     // 加载用户管理的房间列表
     const loadRooms = async () => {
       try {
-        const response = await roomApi.getUserRooms();
+        const response = await roomsApi.getUserRooms();
         if (response.data.success) {
           rooms.value = response.data.data.rooms;
         }
@@ -220,7 +220,7 @@ export default {
       
       loading.value = true;
       try {
-        const response = await inviteCodeApi.getRoomInviteCodes(selectedRoomId.value);
+        const response = await inviteCodesApi.getRoomInviteCodes(selectedRoomId.value);
         if (response.data.success) {
           inviteCodes.value = response.data.data;
         }
@@ -234,7 +234,7 @@ export default {
     // 创建邀请码
     const createInviteCode = async () => {
       try {
-        const response = await inviteCodeApi.generateInviteCode(newCode.value);
+        const response = await inviteCodesApi.generateInviteCode(newCode.value);
         if (response.data.success) {
           // 添加到列表
           inviteCodes.value.unshift(response.data.data);
@@ -267,7 +267,7 @@ export default {
       if (!selectedCode.value) return;
       
       try {
-        const response = await inviteCodeApi.revokeInviteCode(selectedCode.value.id);
+        const response = await inviteCodesApi.revokeInviteCode(selectedCode.value.id);
         if (response.data.success) {
           // 更新列表中的状态
           const index = inviteCodes.value.findIndex(code => code.id === selectedCode.value.id);

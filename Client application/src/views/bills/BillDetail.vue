@@ -196,6 +196,12 @@
                 立即支付
               </button>
             </div>
+            
+            <div class="transfer-actions">
+              <button class="transfer-button" @click="viewPaymentTransfers">
+                支付转移记录
+              </button>
+            </div>
           </div>
           
           <div class="balance-card">
@@ -545,7 +551,7 @@ const deleteBill = async () => {
 
 // 支付账单
 const payBill = () => {
-  showPayModal.value = true
+  router.push(`/payments/${bill.value.id}/scan`)
 }
 
 // 确认支付
@@ -580,6 +586,11 @@ const confirmPay = async () => {
 // 查看收据
 const viewReceipt = () => {
   showReceiptModal.value = true
+}
+
+// 查看支付转移记录
+const viewPaymentTransfers = () => {
+  router.push(`/bills/${bill.value.id}/transfers`)
 }
 
 // 添加评论
@@ -1185,6 +1196,27 @@ onMounted(() => {
 
 .pay-actions {
   text-align: center;
+}
+
+.transfer-actions {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.transfer-button {
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.transfer-button:hover {
+  background-color: #e0e0e0;
 }
 
 .pay-button {

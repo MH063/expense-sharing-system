@@ -173,14 +173,24 @@
             <div class="tab-content">
               <div class="tab-header">
                 <h3>账单管理</h3>
-                <el-button
-                  v-if="canManageBills"
-                  type="primary"
-                  size="small"
-                  @click="createBill"
-                >
-                  创建账单
-                </el-button>
+                <div class="tab-actions">
+                  <el-button
+                    v-if="canManageBills"
+                    type="success"
+                    size="small"
+                    @click="goToPaymentRules"
+                  >
+                    支付规则
+                  </el-button>
+                  <el-button
+                    v-if="canManageBills"
+                    type="primary"
+                    size="small"
+                    @click="createBill"
+                  >
+                    创建账单
+                  </el-button>
+                </div>
               </div>
               <el-table :data="bills" stripe>
                 <el-table-column prop="title" label="账单名称" width="180" />
@@ -501,6 +511,13 @@ const createBill = () => {
 }
 
 /**
+ * 跳转到支付规则页面
+ */
+const goToPaymentRules = () => {
+  router.push(`/rooms/${roomId.value}/payment-rules`)
+}
+
+/**
  * 查看账单详情
  */
 const viewBillDetail = (bill) => {
@@ -816,6 +833,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+}
+
+.tab-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .tab-header h3 {

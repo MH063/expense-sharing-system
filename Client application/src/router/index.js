@@ -16,6 +16,14 @@ import BillDetail from '@/views/bills/BillDetail.vue'
 import BillPayment from '@/views/bills/BillPayment.vue'
 import BillList from '@/views/bills/BillList.vue'
 import BillForm from '@/views/bills/BillForm.vue'
+import QrCodeManagement from '@/views/QrCodeManagement.vue'
+import ScanPayment from '@/views/ScanPayment.vue'
+import PaymentHistory from '@/views/PaymentHistory.vue'
+import InviteCodeManagement from '@/views/InviteCodeManagement.vue'
+import JoinRoom from '@/views/JoinRoom.vue'
+import SpecialPaymentRules from '@/views/SpecialPaymentRules.vue'
+import PaymentTransfers from '@/views/PaymentTransfers.vue'
+import PaymentTransferList from '@/views/bills/PaymentTransferList.vue'
 import ReviewDashboard from '@/views/reviews/ReviewDashboard.vue'
 import ReviewDetail from '@/views/reviews/ReviewDetail.vue'
 import DisputeDashboard from '@/views/disputes/DisputeDashboard.vue'
@@ -178,6 +186,71 @@ const routes = [
     meta: { 
       requiresAuth: true,
       requiresPermission: PERMISSIONS.BILL_PAY
+    },
+    props: true
+  },
+  {
+    path: '/qr-codes',
+    name: 'QrCodeManagement',
+    component: QrCodeManagement,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_PAY
+    }
+  },
+  {
+    path: '/payments/:billId/scan',
+    name: 'ScanPayment',
+    component: ScanPayment,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_PAY
+    },
+    props: true
+  },
+  {
+    path: '/payments/history',
+    name: 'PaymentHistory',
+    component: PaymentHistory,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_PAY
+    }
+  },
+  {
+    path: '/invite-codes',
+    name: 'InviteCodeManagement',
+    component: InviteCodeManagement,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.ROOM_MANAGE
+    }
+  },
+  {
+    path: '/join-room',
+    name: 'JoinRoom',
+    component: JoinRoom,
+    meta: { 
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/rooms/:roomId/payment-rules',
+    name: 'SpecialPaymentRules',
+    component: SpecialPaymentRules,
+    meta: { 
+      requiresAuth: true,
+      requiresRoomPermission: PERMISSIONS.ROOM_MANAGE
+    },
+    props: true
+  },
+  {
+    path: '/bills/:billId/transfers',
+    name: 'PaymentTransfers',
+    component: PaymentTransferList,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.BILL_VIEW
     },
     props: true
   },

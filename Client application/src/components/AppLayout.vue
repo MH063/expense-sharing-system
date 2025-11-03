@@ -20,6 +20,15 @@
             <li class="nav-item" v-if="isAuthenticated">
               <router-link to="/bills" class="nav-link">账单</router-link>
             </li>
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('BILL_PAY')">
+              <router-link to="/qr-codes" class="nav-link">收款码</router-link>
+            </li>
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('BILL_PAY')">
+              <router-link to="/payments/history" class="nav-link">支付记录</router-link>
+            </li>
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('ROOM_MANAGE')">
+              <router-link to="/invite-codes" class="nav-link">邀请码管理</router-link>
+            </li>
             <li class="nav-item" v-if="isAuthenticated">
               <router-link to="/analytics" class="nav-link">统计</router-link>
             </li>

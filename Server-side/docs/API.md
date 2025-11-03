@@ -6,7 +6,7 @@
 
 ## 基础信息
 
-- **基础URL**: `http://localhost:3000/api`
+- **基础URL**: `http://localhost:4000/api`
 - **认证方式**: JWT Bearer Token
 - **数据格式**: JSON
 - **字符编码**: UTF-8
@@ -879,6 +879,363 @@ Authorization: Bearer <token>
 }
 ```
 
+## 支付优化 API
+
+### 获取离线支付记录
+
+**GET** `/payments/offline`
+
+获取当前用户的离线支付记录。
+
+**查询参数**:
+- `room_id` (可选): 寝室ID
+- `status` (可选): 支付状态 (pending, synced, failed)
+- `start_date` (可选): 开始日期
+- `end_date` (可选): 结束日期
+- `page` (可选): 页码，默认为1
+- `limit` (可选): 每页数量，默认为10
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "bill_id": 1,
+      "amount": 100.50,
+      "payment_method": "alipay",
+      "payment_time": "2023-01-01T12:00:00.000Z",
+      "transaction_id": "202301011200123456789",
+      "status": "pending",
+      "sync_status": "pending",
+      "created_at": "2023-01-01T12:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
+
+### 创建离线支付记录
+
+**POST** `/payments/offline`
+
+创建新的离线支付记录。
+
+**请求体**:
+```json
+{
+  "bill_id": "number",
+  "amount": "number",
+  "payment_method": "string",
+  "payment_time": "string",
+  "transaction_id": "string",
+  "note": "string"
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "bill_id": 1,
+    "amount": 100.50,
+    "payment_method": "alipay",
+    "payment_time": "2023-01-01T12:00:00.000Z",
+    "transaction_id": "202301011200123456789",
+    "status": "pending",
+    "sync_status": "pending",
+    "note": "线下支付",
+    "created_at": "2023-01-01T12:00:00.000Z"
+  },
+  "message": "离线支付记录创建成功"
+}
+```
+
+### 同步离线支付记录
+
+**POST** `/payments/:paymentId/sync`
+
+同步指定的离线支付记录。
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "status": "synced",
+    "sync_status": "success",
+    "synced_at": "2023-01-01T12:05:00.000Z"
+  },
+  "message": "离线支付记录同步成功"
+}
+```
+
+### 获取待同步的支付记录
+
+**GET** `/payments/offline/pending-sync`
+
+获取当前用户待同步的支付记录。
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "bill_id": 1,
+      "amount": 100.50,
+      "payment_method": "alipay",
+      "payment_time": "2023-01-01T12:00:00.000Z",
+      "transaction_id": "202301011200123456789",
+      "status": "pending",
+      "sync_status": "pending",
+      "created_at": "2023-01-01T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+### 标记支付记录同步失败
+
+**POST** `/payments/:paymentId/sync-failed`
+
+标记指定支付记录同步失败。
+
+**请求体**:
+```json
+{
+  "error_message": "string"
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "sync_status": "failed",
+    "error_message": "网络连接失败",
+    "failed_at": "2023-01-01T12:05:00.000Z"
+  },
+  "message": "支付记录同步失败标记成功"
+}
+```
+
+### 重试同步失败的支付记录
+
+**POST** `/payments/:paymentId/retry-sync`
+
+重试同步失败的支付记录。
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "status": "synced",
+    "sync_status": "success",
+    "synced_at": "2023-01-01T12:05:00.000Z",
+    "retry_count": 1
+  },
+  "message": "支付记录重试同步成功"
+}
+```
+
+### 获取支付记录详情
+
+**GET** `/payments/records/:id`
+
+获取指定支付记录的详细信息。
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "bill_id": 1,
+    "amount": 100.50,
+    "payment_method": "alipay",
+    "payment_time": "2023-01-01T12:00:00.000Z",
+    "transaction_id": "202301011200123456789",
+    "status": "synced",
+    "sync_status": "success",
+    "note": "线下支付",
+    "created_at": "2023-01-01T12:00:00.000Z",
+    "updated_at": "2023-01-01T12:05:00.000Z",
+    "user": {
+      "id": 1,
+      "username": "testuser",
+      "full_name": "测试用户"
+    },
+    "bill": {
+      "id": 1,
+      "title": "测试账单",
+      "total_amount": 100.50
+    }
+  }
+}
+```
+
+### 获取用户支付统计
+
+**GET** `/payments/stats/user`
+
+获取当前用户的支付统计信息。
+
+**查询参数**:
+- `room_id` (可选): 寝室ID
+- `start_date` (可选): 开始日期
+- `end_date` (可选): 结束日期
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "total_payments": 10,
+    "total_amount": 1000.00,
+    "offline_payments": 3,
+    "offline_amount": 300.00,
+    "online_payments": 7,
+    "online_amount": 700.00,
+    "pending_sync": 1,
+    "failed_sync": 0,
+    "payment_methods": [
+      {
+        "method": "alipay",
+        "count": 5,
+        "amount": 500.00
+      },
+      {
+        "method": "wechat",
+        "count": 5,
+        "amount": 500.00
+      }
+    ]
+  }
+}
+```
+
+### 获取房间支付统计
+
+**GET** `/payments/stats/room/:id`
+
+获取指定房间的支付统计信息。
+
+**查询参数**:
+- `start_date` (可选): 开始日期
+- `end_date` (可选): 结束日期
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "room_id": 1,
+    "room_name": "101寝室",
+    "total_payments": 20,
+    "total_amount": 2000.00,
+    "offline_payments": 5,
+    "offline_amount": 500.00,
+    "online_payments": 15,
+    "online_amount": 1500.00,
+    "pending_sync": 2,
+    "failed_sync": 1,
+    "member_stats": [
+      {
+        "user_id": 1,
+        "username": "testuser",
+        "full_name": "测试用户",
+        "total_payments": 5,
+        "total_amount": 500.00
+      }
+    ]
+  }
+}
+```
+
+## 定时任务 API
+
+### 手动触发定时任务
+
+**POST** `/payment-optimization/trigger-task`
+
+手动触发支付优化相关的定时任务。
+
+**请求体**:
+```json
+{
+  "task_type": "payment_reminder|payment_sync|payment_cleanup"
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "task_id": "task_123456789",
+    "task_type": "payment_reminder",
+    "status": "running",
+    "started_at": "2023-01-01T12:00:00.000Z"
+  },
+  "message": "定时任务触发成功"
+}
+```
+
+### 获取定时任务状态
+
+**GET** `/payment-optimization/task-status`
+
+获取支付优化相关定时任务的状态。
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "payment_reminder": {
+      "status": "running",
+      "last_run": "2023-01-01T12:00:00.000Z",
+      "next_run": "2023-01-02T12:00:00.000Z",
+      "success_count": 10,
+      "failure_count": 0
+    },
+    "payment_sync": {
+      "status": "idle",
+      "last_run": "2023-01-01T11:00:00.000Z",
+      "next_run": "2023-01-01T13:00:00.000Z",
+      "success_count": 8,
+      "failure_count": 2
+    },
+    "payment_cleanup": {
+      "status": "idle",
+      "last_run": "2023-01-01T00:00:00.000Z",
+      "next_run": "2023-01-02T00:00:00.000Z",
+      "success_count": 5,
+      "failure_count": 0
+    }
+  }
+}
+```
+
 ## WebSocket 实时通信
 
 系统支持WebSocket实时通信，用于推送费用、账单和支付相关的实时通知。
@@ -911,6 +1268,12 @@ ws.send(JSON.stringify({
   type: 'subscribe',
   events: ['bills']
 }));
+
+// 订阅支付事件
+ws.send(JSON.stringify({
+  type: 'subscribe',
+  events: ['payments']
+}));
 ```
 
 ### 事件类型
@@ -921,6 +1284,9 @@ ws.send(JSON.stringify({
 - `bill_reviewed`: 账单审核事件
 - `bill_payment_confirmed`: 账单支付确认事件
 - `payment_created`: 支付记录创建事件
+- `payment_synced`: 支付记录同步成功事件
+- `payment_sync_failed`: 支付记录同步失败事件
+- `payment_reminder_sent`: 支付提醒发送事件
 - `split_payment_confirmed`: 分摊支付确认事件
 - `review_status_updated`: 审核状态更新事件
 - `dispute_processed`: 争议处理事件
@@ -932,15 +1298,16 @@ ws.send(JSON.stringify({
 
 ```json
 {
-  "type": "expense_created",
+  "type": "payment_synced",
   "data": {
     "id": 1,
-    "title": "测试费用",
+    "user_id": 1,
+    "bill_id": 1,
     "amount": 100.50,
-    "category": "food",
-    "room_id": 1
+    "status": "synced",
+    "synced_at": "2023-01-01T12:05:00.000Z"
   },
-  "timestamp": "2023-01-01T00:00:00.000Z"
+  "timestamp": "2023-01-01T12:05:00.000Z"
 }
 ```
 
@@ -967,3 +1334,8 @@ ws.send(JSON.stringify({
 ## 版本历史
 
 - v1.0.0: 初始版本，包含基本的用户、寝室、费用和账单管理功能
+- v1.1.0: 添加支付优化功能，包括离线支付记录管理、支付同步机制和定时任务支持
+  - 新增离线支付记录创建、查询、同步和重试功能
+  - 新增支付统计功能，支持用户和房间维度的支付数据分析
+  - 新增定时任务管理，支持支付提醒、同步和清理任务
+  - 扩展WebSocket事件，支持支付相关实时通知

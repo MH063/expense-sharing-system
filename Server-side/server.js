@@ -15,14 +15,23 @@ const { pool, testConnection } = require('./config/db');
 // 导入WebSocket管理器
 const websocketManager = require('./config/websocket');
 
+// 导入定时任务服务
+const scheduler = require('./utils/scheduler');
+
 // 导入路由
-const userRoutes = require('./routes/user-routes');
 const authRoutes = require('./routes/auth-routes');
+const userRoutes = require('./routes/user-routes');
 const roomRoutes = require('./routes/room-routes');
 const expenseRoutes = require('./routes/expense-routes');
 const expenseTypeRoutes = require('./routes/expense-type-routes');
 const billRoutes = require('./routes/bill-routes');
 const statsRoutes = require('./routes/stats-routes');
+const qrCodeRoutes = require('./routes/qr-code-routes');
+const paymentRoutes = require('./routes/payment-routes');
+const inviteCodeRoutes = require('./routes/invite-code-routes');
+const specialPaymentRoutes = require('./routes/special-payment-routes');
+const paymentTransferRoutes = require('./routes/payment-transfer-routes');
+const paymentOptimizationRoutes = require('./routes/payment-optimization-routes');
 
 // 创建Express应用
 const app = express();
@@ -82,13 +91,19 @@ app.get('/health', async (req, res) => {
 });
 
 // API路由
-app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/expense-types', expenseTypeRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/qr-codes', qrCodeRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/invite-codes', inviteCodeRoutes);
+app.use('/api/special-payments', specialPaymentRoutes);
+app.use('/api/payment-transfers', paymentTransferRoutes);
+app.use('/api/payment-optimization', paymentOptimizationRoutes);
 
 // 主页路由
 app.get('/', (req, res) => {
@@ -117,6 +132,9 @@ async function startServer() {
       
       // 初始化WebSocket
       websocketManager.init(server);
+      
+      // 启动定时任务
+      scheduler.startAllTasks();
     });
   } catch (error) {
     logger.error('服务器启动失败:', error);
@@ -135,6 +153,10 @@ module.exports = app;
 // 优雅关闭
 process.on('SIGINT', async () => {
   logger.info('正在关闭服务器...');
+  
+  // 停止定时任务
+  scheduler.stopAllTasks();
+  
   await pool.end();
   process.exit(0);
 });

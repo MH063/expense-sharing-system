@@ -199,6 +199,56 @@ export function deleteBillComment(billId, commentId) {
 }
 
 /**
+ * 获取支付转移记录列表
+ * @param {Object} params - 查询参数
+ * @returns {Promise} 支付转移记录列表
+ */
+export function getPaymentTransfers(params) {
+  return request({
+    url: '/api/payment-transfers',
+    method: 'get',
+    params
+  })
+}
+
+/**
+ * 创建支付转移记录
+ * @param {Object} data - 转移记录信息
+ * @returns {Promise} 创建结果
+ */
+export function createPaymentTransfer(data) {
+  return request({
+    url: '/api/payment-transfers',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 确认支付转移记录
+ * @param {string} transferId - 转移记录ID
+ * @returns {Promise} 确认结果
+ */
+export function confirmPaymentTransfer(transferId) {
+  return request({
+    url: `/api/payment-transfers/${transferId}/confirm`,
+    method: 'post'
+  })
+}
+
+/**
+ * 取消支付转移记录
+ * @param {string} transferId - 转移记录ID
+ * @returns {Promise} 取消结果
+ */
+export function cancelPaymentTransfer(transferId) {
+  return request({
+    url: `/api/payment-transfers/${transferId}/cancel`,
+    method: 'post'
+  })
+}
+
+/**
  * 账单API对象
  */
 export const billApi = {

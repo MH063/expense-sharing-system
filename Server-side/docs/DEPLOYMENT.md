@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档描述了如何部署寝室费用分摊记账系统的后端服务。
+本文档描述了如何部署寝室费用分摊记账系统的后端服务，包括支付优化功能的完整部署流程。
 
 ## 系统要求
 
@@ -18,8 +18,8 @@
 - **操作系统**: Windows 10/11, Linux (Ubuntu 18.04+), macOS 10.15+
 - **Node.js**: 16.x或更高版本
 - **npm**: 8.x或更高版本
-- **MySQL**: 8.0或更高版本
-- **Redis**: 6.0或更高版本 (可选，用于缓存和会话管理)
+- **PostgreSQL**: 12.0或更高版本
+- **Redis**: 6.0或更高版本 (用于分布式锁和缓存)
 
 ## 环境准备
 
@@ -33,31 +33,31 @@ node --version
 npm --version
 ```
 
-### 2. 安装MySQL
+### 2. 安装PostgreSQL
 
 #### Windows
 
-1. 从[MySQL官网](https://dev.mysql.com/downloads/mysql/)下载MySQL安装程序
+1. 从[PostgreSQL官网](https://www.postgresql.org/download/windows/)下载PostgreSQL安装程序
 2. 运行安装程序，按照向导完成安装
-3. 设置root用户密码
-4. 配置MySQL服务
+3. 设置postgres用户密码
+4. 配置PostgreSQL服务
 
 #### Linux (Ubuntu)
 
 ```bash
 sudo apt update
-sudo apt install mysql-server
-sudo mysql_secure_installation
+sudo apt install postgresql postgresql-contrib
+sudo -u postgres psql
 ```
 
 #### macOS
 
 ```bash
-brew install mysql
-brew services start mysql
+brew install postgresql
+brew services start postgresql
 ```
 
-### 3. 安装Redis (可选)
+### 3. 安装Redis
 
 #### Windows
 
@@ -84,27 +84,27 @@ brew services start redis
 
 ### 1. 创建数据库
 
-登录MySQL控制台：
+登录PostgreSQL控制台：
 ```bash
-mysql -u root -p
+sudo -u postgres psql
 ```
 
 创建数据库：
 ```sql
-CREATE DATABASE room_expense_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE room_expense_db;
 ```
 
 创建数据库用户：
 ```sql
-CREATE USER 'expense_user'@'localhost' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON room_expense_db.* TO 'expense_user'@'localhost';
-FLUSH PRIVILEGES;
+CREATE USER expense_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE room_expense_db TO expense_user;
+\q
 ```
 
 ### 2. 导入数据库结构
 
 ```bash
-mysql -u expense_user -p room_expense_db < database/schema.sql
+psql -h localhost -U expense_user -d room_expense_db < database/schema.sql
 ```
 
 ## 应用部署
@@ -137,7 +137,7 @@ NODE_ENV=production
 
 # 数据库配置
 DB_HOST=localhost
-DB_PORT=3306
+DB_PORT=5432
 DB_NAME=room_expense_db
 DB_USER=expense_user
 DB_PASSWORD=your_password
@@ -146,18 +146,40 @@ DB_PASSWORD=your_password
 JWT_SECRET=your_jwt_secret_key
 JWT_EXPIRES_IN=24h
 
-# Redis配置 (可选)
+# 支付优化配置
+PAYMENT_SYNC_RETRY_LIMIT=5
+PAYMENT_SYNC_RETRY_DELAY_BASE=1000
+PAYMENT_SYNC_MAX_DELAY=60000
+PAYMENT_REMINDER_ENABLED=true
+PAYMENT_REMINDER_SCHEDULE=0 12 * * *
+PAYMENT_SYNC_SCHEDULE=0 */2 * * *
+PAYMENT_CLEANUP_SCHEDULE=0 2 * * *
+
+# Redis配置（用于分布式锁和缓存）
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
+REDIS_DB=0
 
-# 日志配置
-LOG_LEVEL=info
-LOG_FILE=logs/app.log
+# 消息通知配置
+SMS_PROVIDER=aliyun
+SMS_ACCESS_KEY_ID=your_sms_access_key
+SMS_ACCESS_KEY_SECRET=your_sms_secret
+EMAIL_SERVICE=smtp
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_USER=noreply@example.com
+EMAIL_PASS=your_email_password
 
 # 文件上传配置
 UPLOAD_PATH=uploads/
 MAX_FILE_SIZE=5242880
+ALLOWED_FILE_TYPES=jpg,jpeg,png,pdf
+
+# 日志配置
+LOG_LEVEL=info
+LOG_FILE=logs/app.log
+PAYMENT_LOG_FILE=logs/payment.log
 
 # CORS配置
 CORS_ORIGIN=http://localhost:3001
@@ -173,6 +195,95 @@ mkdir -p logs uploads
 
 ```bash
 npm run build
+```
+
+## 数据库初始化
+
+支付优化功能需要额外的数据库表。请执行以下SQL脚本：
+
+```sql
+-- 创建支付记录表
+CREATE TABLE IF NOT EXISTS payment_records (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  bill_id INTEGER NOT NULL REFERENCES bills(id),
+  amount DECIMAL(10, 2) NOT NULL,
+  payment_method VARCHAR(50) NOT NULL DEFAULT 'online',
+  payment_time TIMESTAMP NOT NULL,
+  transaction_id VARCHAR(100),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  sync_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  note TEXT,
+  retry_count INTEGER DEFAULT 0,
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建支付记录索引
+CREATE INDEX idx_payment_records_user_id ON payment_records(user_id);
+CREATE INDEX idx_payment_records_bill_id ON payment_records(bill_id);
+CREATE INDEX idx_payment_records_status ON payment_records(status);
+CREATE INDEX idx_payment_records_sync_status ON payment_records(sync_status);
+CREATE INDEX idx_payment_records_payment_time ON payment_records(payment_time);
+
+-- 创建消息模板表
+CREATE TABLE IF NOT EXISTS message_templates (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  title VARCHAR(200) NOT NULL,
+  content TEXT NOT NULL,
+  channel VARCHAR(20) NOT NULL DEFAULT 'app',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 插入默认消息模板
+INSERT INTO message_templates (name, title, content, channel) VALUES
+('payment_reminder', '支付提醒', '您好，{{userName}}！您有一笔账单"{{billTitle}}"需要在{{dueDate}}前支付，金额为{{amount}}元。请及时支付以免产生逾期费用。', 'app'),
+('payment_reminder_sms', '支付提醒', '【寝室记账】{{userName}}，您有账单"{{billTitle}}"需在{{dueDate}}前支付{{amount}}元。', 'sms'),
+('payment_sync_success', '支付同步成功', '您的离线支付记录已成功同步，账单"{{billTitle}}"支付状态已更新。', 'app'),
+('payment_sync_failed', '支付同步失败', '您的离线支付记录同步失败，请稍后重试或联系管理员。错误信息：{{errorMessage}}', 'app');
+
+-- 创建通知记录表
+CREATE TABLE IF NOT EXISTS notification_records (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  bill_id INTEGER REFERENCES bills(id),
+  payment_id INTEGER REFERENCES payment_records(id),
+  channel VARCHAR(20) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  sent_at TIMESTAMP,
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建通知记录索引
+CREATE INDEX idx_notification_records_user_id ON notification_records(user_id);
+CREATE INDEX idx_notification_records_status ON notification_records(status);
+CREATE INDEX idx_notification_records_created_at ON notification_records(created_at);
+
+-- 创建定时任务状态表
+CREATE TABLE IF NOT EXISTS task_status (
+  id SERIAL PRIMARY KEY,
+  task_name VARCHAR(100) NOT NULL UNIQUE,
+  status VARCHAR(20) NOT NULL DEFAULT 'idle',
+  last_run TIMESTAMP,
+  next_run TIMESTAMP,
+  success_count INTEGER DEFAULT 0,
+  failure_count INTEGER DEFAULT 0,
+  last_error TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 插入默认定时任务
+INSERT INTO task_status (task_name, status) VALUES
+('payment_reminder', 'idle'),
+('payment_sync', 'idle'),
+('payment_cleanup', 'idle');
 ```
 
 ## 启动服务
@@ -201,34 +312,65 @@ module.exports = {
     instances: 'max',
     exec_mode: 'cluster',
     env: {
-      NODE_ENV: 'production'
+      NODE_ENV: 'production',
+      PORT: 3000
     },
     error_file: 'logs/err.log',
     out_file: 'logs/out.log',
     log_file: 'logs/combined.log',
     time: true
+  }, {
+    name: 'payment-reminder',
+    script: './utils/scheduler.js',
+    instances: 1,
+    cron: '0 12 * * *', // 每天12:00执行
+    env: {
+      NODE_ENV: 'production',
+      TASK_TYPE: 'payment_reminder'
+    },
+    error_file: 'logs/payment-reminder-err.log',
+    out_file: 'logs/payment-reminder-out.log',
+    log_file: 'logs/payment-reminder.log'
+  }, {
+    name: 'payment-sync',
+    script: './utils/scheduler.js',
+    instances: 1,
+    cron: '0 */2 * * *', // 每2小时执行一次
+    env: {
+      NODE_ENV: 'production',
+      TASK_TYPE: 'payment_sync'
+    },
+    error_file: 'logs/payment-sync-err.log',
+    out_file: 'logs/payment-sync-out.log',
+    log_file: 'logs/payment-sync.log'
+  }, {
+    name: 'payment-cleanup',
+    script: './utils/scheduler.js',
+    instances: 1,
+    cron: '0 2 * * *', // 每天凌晨2:00执行
+    env: {
+      NODE_ENV: 'production',
+      TASK_TYPE: 'payment_cleanup'
+    },
+    error_file: 'logs/payment-cleanup-err.log',
+    out_file: 'logs/payment-cleanup-out.log',
+    log_file: 'logs/payment-cleanup.log'
   }]
 };
 ```
 
-3. 启动应用：
+3. 启动应用和定时任务：
+
 ```bash
 pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
 ```
 
-4. 查看状态：
-```bash
-pm2 status
-```
-
-5. 查看日志：
-```bash
-pm2 logs room-expense-api
-```
-
-#### 使用systemd (Linux)
+#### 使用系统服务
 
 1. 创建systemd服务文件 `/etc/systemd/system/room-expense-api.service`：
+
 ```ini
 [Unit]
 Description=Room Expense API
@@ -236,35 +378,210 @@ After=network.target
 
 [Service]
 Type=simple
-User=your_user
-WorkingDirectory=/path/to/room-expense-system/Server-side
+User=node
+WorkingDirectory=/path/to/your/app
 ExecStart=/usr/bin/node server.js
-Restart=on-failure
+Restart=always
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=room-expense-api
 Environment=NODE_ENV=production
+Environment=PORT=3000
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 2. 启动服务：
+
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable room-expense-api
 sudo systemctl start room-expense-api
+sudo systemctl enable room-expense-api
 ```
 
-3. 查看状态：
+## Redis配置
+
+支付优化功能使用Redis实现分布式锁和缓存，请确保Redis服务正常运行：
+
+1. 启动Redis服务：
+
 ```bash
-sudo systemctl status room-expense-api
+# Linux
+sudo systemctl start redis-server
+sudo systemctl enable redis-server
+
+# Windows
+redis-server.exe
 ```
 
-4. 查看日志：
+2. 验证Redis连接：
+
 ```bash
-sudo journalctl -u room-expense-api -f
+redis-cli ping
+```
+
+## 日志配置
+
+支付优化功能会产生大量日志，建议配置日志轮转：
+
+1. 创建logrotate配置文件 `/etc/logrotate.d/room-expense-api`：
+
+```bash
+/path/to/your/app/logs/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 node node
+    postrotate
+        pm2 reload room-expense-api
+    endscript
+}
+```
+
+2. 测试logrotate配置：
+
+```bash
+logrotate -d /etc/logrotate.d/room-expense-api
+```
+
+## 验证部署
+
+1. 检查API服务状态：
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+2. 检查支付优化API：
+
+```bash
+# 获取账单收款码
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:3000/api/payments/bill/1/qrcode
+
+# 创建离线支付记录
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer YOUR_TOKEN" \
+-d '{"billId": 1, "amount": 50.00, "paymentMethod": "offline", "note": "线下支付"}' \
+http://localhost:3000/api/payments/offline
+```
+
+3. 检查定时任务状态：
+
+```bash
+pm2 list
+```
+
+## 监控和告警
+
+建议设置以下监控和告警：
+
+1. **支付同步失败率监控**：当支付同步失败率超过5%时发送告警
+2. **定时任务执行状态监控**：当定时任务连续失败3次以上时发送告警
+3. **Redis连接状态监控**：当Redis连接失败时发送告警
+4. **磁盘空间监控**：当日志目录磁盘空间使用率超过80%时发送告警
+
+## 性能优化建议
+
+1. **数据库优化**：
+   - 为支付记录表添加适当的索引
+   - 定期清理过期的日志和临时数据
+   - 考虑对历史数据进行归档
+
+2. **缓存优化**：
+   - 配置Redis缓存热点数据
+   - 设置合理的缓存过期时间
+   - 监控缓存命中率
+
+3. **应用优化**：
+   - 使用PM2集群模式提高并发处理能力
+   - 配置适当的连接池大小
+   - 启用gzip压缩减少网络传输
+
+## 故障排查
+
+1. **支付同步失败**：
+   - 检查网络连接
+   - 查看支付同步日志
+   - 检查第三方支付接口状态
+
+2. **定时任务未执行**：
+   - 检查cron配置
+   - 查看定时任务日志
+   - 验证脚本执行权限
+
+3. **性能问题**：
+   - 检查数据库慢查询日志
+   - 监控系统资源使用情况
+   - 分析应用性能瓶颈
+
+## 备份与恢复
+
+### 数据库备份
+
+```bash
+# 创建备份
+pg_dump -h localhost -U expense_user room_expense_db > backup.sql
+
+# 恢复备份
+psql -h localhost -U expense_user room_expense_db < backup.sql
+```
+
+### 应用备份
+
+```bash
+# 创建应用备份
+tar -czf room-expense-api-backup.tar.gz /path/to/your/app
+
+# 恢复应用备份
+tar -xzf room-expense-api-backup.tar.gz -C /path/to/restore
+```
+
+## 升级指南
+
+1. 备份当前应用和数据：
+
+```bash
+# 备份数据库
+pg_dump -h localhost -U expense_user room_expense_db > backup_before_upgrade.sql
+
+# 备份应用文件
+tar -czf app-backup-before-upgrade.tar.gz /path/to/your/app
+```
+
+2. 停止应用：
+
+```bash
+pm2 stop all
+```
+
+3. 更新代码：
+
+```bash
+git pull origin main
+npm install --production
+npm run build
+```
+
+4. 运行数据库迁移（如果有）：
+
+```bash
+npm run migrate
+```
+
+5. 重启应用：
+
+```bash
+pm2 start ecosystem.config.js
+```
+
+6. 验证升级：
+
+```bash
+# 检查API状态
+curl http://localhost:3000/api/health
+
+# 检查新功能
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:3000/api/payments/offline
 ```
 
 ## 反向代理配置
@@ -341,285 +658,3 @@ server {
     # 其他配置...
 }
 ```
-
-## 监控与日志
-
-### 1. 应用监控
-
-#### 使用PM2监控
-
-```bash
-pm2 monit
-```
-
-#### 使用健康检查端点
-
-应用提供了健康检查端点：
-```bash
-curl http://localhost:3000/health
-```
-
-### 2. 日志管理
-
-#### 日志轮转配置
-
-创建logrotate配置文件 `/etc/logrotate.d/room-expense-api`：
-```
-/path/to/room-expense-system/Server-side/logs/*.log {
-    daily
-    missingok
-    rotate 52
-    compress
-    notifempty
-    create 644 your_user your_user
-    postrotate
-        pm2 reload room-expense-api
-    endscript
-}
-```
-
-## 备份策略
-
-### 1. 数据库备份
-
-创建备份脚本 `backup-db.sh`：
-```bash
-#!/bin/bash
-
-BACKUP_DIR="/path/to/backups"
-DATE=$(date +%Y%m%d_%H%M%S)
-DB_NAME="room_expense_db"
-DB_USER="expense_user"
-
-mkdir -p $BACKUP_DIR
-
-# 创建数据库备份
-mysqldump -u $DB_USER -p $DB_NAME > $BACKUP_DIR/db_backup_$DATE.sql
-
-# 压缩备份文件
-gzip $BACKUP_DIR/db_backup_$DATE.sql
-
-# 删除7天前的备份
-find $BACKUP_DIR -name "db_backup_*.sql.gz" -mtime +7 -delete
-```
-
-设置定时任务：
-```bash
-crontab -e
-```
-
-添加以下行（每天凌晨2点执行备份）：
-```
-0 2 * * * /path/to/backup-db.sh
-```
-
-### 2. 应用文件备份
-
-创建应用文件备份脚本 `backup-app.sh`：
-```bash
-#!/bin/bash
-
-BACKUP_DIR="/path/to/backups"
-APP_DIR="/path/to/room-expense-system/Server-side"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p $BACKUP_DIR
-
-# 创建应用文件备份
-tar -czf $BACKUP_DIR/app_backup_$DATE.tar.gz -C $APP_DIR .
-
-# 删除30天前的备份
-find $BACKUP_DIR -name "app_backup_*.tar.gz" -mtime +30 -delete
-```
-
-## 性能优化
-
-### 1. 数据库优化
-
-#### 添加索引
-
-```sql
--- 用户表索引
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_email ON users(email);
-
--- 寝室表索引
-CREATE INDEX idx_rooms_creator_id ON rooms(creator_id);
-
--- 费用表索引
-CREATE INDEX idx_expenses_room_id ON expenses(room_id);
-CREATE INDEX idx_expenses_paid_by ON expenses(paid_by);
-CREATE INDEX idx_expenses_created_by ON expenses(created_by);
-CREATE INDEX idx_expenses_date ON expenses(date);
-CREATE INDEX idx_expenses_category ON expenses(category);
-
--- 账单表索引
-CREATE INDEX idx_bills_room_id ON bills(room_id);
-CREATE INDEX idx_bills_created_by ON bills(created_by);
-CREATE INDEX idx_bills_status ON bills(status);
-CREATE INDEX idx_bills_due_date ON bills(due_date);
-
--- 费用分摊表索引
-CREATE INDEX idx_expense_splits_expense_id ON expense_splits(expense_id);
-CREATE INDEX idx_expense_splits_user_id ON expense_splits(user_id);
-
--- 账单分摊表索引
-CREATE INDEX idx_bill_splits_bill_id ON bill_splits(bill_id);
-CREATE INDEX idx_bill_splits_user_id ON bill_splits(user_id);
-
--- 寝室成员表索引
-CREATE INDEX idx_room_members_room_id ON room_members(room_id);
-CREATE INDEX idx_room_members_user_id ON room_members(user_id);
-```
-
-#### 查询优化
-
-- 使用适当的索引
-- 避免SELECT *
-- 使用LIMIT限制结果集
-- 优化JOIN操作
-
-### 2. 应用优化
-
-#### 启用Gzip压缩
-
-在Express中添加压缩中间件：
-```javascript
-const compression = require('compression');
-app.use(compression());
-```
-
-#### 使用缓存
-
-```javascript
-const NodeCache = require('node-cache');
-const cache = new NodeCache({ stdTTL: 600 }); // 10分钟缓存
-
-// 缓存中间件
-function cacheMiddleware(req, res, next) {
-  const key = req.originalUrl;
-  const cached = cache.get(key);
-  
-  if (cached) {
-    return res.json(cached);
-  }
-  
-  res.sendResponse = res.json;
-  res.json = (body) => {
-    cache.set(key, body);
-    res.sendResponse(body);
-  };
-  
-  next();
-}
-```
-
-## 安全加固
-
-### 1. 服务器安全
-
-- 定期更新系统和软件包
-- 配置防火墙，只开放必要端口
-- 使用SSH密钥认证，禁用密码认证
-- 禁用root登录
-- 使用fail2ban防止暴力破解
-
-### 2. 应用安全
-
-- 使用HTTPS
-- 设置安全HTTP头
-- 实现请求速率限制
-- 验证和清理所有输入
-- 使用参数化查询防止SQL注入
-- 实现CSP (Content Security Policy)
-
-### 3. 数据库安全
-
-- 使用强密码
-- 限制数据库用户权限
-- 定期备份数据
-- 加密敏感数据
-
-## 故障排除
-
-### 1. 常见问题
-
-#### 应用无法启动
-
-检查以下几点：
-- Node.js版本是否正确
-- 依赖是否正确安装
-- 环境变量是否正确设置
-- 数据库连接是否正常
-- 端口是否被占用
-
-#### 数据库连接失败
-
-检查以下几点：
-- 数据库服务是否运行
-- 连接参数是否正确
-- 数据库用户是否有权限
-- 防火墙是否阻止连接
-
-#### 性能问题
-
-检查以下几点：
-- 数据库查询是否优化
-- 是否有内存泄漏
-- 服务器资源是否充足
-- 是否有慢查询
-
-### 2. 日志分析
-
-查看应用日志：
-```bash
-tail -f logs/app.log
-```
-
-查看Nginx日志：
-```bash
-tail -f /var/log/nginx/access.log
-tail -f /var/log/nginx/error.log
-```
-
-查看系统日志：
-```bash
-journalctl -u room-expense-api -f
-```
-
-## 更新与维护
-
-### 1. 应用更新
-
-1. 备份当前应用和数据库
-2. 获取最新代码：
-   ```bash
-   git pull origin main
-   ```
-3. 安装新依赖：
-   ```bash
-   npm install --production
-   ```
-4. 运行数据库迁移（如果有）：
-   ```bash
-   npm run migrate
-   ```
-5. 重启应用：
-   ```bash
-   pm2 restart room-expense-api
-   ```
-
-### 2. 定期维护任务
-
-- 每周检查日志文件大小
-- 每月检查数据库性能
-- 每季度检查安全更新
-- 每年审查和更新备份策略
-
-## 联系支持
-
-如果在部署过程中遇到问题，请联系技术支持：
-
-- 邮箱：support@example.com
-- 文档：https://docs.example.com
-- 问题追踪：https://github.com/your-repo/room-expense-system/issues

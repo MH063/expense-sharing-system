@@ -18,17 +18,9 @@ process.env.PGUSER = process.env.PGUSER || process.env.DB_USER;
 process.env.PGPASSWORD = String(process.env.PGPASSWORD || process.env.DB_PASSWORD || '');
 process.env.PGDATABASE = process.env.PGDATABASE || process.env.DB_NAME;
 
-// 预加载 Sequelize 模型并注入到全局，避免测试文件顶部解构 models 为空
-const td = require('./test-database');
-if (td && td.models) {
-  global.models = td.models;
-} else {
-  // 如果模型未正确加载，设置一个空的模型对象
-  global.models = global.models || {};
-} else {
-  // 如果模型未正确加载，设置一个空的模型对象
-  global.models = global.models || {};
-}
+// 预加载原生SQL测试数据库设置
+const nativeTestDb = require('./native-test-database');
+global.testDb = nativeTestDb;
 
 // 设置测试环境变量
 process.env.NODE_ENV = 'test';
@@ -53,21 +45,21 @@ try {
 // 全局测试设置
 beforeAll(async () => {
   // 初始化测试数据库
-  const { initTestDatabase } = require('./test-database');
+  const { initTestDatabase } = require('./native-test-database');
   await initTestDatabase();
 });
 
 // 可选：每个测试文件前清理数据库（默认关闭，以兼容依赖前置数据的集成测试）
 beforeEach(async () => {
   if (process.env.CLEAR_DB_EACH_TEST === 'true') {
-    const { clearTestDatabase } = require('./test-database');
+    const { clearTestDatabase } = require('./native-test-database');
     await clearTestDatabase();
   }
 });
 
 // 所有测试完成后关闭数据库连接
 afterAll(async () => {
-  const { closeTestDatabase } = require('./test-database');
+  const { closeTestDatabase } = require('./native-test-database');
   await closeTestDatabase();
 });
 

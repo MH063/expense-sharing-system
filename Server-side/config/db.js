@@ -1,66 +1,9 @@
 const { Pool } = require('pg');
-const { Sequelize } = require('sequelize');
 const path = require('path');
 
 // 根据环境变量加载对应的环境配置文件
 const env = process.env.NODE_ENV || 'development';
 require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
-
-// 检查是否使用SQLite
-const isSQLite = process.env.DB_DIALECT === 'sqlite';
-
-if (isSQLite) {
-  // SQLite配置
-  const sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: process.env.DB_STORAGE || './database.sqlite',
-    logging: false
-  });
-  
-  // 为SQLite创建一个模拟的查询函数
-  async function query(text, params) {
-    try {
-      const result = await sequelize.query(text, {
-        replacements: params,
-        type: Sequelize.QueryTypes.RAW
-      });
-      console.log('执行查询:', { text, rows: Array.isArray(result) ? result[0].length : 0 });
-      return Array.isArray(result) ? result[0] : result;
-    } catch (error) {
-      console.error('查询错误:', { text, error: error.message });
-      throw error;
-    }
-  }
-  
-  // 模拟连接池对象
-  const pool = {
-    query: query,
-    connect: async () => ({
-      query: async (text, params) => await query(text, params),
-      release: () => {}
-    }),
-    end: async () => {}
-  };
-  
-  module.exports = {
-    pool,
-    query,
-    testConnection: async () => {
-      try {
-        await sequelize.authenticate();
-        console.log('SQLite数据库连接成功');
-        return true;
-      } catch (error) {
-        console.error('SQLite数据库连接失败:', error.message);
-        return false;
-      }
-    },
-    getConfig: () => ({
-      dialect: 'sqlite',
-      storage: process.env.DB_STORAGE || './database.sqlite'
-    })
-  };
-} else {
   // PostgreSQL数据库连接配置
   const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
@@ -121,4 +64,3 @@ if (isSQLite) {
     testConnection,
     getConfig: () => dbConfig,
   };
-}

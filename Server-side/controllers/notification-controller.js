@@ -1,11 +1,27 @@
-const { Notification, User, Bill, Payment } = require('../models');
-const { Op } = require('sequelize');
-const { sequelize } = require('../config/database');
+const { pool } = require('../config/db');
+const winston = require('winston');
+
+// 创建日志记录器
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/notification-controller.log' })
+  ]
+});
 
 /**
  * 通知控制器
  */
 class NotificationController {
+  constructor() {
+    this.logger = logger;
+  }
+
   /**
    * 创建通知
    * @param {Object} notificationData - 通知数据
@@ -19,21 +35,26 @@ class NotificationController {
    */
   static async createNotification(notificationData) {
     try {
-      console.log('创建通知，数据:', notificationData);
+      logger.info('创建通知，数据:', notificationData);
       
-      const notification = await Notification.create({
-        user_id: notificationData.user_id,
-        title: notificationData.title,
-        content: notificationData.content,
-        type: notificationData.type,
-        related_id: notificationData.related_id || null,
-        is_read: notificationData.is_read || false
-      });
+      const result = await pool.query(
+        `INSERT INTO notifications (user_id, title, content, type, related_id, is_read, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING *`,
+        [
+          notificationData.user_id,
+          notificationData.title,
+          notificationData.content,
+          notificationData.type,
+          notificationData.related_id || null,
+          notificationData.is_read || false
+        ]
+      );
       
-      console.log('通知创建成功:', notification.id);
+      const notification = result.rows[0];
+      logger.info('通知创建成功:', notification.id);
       return notification;
     } catch (error) {
-      console.error('创建通知失败:', error);
+      logger.error('创建通知失败:', error);
       throw error;
     }
   }
@@ -50,7 +71,7 @@ class NotificationController {
    */
   static async getUserNotifications(userId, options = {}) {
     try {
-      console.log('获取用户通知列表，用户ID:', userId, '选项:', options);
+      logger.info('获取用户通知列表，用户ID:', userId, '选项:', options);
       
       const {
         unreadOnly = false,
@@ -60,40 +81,54 @@ class NotificationController {
       } = options;
       
       // 构建查询条件
-      const whereClause = {
-        user_id: userId
-      };
+      const conditions = ['user_id = $1'];
+      const queryParams = [userId];
+      let paramIndex = 2;
       
       if (unreadOnly) {
-        whereClause.is_read = false;
+        conditions.push(`is_read = $${paramIndex++}`);
+        queryParams.push(false);
       }
       
       if (type) {
-        whereClause.type = type;
+        conditions.push(`type = $${paramIndex++}`);
+        queryParams.push(type);
       }
+      
+      const whereClause = conditions.join(' AND ');
       
       // 计算偏移量
       const offset = (page - 1) * limit;
       
       // 查询通知
-      const { count, rows: notifications } = await Notification.findAndCountAll({
-        where: whereClause,
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
-      });
+      const notificationsQuery = `
+        SELECT * FROM notifications
+        WHERE ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+      `;
       
-      console.log(`找到 ${count} 条通知，返回第 ${page} 页，每页 ${limit} 条`);
+      queryParams.push(limit, offset);
+      
+      const notificationsResult = await pool.query(notificationsQuery, queryParams);
+      const notifications = notificationsResult.rows;
+      
+      // 查询总数
+      const countQuery = `SELECT COUNT(*) FROM notifications WHERE ${whereClause}`;
+      const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
+      const total = parseInt(countResult.rows[0].count);
+      
+      logger.info(`找到 ${total} 条通知，返回第 ${page} 页，每页 ${limit} 条`);
       
       return {
         notifications,
-        total: count,
+        total,
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(count / limit)
+        totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
-      console.error('获取用户通知列表失败:', error);
+      logger.error('获取用户通知列表失败:', error);
       throw error;
     }
   }
@@ -106,24 +141,21 @@ class NotificationController {
    */
   static async markNotificationAsRead(notificationId, userId) {
     try {
-      console.log('标记通知为已读，通知ID:', notificationId, '用户ID:', userId);
+      logger.info('标记通知为已读，通知ID:', notificationId, '用户ID:', userId);
       
-      const [updatedRowsCount] = await Notification.update(
-        { is_read: true },
-        {
-          where: {
-            id: notificationId,
-            user_id: userId
-          }
-        }
+      const result = await pool.query(
+        `UPDATE notifications 
+         SET is_read = true, updated_at = NOW()
+         WHERE id = $1 AND user_id = $2`,
+        [notificationId, userId]
       );
       
-      const success = updatedRowsCount > 0;
-      console.log(`标记通知为已读${success ? '成功' : '失败'}，影响行数:`, updatedRowsCount);
+      const success = result.rowCount > 0;
+      logger.info(`标记通知为已读${success ? '成功' : '失败'}，影响行数:`, result.rowCount);
       
       return success;
     } catch (error) {
-      console.error('标记通知为已读失败:', error);
+      logger.error('标记通知为已读失败:', error);
       throw error;
     }
   }
@@ -136,27 +168,32 @@ class NotificationController {
    */
   static async markAllNotificationsAsRead(userId, type = null) {
     try {
-      console.log('标记所有通知为已读，用户ID:', userId, '类型:', type);
+      logger.info('标记所有通知为已读，用户ID:', userId, '类型:', type);
       
-      const whereClause = {
-        user_id: userId,
-        is_read: false
-      };
+      const conditions = ['user_id = $1', 'is_read = false'];
+      const queryParams = [userId];
+      let paramIndex = 2;
       
       if (type) {
-        whereClause.type = type;
+        conditions.push(`type = $${paramIndex++}`);
+        queryParams.push(type);
       }
       
-      const [updatedRowsCount] = await Notification.update(
-        { is_read: true },
-        { where: whereClause }
+      const whereClause = conditions.join(' AND ');
+      
+      const result = await pool.query(
+        `UPDATE notifications 
+         SET is_read = true, updated_at = NOW()
+         WHERE ${whereClause}`,
+        queryParams
       );
       
-      console.log(`标记 ${updatedRowsCount} 条通知为已读`);
+      const updatedRowsCount = result.rowCount;
+      logger.info(`标记 ${updatedRowsCount} 条通知为已读`);
       
       return updatedRowsCount;
     } catch (error) {
-      console.error('标记所有通知为已读失败:', error);
+      logger.error('标记所有通知为已读失败:', error);
       throw error;
     }
   }
@@ -169,21 +206,19 @@ class NotificationController {
    */
   static async deleteNotification(notificationId, userId) {
     try {
-      console.log('删除通知，通知ID:', notificationId, '用户ID:', userId);
+      logger.info('删除通知，通知ID:', notificationId, '用户ID:', userId);
       
-      const deletedRowsCount = await Notification.destroy({
-        where: {
-          id: notificationId,
-          user_id: userId
-        }
-      });
+      const result = await pool.query(
+        'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+        [notificationId, userId]
+      );
       
-      const success = deletedRowsCount > 0;
-      console.log(`删除通知${success ? '成功' : '失败'}，影响行数:`, deletedRowsCount);
+      const success = result.rowCount > 0;
+      logger.info(`删除通知${success ? '成功' : '失败'}，影响行数:`, result.rowCount);
       
       return success;
     } catch (error) {
-      console.error('删除通知失败:', error);
+      logger.error('删除通知失败:', error);
       throw error;
     }
   }
@@ -196,24 +231,30 @@ class NotificationController {
    */
   static async getUnreadNotificationCount(userId, type = null) {
     try {
-      console.log('获取未读通知数量，用户ID:', userId, '类型:', type);
+      logger.info('获取未读通知数量，用户ID:', userId, '类型:', type);
       
-      const whereClause = {
-        user_id: userId,
-        is_read: false
-      };
+      const conditions = ['user_id = $1', 'is_read = false'];
+      const queryParams = [userId];
+      let paramIndex = 2;
       
       if (type) {
-        whereClause.type = type;
+        conditions.push(`type = $${paramIndex++}`);
+        queryParams.push(type);
       }
       
-      const count = await Notification.count({ where: whereClause });
+      const whereClause = conditions.join(' AND ');
       
-      console.log(`找到 ${count} 条未读通知`);
+      const result = await pool.query(
+        `SELECT COUNT(*) FROM notifications WHERE ${whereClause}`,
+        queryParams
+      );
+      
+      const count = parseInt(result.rows[0].count);
+      logger.info(`找到 ${count} 条未读通知`);
       
       return count;
     } catch (error) {
-      console.error('获取未读通知数量失败:', error);
+      logger.error('获取未读通知数量失败:', error);
       throw error;
     }
   }
@@ -226,26 +267,24 @@ class NotificationController {
    */
   static async createBillDueNotifications(billData, daysUntilDue) {
     try {
-      console.log('创建账单到期提醒通知，账单ID:', billData.id, '距离到期天数:', daysUntilDue);
+      logger.info('创建账单到期提醒通知，账单ID:', billData.id, '距离到期天数:', daysUntilDue);
       
       const notifications = [];
       
       // 获取账单分摊信息，找出需要支付的用户
-      const billSplits = await BillSplit.findAll({
-        where: {
-          bill_id: billData.id
-        },
-        include: [
-          {
-            model: User,
-            attributes: ['id', 'username', 'email']
-          }
-        ]
-      });
+      const billSplitsResult = await pool.query(
+        `SELECT bs.*, u.username, u.email
+         FROM bill_splits bs
+         JOIN users u ON bs.user_id = u.id
+         WHERE bs.bill_id = $1`,
+        [billData.id]
+      );
+      
+      const billSplits = billSplitsResult.rows;
       
       // 为每个需要支付的用户创建通知
       for (const split of billSplits) {
-        if (split.amount > 0) { // 只为需要支付的用户创建通知
+        if (parseFloat(split.amount) > 0) { // 只为需要支付的用户创建通知
           const title = daysUntilDue <= 0 
             ? '账单已逾期' 
             : daysUntilDue <= 3 
@@ -274,11 +313,11 @@ class NotificationController {
         }
       }
       
-      console.log(`创建了 ${notifications.length} 条账单到期提醒通知`);
+      logger.info(`创建了 ${notifications.length} 条账单到期提醒通知`);
       
       return notifications;
     } catch (error) {
-      console.error('创建账单到期提醒通知失败:', error);
+      logger.error('创建账单到期提醒通知失败:', error);
       throw error;
     }
   }
@@ -291,38 +330,36 @@ class NotificationController {
    */
   static async createPaymentStatusNotifications(paymentData, status) {
     try {
-      console.log('创建支付状态变更通知，支付ID:', paymentData.id, '状态:', status);
+      logger.info('创建支付状态变更通知，支付ID:', paymentData.id, '状态:', status);
       
       const notifications = [];
       
       // 获取账单信息
-      const bill = await Bill.findByPk(paymentData.bill_id, {
-        include: [
-          {
-            model: User,
-            as: 'creator',
-            attributes: ['id', 'username', 'email']
-          }
-        ]
-      });
+      const billResult = await pool.query(
+        `SELECT b.*, u.username as creator_username, u.email as creator_email
+         FROM bills b
+         JOIN users u ON b.creator_id = u.id
+         WHERE b.id = $1`,
+        [paymentData.bill_id]
+      );
       
-      if (!bill) {
-        console.error('未找到账单信息');
+      if (billResult.rows.length === 0) {
+        logger.error('未找到账单信息');
         return notifications;
       }
       
+      const bill = billResult.rows[0];
+      
       // 获取账单分摊信息
-      const billSplits = await BillSplit.findAll({
-        where: {
-          bill_id: bill.id
-        },
-        include: [
-          {
-            model: User,
-            attributes: ['id', 'username', 'email']
-          }
-        ]
-      });
+      const billSplitsResult = await pool.query(
+        `SELECT bs.*, u.username, u.email
+         FROM bill_splits bs
+         JOIN users u ON bs.user_id = u.id
+         WHERE bs.bill_id = $1`,
+        [bill.id]
+      );
+      
+      const billSplits = billSplitsResult.rows;
       
       // 根据状态创建不同的通知
       let title, content;
@@ -365,11 +402,11 @@ class NotificationController {
         notifications.push(notification);
       }
       
-      console.log(`创建了 ${notifications.length} 条支付状态变更通知`);
+      logger.info(`创建了 ${notifications.length} 条支付状态变更通知`);
       
       return notifications;
     } catch (error) {
-      console.error('创建支付状态变更通知失败:', error);
+      logger.error('创建支付状态变更通知失败:', error);
       throw error;
     }
   }
@@ -381,7 +418,7 @@ class NotificationController {
    */
   static async checkAndSendDueBillNotifications(days = 3) {
     try {
-      console.log(`检查并发送即将到期的账单提醒，提前天数: ${days}`);
+      logger.info(`检查并发送即将到期的账单提醒，提前天数: ${days}`);
       
       // 计算目标日期
       const targetDate = new Date();
@@ -389,25 +426,12 @@ class NotificationController {
       const targetDateStr = targetDate.toISOString().split('T')[0];
       
       // 查找即将到期的账单
-      const dueBills = await Bill.findAll({
-        where: {
-          due_date: targetDateStr,
-          status: {
-            [Op.notIn]: ['paid', 'cancelled']
-          }
-        },
-        include: [
-          {
-            model: BillSplit,
-            include: [
-              {
-                model: User,
-                attributes: ['id', 'username', 'email']
-              }
-            ]
-          }
-        ]
-      });
+      const dueBillsResult = await pool.query(
+        `SELECT * FROM bills WHERE due_date = $1 AND status != 'PAID'`,
+        [targetDateStr]
+      );
+      
+      const dueBills = dueBillsResult.rows;
       
       let totalNotifications = 0;
       
@@ -437,27 +461,12 @@ class NotificationController {
       // 查找已逾期的账单
       const today = new Date().toISOString().split('T')[0];
       
-      const overdueBills = await Bill.findAll({
-        where: {
-          due_date: {
-            [Op.lt]: today
-          },
-          status: {
-            [Op.notIn]: ['paid', 'cancelled']
-          }
-        },
-        include: [
-          {
-            model: BillSplit,
-            include: [
-              {
-                model: User,
-                attributes: ['id', 'username', 'email']
-              }
-            ]
-          }
-        ]
-      });
+      const overdueBillsResult = await pool.query(
+        `SELECT * FROM bills WHERE due_date < $1 AND status NOT IN ('paid', 'cancelled')`,
+        [today]
+      );
+      
+      const overdueBills = overdueBillsResult.rows;
       
       let totalNotifications = 0;
       

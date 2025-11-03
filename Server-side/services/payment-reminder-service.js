@@ -3,8 +3,8 @@
  * 处理支付提醒的创建、发送和管理
  */
 
-const { Bill, User, Room, Payment, PaymentReminder } = require('../models');
-const { Op } = require('sequelize');
+const pool = require('../config/db').pool;
+const logger = require('../config/winston');
 const { v4: uuidv4 } = require('uuid');
 const { sendEmail, sendSMS } = require('../utils/notification-service');
 
@@ -16,59 +16,58 @@ const { sendEmail, sendSMS } = require('../utils/notification-service');
  * @param {string} reminderData.reminderType - 提醒类型
  * @param {Date} reminderData.reminderTime - 提醒时间
  * @param {string} reminderData.message - 提醒消息
- * @param {string} reminderData.channel - 提醒渠道
- * @returns {Object} 支付提醒记录
+ * @param {string} reminderData.channel - 提醒渠道 (email, sms, notification)
+ * @returns {Object} 创建的提醒记录
  */
 const createPaymentReminder = async (reminderData) => {
   try {
-    console.log('创建支付提醒，数据:', reminderData);
+    logger.info('创建支付提醒', { billId: reminderData.billId, userId: reminderData.userId });
     
-    // 验证必要参数
-    const {
+    const { billId, userId, reminderType, reminderTime, message, channel } = reminderData;
+    
+    // 检查账单是否存在
+    const billQuery = 'SELECT id FROM bills WHERE id = $1';
+    const billResult = await pool.query(billQuery, [billId]);
+    
+    if (billResult.rows.length === 0) {
+      throw new Error('账单不存在');
+    }
+    
+    // 检查用户是否存在
+    const userQuery = 'SELECT id FROM users WHERE id = $1';
+    const userResult = await pool.query(userQuery, [userId]);
+    
+    if (userResult.rows.length === 0) {
+      throw new Error('用户不存在');
+    }
+    
+    // 创建提醒记录
+    const reminderId = uuidv4();
+    const insertQuery = `
+      INSERT INTO payment_reminders 
+      (id, bill_id, user_id, reminder_type, reminder_time, message, channel, status, created_at, updated_at) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) 
+      RETURNING *
+    `;
+    
+    const reminderResult = await pool.query(insertQuery, [
+      reminderId,
       billId,
       userId,
       reminderType,
       reminderTime,
       message,
-      channel
-    } = reminderData;
-    
-    if (!billId || !userId || !reminderType || !reminderTime || !channel) {
-      throw new Error('缺少必要参数');
-    }
-    
-    // 检查账单是否存在
-    const bill = await Bill.findByPk(billId);
-    if (!bill) {
-      throw new Error('账单不存在');
-    }
-    
-    // 检查用户是否存在
-    const user = await User.findByPk(userId);
-    if (!user) {
-      throw new Error('用户不存在');
-    }
-    
-    // 创建支付提醒记录
-    const reminder = await PaymentReminder.create({
-      id: uuidv4(),
-      billId,
-      userId,
-      reminderType,
-      reminderTime,
-      message: message || '',
       channel,
-      status: 'pending', // 待发送状态
-      sentAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+      'pending'
+    ]);
     
-    console.log(`成功创建支付提醒，ID: ${reminder.id}`);
+    const reminder = reminderResult.rows[0];
+    
+    logger.info('支付提醒创建成功', { reminderId: reminder.id });
     
     return reminder;
   } catch (error) {
-    console.error('创建支付提醒失败:', error);
+    logger.error('创建支付提醒失败', { error: error.message, billId: reminderData.billId });
     throw error;
   }
 };
@@ -80,73 +79,91 @@ const createPaymentReminder = async (reminderData) => {
  */
 const sendPaymentReminder = async (reminderId) => {
   try {
-    console.log(`发送支付提醒，ID: ${reminderId}`);
+    logger.info('发送支付提醒', { reminderId });
     
-    // 查找提醒记录
-    const reminder = await PaymentReminder.findByPk(reminderId, {
-      include: [
-        {
-          model: Bill,
-          as: 'bill',
-          attributes: ['id', 'title', 'amount', 'dueDate']
-        },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'name', 'email', 'phone']
-        }
-      ]
-    });
+    // 开始事务
+    await pool.query('BEGIN');
     
-    if (!reminder) {
-      throw new Error('提醒记录不存在');
-    }
-    
-    if (reminder.status !== 'pending') {
-      throw new Error('只能发送待发送状态的提醒');
-    }
-    
-    let sentSuccess = false;
-    let errorMessage = '';
-    
-    // 根据渠道发送提醒
     try {
-      if (reminder.channel === 'email') {
-        await sendEmail({
-          to: reminder.user.email,
-          subject: `支付提醒：${reminder.bill.title}`,
-          message: reminder.message || `您有一笔账单待支付：${reminder.bill.title}，金额：${reminder.bill.amount}，截止日期：${reminder.bill.dueDate}`
-        });
-        sentSuccess = true;
-      } else if (reminder.channel === 'sms') {
-        await sendSMS({
-          to: reminder.user.phone,
-          message: reminder.message || `【记账系统】您有一笔账单待支付：${reminder.bill.title}，金额：${reminder.bill.amount}，截止日期：${reminder.bill.dueDate}`
-        });
-        sentSuccess = true;
-      } else if (reminder.channel === 'app_notification') {
-        // 发送应用内通知（这里简化处理，实际可能需要WebSocket或其他推送机制）
-        console.log(`发送应用内通知给用户 ${reminder.user.id}：${reminder.message}`);
-        sentSuccess = true;
+      // 查询提醒记录
+      const reminderQuery = `
+        SELECT pr.*, 
+               b.title as bill_title, b.amount as bill_amount, b.due_date as bill_due_date,
+               u.name as user_name, u.email as user_email, u.phone as user_phone
+        FROM payment_reminders pr
+        LEFT JOIN bills b ON pr.bill_id = b.id
+        LEFT JOIN users u ON pr.user_id = u.id
+        WHERE pr.id = $1
+      `;
+      
+      const reminderResult = await pool.query(reminderQuery, [reminderId]);
+      
+      if (reminderResult.rows.length === 0) {
+        throw new Error('提醒记录不存在');
       }
+      
+      const reminder = reminderResult.rows[0];
+      
+      if (reminder.status !== 'pending') {
+        throw new Error('只能发送待发送状态的提醒');
+      }
+      
+      let sentSuccess = false;
+      let errorMessage = '';
+      
+      // 根据渠道发送提醒
+      try {
+        if (reminder.channel === 'email') {
+          await sendEmail({
+            to: reminder.user_email,
+            subject: `支付提醒：${reminder.bill_title}`,
+            message: reminder.message || `您有一笔账单待支付：${reminder.bill_title}，金额：${reminder.bill_amount}，截止日期：${reminder.bill_due_date}`
+          });
+          sentSuccess = true;
+        } else if (reminder.channel === 'sms') {
+          await sendSMS({
+            to: reminder.user_phone,
+            message: reminder.message || `【记账系统】您有一笔账单待支付：${reminder.bill_title}，金额：${reminder.bill_amount}，截止日期：${reminder.bill_due_date}`
+          });
+          sentSuccess = true;
+        } else if (reminder.channel === 'app_notification') {
+          // 发送应用内通知（这里简化处理，实际可能需要WebSocket或其他推送机制）
+          logger.info(`发送应用内通知给用户 ${reminder.user_id}：${reminder.message}`);
+          sentSuccess = true;
+        }
+      } catch (error) {
+        errorMessage = error.message;
+        logger.error(`发送${reminder.channel}提醒失败:`, error);
+      }
+      
+      // 更新提醒记录
+      const updateQuery = `
+        UPDATE payment_reminders 
+        SET status = $1, sent_at = $2, error_message = $3, updated_at = NOW()
+        WHERE id = $4
+        RETURNING *
+      `;
+      
+      const updateResult = await pool.query(updateQuery, [
+        sentSuccess ? 'sent' : 'failed',
+        sentSuccess ? new Date() : null,
+        errorMessage || null,
+        reminderId
+      ]);
+      
+      // 提交事务
+      await pool.query('COMMIT');
+      
+      logger.info(`支付提醒发送${sentSuccess ? '成功' : '失败'}，ID: ${reminderId}`);
+      
+      return updateResult.rows[0];
     } catch (error) {
-      errorMessage = error.message;
-      console.error(`发送${reminder.channel}提醒失败:`, error);
+      // 回滚事务
+      await pool.query('ROLLBACK');
+      throw error;
     }
-    
-    // 更新提醒记录
-    const updatedReminder = await reminder.update({
-      status: sentSuccess ? 'sent' : 'failed',
-      sentAt: sentSuccess ? new Date() : null,
-      errorMessage: errorMessage || null,
-      updatedAt: new Date()
-    });
-    
-    console.log(`支付提醒发送${sentSuccess ? '成功' : '失败'}，ID: ${reminderId}`);
-    
-    return updatedReminder;
   } catch (error) {
-    console.error('发送支付提醒失败:', error);
+    logger.error('发送支付提醒失败:', error);
     throw error;
   }
 };
@@ -163,7 +180,7 @@ const sendPaymentReminder = async (reminderId) => {
  */
 const getUserPaymentReminders = async (userId, options = {}) => {
   try {
-    console.log(`获取用户支付提醒列表，用户ID: ${userId}`);
+    logger.info('获取用户支付提醒列表', { userId });
     
     const {
       status,
@@ -173,38 +190,82 @@ const getUserPaymentReminders = async (userId, options = {}) => {
     } = options;
     
     // 构建查询条件
-    const whereClause = {
-      userId
-    };
+    let whereConditions = ['pr.user_id = $1'];
+    let queryParams = [userId];
+    let paramIndex = 2;
     
     if (status) {
-      whereClause.status = status;
+      whereConditions.push(`pr.status = $${paramIndex}`);
+      queryParams.push(status);
+      paramIndex++;
     }
     
     if (channel) {
-      whereClause.channel = channel;
+      whereConditions.push(`pr.channel = $${paramIndex}`);
+      queryParams.push(channel);
+      paramIndex++;
     }
     
     // 计算分页偏移量
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const limit = parseInt(pageSize);
     
-    // 查询支付提醒记录
-    const { count, rows: reminders } = await PaymentReminder.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: Bill,
-          as: 'bill',
-          attributes: ['id', 'title', 'amount', 'dueDate', 'status']
-        }
-      ],
-      order: [['reminderTime', 'DESC']],
-      offset,
-      limit
-    });
+    // 查询总数
+    const countQuery = `
+      SELECT COUNT(*) as count
+      FROM payment_reminders pr
+      WHERE ${whereConditions.join(' AND ')}
+    `;
     
-    console.log(`成功查询到 ${count} 条用户支付提醒记录`);
+    const countResult = await pool.query(countQuery, queryParams);
+    const count = parseInt(countResult.rows[0].count);
+    
+    // 查询提醒记录
+    const remindersQuery = `
+      SELECT pr.*, 
+             b.title as bill_title, b.amount as bill_amount, b.due_date as bill_due_date, b.status as bill_status,
+             u.name as user_name, u.email as user_email, u.phone as user_phone
+      FROM payment_reminders pr
+      LEFT JOIN bills b ON pr.bill_id = b.id
+      LEFT JOIN users u ON pr.user_id = u.id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY pr.reminder_time DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    
+    queryParams.push(limit, offset);
+    const remindersResult = await pool.query(remindersQuery, queryParams);
+    
+    // 格式化结果
+    const reminders = remindersResult.rows.map(row => ({
+      id: row.id,
+      billId: row.bill_id,
+      userId: row.user_id,
+      reminderType: row.reminder_type,
+      reminderTime: row.reminder_time,
+      message: row.message,
+      channel: row.channel,
+      status: row.status,
+      sentAt: row.sent_at,
+      errorMessage: row.error_message,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      bill: row.bill_id ? {
+        id: row.bill_id,
+        title: row.bill_title,
+        amount: row.bill_amount,
+        dueDate: row.bill_due_date,
+        status: row.bill_status
+      } : null,
+      user: {
+        id: row.user_id,
+        name: row.user_name,
+        email: row.user_email,
+        phone: row.user_phone
+      }
+    }));
+    
+    logger.info(`成功查询到 ${count} 条用户支付提醒记录`);
     
     return {
       items: reminders,
@@ -214,7 +275,7 @@ const getUserPaymentReminders = async (userId, options = {}) => {
       totalPages: Math.ceil(count / parseInt(pageSize))
     };
   } catch (error) {
-    console.error('获取用户支付提醒列表失败:', error);
+    logger.error('获取用户支付提醒列表失败', { error: error.message, userId });
     throw error;
   }
 };
@@ -229,7 +290,7 @@ const getUserPaymentReminders = async (userId, options = {}) => {
  */
 const getPendingReminders = async (currentTime = new Date(), options = {}) => {
   try {
-    console.log('获取待发送的支付提醒');
+    logger.info('获取待发送的支付提醒');
     
     const {
       page = 1,
@@ -240,32 +301,60 @@ const getPendingReminders = async (currentTime = new Date(), options = {}) => {
     const offset = (parseInt(page) - 1) * parseInt(pageSize);
     const limit = parseInt(pageSize);
     
-    // 查询待发送的支付提醒
-    const { count, rows: reminders } = await PaymentReminder.findAndCountAll({
-      where: {
-        status: 'pending',
-        reminderTime: {
-          [Op.lte]: currentTime
-        }
-      },
-      include: [
-        {
-          model: Bill,
-          as: 'bill',
-          attributes: ['id', 'title', 'amount', 'dueDate']
-        },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'name', 'email', 'phone']
-        }
-      ],
-      order: [['reminderTime', 'ASC']], // 按提醒时间升序，先处理早到期的提醒
-      offset,
-      limit
-    });
+    // 查询总数
+    const countQuery = `
+      SELECT COUNT(*) as count
+      FROM payment_reminders pr
+      WHERE pr.status = 'pending' AND pr.reminder_time <= $1
+    `;
     
-    console.log(`成功查询到 ${count} 条待发送的支付提醒`);
+    const countResult = await pool.query(countQuery, [currentTime]);
+    const count = parseInt(countResult.rows[0].count);
+    
+    // 查询待发送的支付提醒
+    const remindersQuery = `
+      SELECT pr.*, 
+             b.title as bill_title, b.amount as bill_amount, b.due_date as bill_due_date,
+             u.name as user_name, u.email as user_email, u.phone as user_phone
+      FROM payment_reminders pr
+      LEFT JOIN bills b ON pr.bill_id = b.id
+      LEFT JOIN users u ON pr.user_id = u.id
+      WHERE pr.status = 'pending' AND pr.reminder_time <= $1
+      ORDER BY pr.reminder_time ASC
+      LIMIT $2 OFFSET $3
+    `;
+    
+    const remindersResult = await pool.query(remindersQuery, [currentTime, limit, offset]);
+    
+    // 格式化结果
+    const reminders = remindersResult.rows.map(row => ({
+      id: row.id,
+      billId: row.bill_id,
+      userId: row.user_id,
+      reminderType: row.reminder_type,
+      reminderTime: row.reminder_time,
+      message: row.message,
+      channel: row.channel,
+      status: row.status,
+      sentAt: row.sent_at,
+      errorMessage: row.error_message,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      bill: row.bill_id ? {
+        id: row.bill_id,
+        title: row.bill_title,
+        amount: row.bill_amount,
+        dueDate: row.bill_due_date
+      } : null,
+      user: {
+        id: row.user_id,
+        name: row.user_name,
+        email: row.user_email,
+        phone: row.user_phone
+      }
+    }));
+    
+    logger.info(`成功查询到 ${count} 条待发送的支付提醒`);
     
     return {
       items: reminders,
@@ -275,7 +364,7 @@ const getPendingReminders = async (currentTime = new Date(), options = {}) => {
       totalPages: Math.ceil(count / parseInt(pageSize))
     };
   } catch (error) {
-    console.error('获取待发送的支付提醒失败:', error);
+    logger.error('获取待发送的支付提醒失败', { error: error.message });
     throw error;
   }
 };
@@ -287,7 +376,7 @@ const getPendingReminders = async (currentTime = new Date(), options = {}) => {
  */
 const sendPendingReminders = async (batchSize = 10) => {
   try {
-    console.log('批量发送待发送的支付提醒');
+    logger.info('批量发送待发送的支付提醒');
     
     // 获取待发送的提醒
     const { items: reminders } = await getPendingReminders(new Date(), {
@@ -296,7 +385,7 @@ const sendPendingReminders = async (batchSize = 10) => {
     });
     
     if (reminders.length === 0) {
-      console.log('没有待发送的支付提醒');
+      logger.info('没有待发送的支付提醒');
       return {
         total: 0,
         success: 0,
@@ -313,12 +402,12 @@ const sendPendingReminders = async (batchSize = 10) => {
         await sendPaymentReminder(reminder.id);
         successCount++;
       } catch (error) {
-        console.error(`发送提醒失败，ID: ${reminder.id}`, error);
+        logger.error(`发送提醒失败，ID: ${reminder.id}`, { error: error.message });
         failedCount++;
       }
     }
     
-    console.log(`批量发送支付提醒完成，成功: ${successCount}，失败: ${failedCount}`);
+    logger.info(`批量发送支付提醒完成，成功: ${successCount}，失败: ${failedCount}`);
     
     return {
       total: reminders.length,
@@ -326,7 +415,7 @@ const sendPendingReminders = async (batchSize = 10) => {
       failed: failedCount
     };
   } catch (error) {
-    console.error('批量发送待发送的支付提醒失败:', error);
+    logger.error('批量发送待发送的支付提醒失败', { error: error.message });
     throw error;
   }
 };
@@ -339,26 +428,36 @@ const sendPendingReminders = async (batchSize = 10) => {
  */
 const createAutoReminders = async (billId, reminderConfig = []) => {
   try {
-    console.log(`为账单创建自动提醒，账单ID: ${billId}`);
+    logger.info('为账单创建自动提醒', { billId });
     
     // 检查账单是否存在
-    const bill = await Bill.findByPk(billId, {
-      include: [
-        {
-          model: Room,
-          as: 'room',
-          include: [
-            {
-              model: User,
-              as: 'members'
-            }
-          ]
-        }
-      ]
-    });
+    const billQuery = `
+      SELECT b.*, r.id as room_id
+      FROM bills b
+      LEFT JOIN rooms r ON b.room_id = r.id
+      WHERE b.id = $1
+    `;
     
-    if (!bill) {
+    const billResult = await pool.query(billQuery, [billId]);
+    
+    if (billResult.rows.length === 0) {
       throw new Error('账单不存在');
+    }
+    
+    const bill = billResult.rows[0];
+    
+    // 查询房间成员
+    const membersQuery = `
+      SELECT u.*
+      FROM users u
+      JOIN room_members rm ON u.id = rm.user_id
+      WHERE rm.room_id = $1
+    `;
+    
+    const membersResult = await pool.query(membersQuery, [bill.room_id]);
+    
+    if (membersResult.rows.length === 0) {
+      throw new Error('房间没有成员');
     }
     
     // 如果没有提供提醒配置，使用默认配置
@@ -385,15 +484,15 @@ const createAutoReminders = async (billId, reminderConfig = []) => {
     const createdReminders = [];
     
     // 为每个成员创建提醒
-    for (const member of bill.room.members) {
+    for (const member of membersResult.rows) {
       for (const config of reminderConfig) {
         let reminderTime;
         
         if (config.reminderType === 'due_date_reminder' && config.daysBeforeDue) {
-          reminderTime = new Date(bill.dueDate);
+          reminderTime = new Date(bill.due_date);
           reminderTime.setDate(reminderTime.getDate() - config.daysBeforeDue);
         } else if (config.reminderType === 'overdue_reminder' && config.daysAfterDue) {
-          reminderTime = new Date(bill.dueDate);
+          reminderTime = new Date(bill.due_date);
           reminderTime.setDate(reminderTime.getDate() + config.daysAfterDue);
         } else {
           continue; // 跳过无效的配置
@@ -406,7 +505,7 @@ const createAutoReminders = async (billId, reminderConfig = []) => {
             userId: member.id,
             reminderType: config.reminderType,
             reminderTime,
-            message: `提醒：账单"${bill.title}"将于${bill.dueDate.toLocaleDateString()}到期，请及时支付`,
+            message: `提醒：账单"${bill.title}"将于${bill.due_date.toLocaleDateString()}到期，请及时支付`,
             channel: config.channel
           });
           
@@ -415,11 +514,11 @@ const createAutoReminders = async (billId, reminderConfig = []) => {
       }
     }
     
-    console.log(`成功创建 ${createdReminders.length} 条自动提醒`);
+    logger.info(`成功创建 ${createdReminders.length} 条自动提醒`);
     
     return createdReminders;
   } catch (error) {
-    console.error('为账单创建自动提醒失败:', error);
+    logger.error('为账单创建自动提醒失败', { error: error.message, billId });
     throw error;
   }
 };

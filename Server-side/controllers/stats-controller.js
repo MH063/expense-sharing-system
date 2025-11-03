@@ -580,6 +580,23 @@ class StatsController {
       const historicalResult = await client.query(historicalQuery, [room_id]);
       const historicalData = historicalResult.rows;
       
+      // 获取历史账单数据（过去3个月）
+      const billHistoricalQuery = `
+        SELECT 
+          DATE_TRUNC('week', created_at) as week,
+          COUNT(*) as bill_count,
+          COALESCE(SUM(total_amount), 0) as total_amount,
+          COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0) as paid_amount,
+          COALESCE(SUM(CASE WHEN status = 'PENDING' THEN total_amount ELSE 0 END), 0) as pending_amount
+        FROM bills
+        WHERE room_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '90 days'
+        GROUP BY DATE_TRUNC('week', created_at)
+        ORDER BY week
+      `;
+      
+      const billHistoricalResult = await client.query(billHistoricalQuery, [room_id]);
+      const billHistoricalData = billHistoricalResult.rows;
+      
       // 简单的线性回归预测（基于历史数据）
       let forecast = [];
       if (historicalData.length >= 4) {
@@ -613,6 +630,39 @@ class StatsController {
         }
       }
       
+      // 账单预测
+      let billForecast = [];
+      if (billHistoricalData.length >= 4) {
+        // 计算账单平均增长率
+        let billGrowthRates = [];
+        for (let i = 1; i < billHistoricalData.length; i++) {
+          const prev = parseFloat(billHistoricalData[i-1].total_amount);
+          const curr = parseFloat(billHistoricalData[i].total_amount);
+          if (prev > 0) {
+            billGrowthRates.push((curr - prev) / prev);
+          }
+        }
+        
+        const avgBillGrowthRate = billGrowthRates.length > 0 
+          ? billGrowthRates.reduce((sum, rate) => sum + rate, 0) / billGrowthRates.length 
+          : 0;
+        
+        // 生成未来4周的账单预测
+        const lastBillAmount = parseFloat(billHistoricalData[billHistoricalData.length - 1].total_amount);
+        const lastBillDate = new Date(billHistoricalData[billHistoricalData.length - 1].week);
+        
+        for (let i = 1; i <= 4; i++) {
+          const predictedAmount = lastBillAmount * (1 + avgBillGrowthRate) * i;
+          const predictedDate = new Date(lastBillDate);
+          predictedDate.setDate(predictedDate.getDate() + (i * 7));
+          
+          billForecast.push({
+            week: predictedDate,
+            predicted_amount: Math.max(0, predictedAmount)
+          });
+        }
+      }
+      
       // 获取费用类型分布
       const typeDistributionQuery = `
         SELECT 
@@ -630,6 +680,38 @@ class StatsController {
       const typeDistributionResult = await client.query(typeDistributionQuery, [room_id]);
       const typeDistribution = typeDistributionResult.rows;
       
+      // 获取账单状态分布
+      const billStatusQuery = `
+        SELECT 
+          status,
+          COUNT(*) as count,
+          COALESCE(SUM(total_amount), 0) as total_amount
+        FROM bills
+        WHERE room_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '90 days'
+        GROUP BY status
+        ORDER BY total_amount DESC
+      `;
+      
+      const billStatusResult = await client.query(billStatusQuery, [room_id]);
+      const billStatusDistribution = billStatusResult.rows;
+      
+      // 获取即将到期的账单
+      const upcomingBillsQuery = `
+        SELECT 
+          id,
+          title,
+          total_amount,
+          due_date,
+          status,
+          creator_id
+        FROM bills
+        WHERE room_id = $1 AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
+        ORDER BY due_date
+      `;
+      
+      const upcomingBillsResult = await client.query(upcomingBillsQuery, [room_id]);
+      const upcomingBills = upcomingBillsResult.rows;
+      
       res.status(200).json({
         success: true,
         data: {
@@ -637,12 +719,33 @@ class StatsController {
             week: data.week,
             total_amount: parseFloat(data.total_amount)
           })),
+          bill_historical_data: billHistoricalData.map(data => ({
+            week: data.week,
+            bill_count: parseInt(data.bill_count),
+            total_amount: parseFloat(data.total_amount),
+            paid_amount: parseFloat(data.paid_amount),
+            pending_amount: parseFloat(data.pending_amount)
+          })),
           forecast: forecast,
+          bill_forecast: billForecast,
           type_distribution: typeDistribution.map(type => ({
             type_name: type.type_name,
             count: parseInt(type.count),
             total_amount: parseFloat(type.total_amount),
             avg_amount: parseFloat(type.avg_amount)
+          })),
+          bill_status_distribution: billStatusDistribution.map(status => ({
+            status: status.status,
+            count: parseInt(status.count),
+            total_amount: parseFloat(status.total_amount)
+          })),
+          upcoming_bills: upcomingBills.map(bill => ({
+            id: bill.id,
+            title: bill.title,
+            total_amount: parseFloat(bill.total_amount),
+            due_date: bill.due_date,
+            status: bill.status,
+            creator_id: bill.creator_id
           }))
         }
       });

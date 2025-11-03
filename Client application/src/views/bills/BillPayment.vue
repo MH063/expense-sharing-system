@@ -142,6 +142,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 export default {
   name: 'BillPayment',
@@ -184,10 +185,18 @@ export default {
     const isPaid = computed(() => {
       if (!bill.value || !currentUser.value) return false
       
-      const participant = bill.value.participants.find(
+      // 检查当前用户是否已支付
+      const participant = bill.value.participants?.find(
         p => p.id === currentUser.value.id
       )
-      return participant ? participant.paid : false
+      
+      // 如果用户已支付，返回true
+      if (participant && participant.paid) {
+        return true
+      }
+      
+      // 否则检查账单状态
+      return bill.value.status === 'paid' || bill.value.status === 'completed'
     })
     
     const isOverdue = computed(() => {
@@ -204,7 +213,31 @@ export default {
         console.log('获取账单详情:', response.data)
         
         if (response.data.success) {
-          bill.value = response.data.data
+          // 处理后端返回的数据结构
+          const billData = response.data.data.bill
+          
+          // 转换数据格式以匹配前端需求
+          bill.value = {
+            id: billData.id,
+            title: billData.title,
+            description: billData.description,
+            totalAmount: parseFloat(billData.total_amount),
+            dueDate: billData.due_date,
+            createdAt: billData.created_at,
+            status: billData.status.toLowerCase(),
+            creator: {
+              id: billData.creator_id,
+              name: billData.creator_name || '未知用户'
+            },
+            // 转换分摊记录为参与者信息
+            participants: billData.splits.map(split => ({
+              id: split.user_id,
+              name: split.user_name,
+              share: parseFloat(split.amount),
+              paid: split.status === 'PAID',
+              paymentTime: split.paid_at
+            }))
+          }
           
           // 检查当前用户是否已支付
           const participant = bill.value.participants.find(
@@ -235,9 +268,11 @@ export default {
       try {
         processing.value = true
         
-        const response = await axios.post(`/api/bills/${props.billId}/payment`, {
-          paymentMethod: selectedPaymentMethod.value
-        })
+        // 模拟支付处理 - 在实际应用中，这里会调用支付网关
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // 调用后端API确认支付
+        const response = await axios.post(`/api/bills/${props.billId}/payment`)
         
         console.log('支付结果:', response.data)
         
@@ -253,23 +288,17 @@ export default {
           }
           
           // 显示成功消息
-          store.dispatch('notification/addNotification', {
-            type: 'success',
-            message: '支付成功！'
-          })
+          ElMessage.success('支付成功！')
+          
+          // 跳转到账单详情页
+          router.push(`/bills/${props.billId}`)
         } else {
           console.error('支付失败:', response.data.message)
-          store.dispatch('notification/addNotification', {
-            type: 'error',
-            message: response.data.message || '支付失败，请重试'
-          })
+          ElMessage.error(response.data.message || '支付失败，请重试')
         }
       } catch (error) {
         console.error('支付出错:', error)
-        store.dispatch('notification/addNotification', {
-          type: 'error',
-          message: '支付出错，请重试'
-        })
+        ElMessage.error('支付出错，请重试')
       } finally {
         processing.value = false
       }

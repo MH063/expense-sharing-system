@@ -38,6 +38,9 @@
             <li class="nav-item" v-if="isAuthenticated">
               <router-link to="/notifications" class="nav-link">通知</router-link>
             </li>
+            <li class="nav-item" v-if="isAuthenticated">
+              <router-link to="/notifications/center" class="nav-link">通知中心</router-link>
+            </li>
           </ul>
         </nav>
         

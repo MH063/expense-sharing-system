@@ -32,6 +32,7 @@ const inviteCodeRoutes = require('./routes/invite-code-routes');
 const specialPaymentRoutes = require('./routes/special-payment-routes');
 const paymentTransferRoutes = require('./routes/payment-transfer-routes');
 const paymentOptimizationRoutes = require('./routes/payment-optimization-routes');
+const notificationRoutes = require('./routes/notification-routes');
 
 // 创建Express应用
 const app = express();
@@ -104,6 +105,7 @@ app.use('/api/invite-codes', inviteCodeRoutes);
 app.use('/api/special-payments', specialPaymentRoutes);
 app.use('/api/payment-transfers', paymentTransferRoutes);
 app.use('/api/payment-optimization', paymentOptimizationRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 主页路由
 app.get('/', (req, res) => {

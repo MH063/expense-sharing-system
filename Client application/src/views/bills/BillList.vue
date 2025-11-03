@@ -27,11 +27,11 @@
         <div class="filter-group">
           <label>创建者</label>
           <select v-model="filters.creator" @change="applyFilters">
-            <option value="">全部创建者</option>
-            <option v-for="member in members" :key="member.id" :value="member.id">
-              {{ member.name }}
-            </option>
-          </select>
+              <option value="">全部创建者</option>
+              <option v-for="member in members" :key="member.id || member.user_id" :value="member.id || member.user_id">
+                {{ member.name || member.username }}
+              </option>
+            </select>
         </div>
         
         <div class="filter-group">
@@ -211,10 +211,10 @@
           </div>
           
           <div class="bill-details">
-            <div class="bill-amount">¥{{ bill.amount.toFixed(2) }}</div>
+            <div class="bill-amount">¥{{ parseFloat(bill.total_amount || bill.amount || 0).toFixed(2) }}</div>
             <div class="bill-info">
-              <div class="bill-creator">创建者: {{ bill.creatorName }}</div>
-              <div class="bill-date">到期日: {{ formatDate(bill.dueDate) }}</div>
+              <div class="bill-creator">创建者: {{ bill.creator_name || bill.creatorName }}</div>
+              <div class="bill-date">到期日: {{ formatDate(bill.due_date || bill.dueDate) }}</div>
             </div>
           </div>
           
@@ -241,7 +241,7 @@
               <line x1="12" y1="8" x2="12" y2="12"></line>
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
-            已逾期 {{ getOverdueDays(bill.dueDate) }} 天
+            已逾期 {{ getOverdueDays(bill.due_date || bill.dueDate) }} 天
           </div>
         </div>
       </div>
@@ -263,11 +263,11 @@
             </div>
           </div>
           
-          <div class="bill-grid-amount">¥{{ bill.amount.toFixed(2) }}</div>
+          <div class="bill-grid-amount">¥{{ parseFloat(bill.total_amount || bill.amount || 0).toFixed(2) }}</div>
           
           <div class="bill-grid-info">
-            <div class="bill-grid-creator">创建者: {{ bill.creatorName }}</div>
-            <div class="bill-grid-date">到期: {{ formatDate(bill.dueDate) }}</div>
+            <div class="bill-grid-creator">创建者: {{ bill.creator_name || bill.creatorName }}</div>
+            <div class="bill-grid-date">到期: {{ formatDate(bill.due_date || bill.dueDate) }}</div>
           </div>
           
           <div class="bill-grid-participants">
@@ -292,7 +292,7 @@
               <line x1="12" y1="8" x2="12" y2="12"></line>
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
-            逾期 {{ getOverdueDays(bill.dueDate) }} 天
+            逾期 {{ getOverdueDays(bill.due_date || bill.dueDate) }} 天
           </div>
         </div>
       </div>
@@ -359,11 +359,9 @@ const itemsPerPage = ref(10)
 // 筛选条件
 const filters = ref({
   status: '',
-  creator: '',
-  startDate: '',
-  endDate: '',
-  minAmount: '',
-  maxAmount: ''
+  creator_id: '',
+  dateRange: [],
+  amountRange: []
 })
 
 // 统计数据
@@ -385,27 +383,27 @@ const filteredBills = computed(() => {
   
   // 创建者筛选
   if (filters.value.creator) {
-    result = result.filter(bill => bill.creatorId === filters.value.creator)
+    result = result.filter(bill => bill.creator_id == filters.value.creator)
   }
   
-  // 日期范围筛选
+  // 日期范围筛选 - 使用due_date字段
   if (filters.value.startDate) {
     const startDate = new Date(filters.value.startDate)
-    result = result.filter(bill => new Date(bill.dueDate) >= startDate)
+    result = result.filter(bill => new Date(bill.due_date || bill.dueDate) >= startDate)
   }
   
   if (filters.value.endDate) {
     const endDate = new Date(filters.value.endDate)
-    result = result.filter(bill => new Date(bill.dueDate) <= endDate)
+    result = result.filter(bill => new Date(bill.due_date || bill.dueDate) <= endDate)
   }
   
-  // 金额范围筛选
+  // 金额范围筛选 - 使用total_amount字段
   if (filters.value.minAmount) {
-    result = result.filter(bill => bill.amount >= parseFloat(filters.value.minAmount))
+    result = result.filter(bill => parseFloat(bill.total_amount || bill.amount || 0) >= parseFloat(filters.value.minAmount))
   }
   
   if (filters.value.maxAmount) {
-    result = result.filter(bill => bill.amount <= parseFloat(filters.value.maxAmount))
+    result = result.filter(bill => parseFloat(bill.total_amount || bill.amount || 0) <= parseFloat(filters.value.maxAmount))
   }
   
   return result
@@ -467,12 +465,15 @@ const getOverdueDays = (dueDate) => {
   const today = new Date()
   const due = new Date(dueDate)
   const diffTime = today - due
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  const days = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  return days > 0 ? days : 0
 }
 
 // 应用筛选
 const applyFilters = () => {
-  currentPage.value = 1
+  console.log('应用筛选条件:', filters.value)
+  currentPage.value = 1 // 重置到第一页
+  loadBills()
 }
 
 // 应用排序
@@ -483,9 +484,16 @@ const applySorting = () => {
     let valueA = a[field]
     let valueB = b[field]
     
-    if (field === 'amount') {
-      valueA = parseFloat(valueA)
-      valueB = parseFloat(valueB)
+    // 处理字段名称映射
+    if (field === 'createdAt') {
+      valueA = a.created_at || a.createdAt
+      valueB = b.created_at || b.createdAt
+    } else if (field === 'dueDate') {
+      valueA = a.due_date || a.dueDate
+      valueB = b.due_date || b.dueDate
+    } else if (field === 'amount') {
+      valueA = parseFloat(a.total_amount || a.amount || 0)
+      valueB = parseFloat(b.total_amount || b.amount || 0)
     }
     
     if (order === 'asc') {
@@ -498,6 +506,7 @@ const applySorting = () => {
 
 // 重置筛选
 const resetFilters = () => {
+  console.log('重置筛选条件')
   filters.value = {
     status: '',
     creator: '',
@@ -524,101 +533,80 @@ const loadBills = async () => {
   loading.value = true
   
   try {
-    // bills.value = await api.getBills()
-    // members.value = await api.getRoomMembers()
+    console.log('开始加载账单数据...')
     
-    // 模拟账单数据
-    bills.value = [
-      {
-        id: 'bill-1',
-        title: '11月水电费',
-        amount: 156.50,
-        status: 'pending',
-        creatorId: 'user-1',
-        creatorName: '张三',
-        dueDate: new Date('2023-11-30').toISOString(),
-        createdAt: new Date('2023-11-01').toISOString(),
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      },
-      {
-        id: 'bill-2',
-        title: '10月网费',
-        amount: 99.00,
-        status: 'paid',
-        creatorId: 'user-2',
-        creatorName: '李四',
-        dueDate: new Date('2023-10-31').toISOString(),
-        createdAt: new Date('2023-10-15').toISOString(),
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      },
-      {
-        id: 'bill-3',
-        title: '9月物业费',
-        amount: 300.00,
-        status: 'overdue',
-        creatorId: 'user-3',
-        creatorName: '王五',
-        dueDate: new Date('2023-09-30').toISOString(),
-        createdAt: new Date('2023-09-01').toISOString(),
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      },
-      {
-        id: 'bill-4',
-        title: '8月燃气费',
-        amount: 85.30,
-        status: 'partial',
-        creatorId: 'user-1',
-        creatorName: '张三',
-        dueDate: new Date('2023-08-31').toISOString(),
-        createdAt: new Date('2023-08-15').toISOString(),
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      },
-      {
-        id: 'bill-5',
-        title: '7月水费',
-        amount: 67.80,
-        status: 'paid',
-        creatorId: 'user-2',
-        creatorName: '李四',
-        dueDate: new Date('2023-07-31').toISOString(),
-        createdAt: new Date('2023-07-15').toISOString(),
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
+    // 构建查询参数
+    const params = new URLSearchParams()
+    
+    // 添加筛选参数
+    if (filters.value.status) {
+      params.append('status', filters.value.status)
+    }
+    
+    if (filters.value.creator_id) {
+      params.append('creator_id', filters.value.creator_id)
+    }
+    
+    if (filters.value.dateRange && filters.value.dateRange.length === 2) {
+      params.append('start_date', filters.value.dateRange[0])
+      params.append('end_date', filters.value.dateRange[1])
+    }
+    
+    if (filters.value.amountRange && filters.value.amountRange.length === 2) {
+      params.append('min_amount', filters.value.amountRange[0])
+      params.append('max_amount', filters.value.amountRange[1])
+    }
+    
+    // 添加分页参数
+    params.append('page', currentPage.value)
+    params.append('limit', itemsPerPage.value)
+    
+    // 调用API获取账单数据
+    const response = await fetch(`/api/bills?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${authStore.token}`,
+        'Content-Type': 'application/json'
       }
-    ]
+    })
     
-    // 模拟成员数据
-    members.value = [
-      { id: 'user-1', name: '张三' },
-      { id: 'user-2', name: '李四' },
-      { id: 'user-3', name: '王五' }
-    ]
+    if (!response.ok) {
+      throw new Error('获取账单数据失败')
+    }
     
-    // 计算统计数据
-    stats.value = {
-      pending: bills.value.filter(bill => bill.status === 'pending').length,
-      paid: bills.value.filter(bill => bill.status === 'paid').length,
-      overdue: bills.value.filter(bill => bill.status === 'overdue').length,
-      totalAmount: bills.value.reduce((sum, bill) => sum + bill.amount, 0)
+    const result = await response.json()
+    console.log('获取到的账单数据:', result)
+    
+    if (result.success) {
+      bills.value = result.data.bills || []
+      
+      // 计算统计数据
+      stats.value = {
+        pending: bills.value.filter(bill => bill.status === 'pending').length,
+        paid: bills.value.filter(bill => bill.status === 'paid').length,
+        overdue: bills.value.filter(bill => bill.status === 'overdue').length,
+        totalAmount: bills.value.reduce((sum, bill) => sum + parseFloat(bill.total_amount || bill.amount || 0), 0)
+      }
+      console.log('账单数据加载成功，共', bills.value.length, '条记录')
+    } else {
+      console.error('获取账单列表失败:', result.message)
+      throw new Error(result.message || '获取账单数据失败')
+    }
+    
+    // 获取房间成员数据（如果还没有）
+    if (members.value.length === 0) {
+      const membersResponse = await fetch('/api/room/members', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${authStore.token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      const membersResult = await membersResponse.json()
+      if (membersResult.success) {
+        members.value = membersResult.data || []
+      }
     }
     
   } catch (error) {

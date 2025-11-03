@@ -1,65 +1,131 @@
 <template>
   <div class="bill-form-container">
     <div class="form-header">
-      <button class="back-button" @click="goBack">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        返回
-      </button>
-      
-      <h1>{{ isEditing ? '编辑账单' : '创建账单' }}</h1>
+      <div class="header-left">
+        <button class="back-button" @click="goBack">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          返回
+        </button>
+        
+        <h1>{{ isEditing ? '编辑账单' : '创建账单' }}</h1>
+      </div>
+      <div class="header-right">
+        <div v-if="lastSavedTime" class="auto-save-indicator">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          已自动保存于 {{ formatTime(lastSavedTime) }}
+        </div>
+      </div>
     </div>
     
     <div class="form-content">
       <div class="form-card">
         <form @submit.prevent="handleSubmit">
-          <div class="form-group">
+          <div class="form-group" :class="{ 'has-error': errors.title }">
             <label for="title">账单标题 *</label>
-            <input 
-              id="title"
-              v-model="form.title" 
-              type="text" 
-              placeholder="请输入账单标题"
-              required
-            />
+            <div class="input-wrapper">
+              <input 
+                id="title"
+                v-model="form.title" 
+                type="text" 
+                placeholder="请输入账单标题"
+                required
+                @blur="validateField('title')"
+                :class="{ 'is-error': errors.title }"
+              />
+              <div class="validation-status" v-if="validationStatus.title !== 'pending'">
+                <svg v-if="validationStatus.title" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="valid-icon">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="invalid-icon">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </div>
+            </div>
             <div v-if="errors.title" class="error-message">{{ errors.title }}</div>
           </div>
           
-          <div class="form-group">
+          <div class="form-group" :class="{ 'has-error': errors.amount }">
             <label for="amount">总金额 (¥) *</label>
-            <input 
-              id="amount"
-              v-model="form.amount" 
-              type="number" 
-              step="0.01" 
-              min="0.01"
-              placeholder="0.00"
-              required
-            />
+            <div class="input-wrapper">
+              <input 
+                id="amount"
+                v-model="form.amount" 
+                type="number" 
+                step="0.01" 
+                min="0.01"
+                placeholder="0.00"
+                required
+                @blur="validateField('amount')"
+                :class="{ 'is-error': errors.amount }"
+              />
+              <div class="validation-status" v-if="validationStatus.amount !== 'pending'">
+                <svg v-if="validationStatus.amount" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="valid-icon">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="invalid-icon">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </div>
+            </div>
             <div v-if="errors.amount" class="error-message">{{ errors.amount }}</div>
           </div>
           
-          <div class="form-group">
+          <div class="form-group" :class="{ 'has-error': errors.category }">
             <label for="category">类别 *</label>
-            <select id="category" v-model="form.category" required>
-              <option value="" disabled>请选择类别</option>
-              <option v-for="category in categories" :key="category.id" :value="category.id">
-                {{ category.name }}
-              </option>
-            </select>
+            <div class="input-wrapper">
+              <select 
+                id="category" 
+                v-model="form.category" 
+                required
+                @change="validateField('category')"
+                :class="{ 'is-error': errors.category }"
+              >
+                <option value="" disabled>请选择类别</option>
+                <option v-for="category in categories" :key="category.id" :value="category.id">
+                  {{ category.name }}
+                </option>
+              </select>
+              <div class="validation-status" v-if="validationStatus.category !== 'pending'">
+                <svg v-if="validationStatus.category" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="valid-icon">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="invalid-icon">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </div>
+            </div>
             <div v-if="errors.category" class="error-message">{{ errors.category }}</div>
           </div>
           
-          <div class="form-group">
+          <div class="form-group" :class="{ 'has-error': errors.dueDate }">
             <label for="dueDate">到期日期 *</label>
-            <input 
-              id="dueDate"
-              v-model="form.dueDate" 
-              type="date" 
-              required
-            />
+            <div class="input-wrapper">
+              <input 
+                id="dueDate"
+                v-model="form.dueDate" 
+                type="date" 
+                required
+                @change="validateField('dueDate')"
+                :class="{ 'is-error': errors.dueDate }"
+              />
+              <div class="validation-status" v-if="validationStatus.dueDate !== 'pending'">
+                <svg v-if="validationStatus.dueDate" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="valid-icon">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="invalid-icon">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </div>
+            </div>
             <div v-if="errors.dueDate" class="error-message">{{ errors.dueDate }}</div>
           </div>
           
@@ -222,7 +288,7 @@
           
           <div class="form-actions">
             <button type="button" class="cancel-button" @click="goBack">取消</button>
-            <button type="submit" class="submit-button" :disabled="isSubmitting">
+            <button type="submit" class="submit-button" :disabled="isSubmitting || (!formChanged && !isEditing)">
               {{ isSubmitting ? '保存中...' : (isEditing ? '更新账单' : '创建账单') }}
             </button>
           </div>
@@ -307,10 +373,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import billAPI from '@/api/bill-api'
 
 // 路由和状态管理
@@ -326,6 +392,17 @@ const showReceiptModal = ref(false)
 const participantSearchQuery = ref('')
 const fileInput = ref(null)
 const uploading = ref(false)
+const autoSaveTimer = ref(null)
+const lastSavedTime = ref(null)
+const formChanged = ref(false)
+const validationStatus = ref({
+  title: 'pending',
+  amount: 'pending',
+  category: 'pending',
+  dueDate: 'pending',
+  participants: 'pending',
+  customShares: 'pending'
+})
 
 // 表单数据
 const form = ref({
@@ -386,8 +463,220 @@ const shareDifference = computed(() => {
 })
 
 // 方法
-const goBack = () => {
+const goBack = async () => {
+  // 如果表单已更改，提示用户保存
+  if (formChanged.value) {
+    try {
+      await ElMessageBox.confirm(
+        '您有未保存的更改，确定要离开吗？',
+        '提示',
+        {
+          confirmButtonText: '离开',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
+    } catch {
+      return
+    }
+  }
   router.go(-1)
+}
+
+/**
+ * 实时验证单个字段
+ * @param {string} field - 要验证的字段名
+ * @returns {boolean} - 验证是否通过
+ */
+const validateField = (field) => {
+  let isValid = true
+  let errorMessage = ''
+  
+  switch (field) {
+    case 'title':
+      if (!form.value.title.trim()) {
+        errorMessage = '请输入账单标题'
+        isValid = false
+      } else if (form.value.title.trim().length < 2) {
+        errorMessage = '账单标题至少需要2个字符'
+        isValid = false
+      } else if (form.value.title.trim().length > 50) {
+        errorMessage = '账单标题不能超过50个字符'
+        isValid = false
+      }
+      break
+      
+    case 'amount':
+      if (!form.value.amount || parseFloat(form.value.amount) <= 0) {
+        errorMessage = '请输入有效的金额'
+        isValid = false
+      } else if (parseFloat(form.value.amount) > 999999.99) {
+        errorMessage = '金额不能超过999,999.99'
+        isValid = false
+      }
+      break
+      
+    case 'category':
+      if (!form.value.category) {
+        errorMessage = '请选择类别'
+        isValid = false
+      }
+      break
+      
+    case 'dueDate':
+      if (!form.value.dueDate) {
+        errorMessage = '请选择到期日期'
+        isValid = false
+      } else {
+        const dueDate = new Date(form.value.dueDate)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
+        if (dueDate < today) {
+          errorMessage = '到期日期不能早于今天'
+          isValid = false
+        }
+      }
+      break
+      
+    case 'participants':
+      if (selectedParticipants.value.length === 0) {
+        errorMessage = '请至少选择一个参与者'
+        isValid = false
+      }
+      break
+      
+    case 'customShares':
+      if (form.value.splitType === 'custom' && Math.abs(shareDifference.value) > 0.01) {
+        errorMessage = '分摊总额必须等于账单金额'
+        isValid = false
+      }
+      break
+  }
+  
+  // 更新验证状态和错误信息
+  validationStatus.value[field] = isValid ? true : false
+  if (errorMessage) {
+    errors.value[field] = errorMessage
+  } else {
+    delete errors.value[field]
+  }
+  
+  return isValid
+}
+
+/**
+ * 验证整个表单
+ * @returns {boolean} - 表单是否有效
+ */
+const validateForm = () => {
+  // 验证所有必填字段
+  const fields = ['title', 'amount', 'category', 'dueDate', 'participants']
+  let isValid = true
+  
+  fields.forEach(field => {
+    if (!validateField(field)) {
+      isValid = false
+    }
+  })
+  
+  // 如果是自定义分摊，验证分摊金额
+  if (form.value.splitType === 'custom') {
+    if (!validateField('customShares')) {
+      isValid = false
+    }
+  }
+  
+  return isValid
+}
+
+/**
+ * 自动保存表单数据
+ */
+const autoSave = async () => {
+  if (!formChanged.value || isEditing.value) return
+  
+  try {
+    // 只保存非敏感数据，不包括收据图片
+    const draftData = {
+      title: form.value.title,
+      amount: form.value.amount,
+      category: form.value.category,
+      dueDate: form.value.dueDate,
+      description: form.value.description,
+      splitType: form.value.splitType,
+      participants: selectedParticipants.value.map(p => ({
+        id: p.id,
+        name: p.name,
+        customShare: p.customShare
+      }))
+    }
+    
+    // 保存到本地存储
+    localStorage.setItem('billDraft', JSON.stringify(draftData))
+    lastSavedTime.value = new Date()
+    
+    // 显示自动保存提示
+    ElMessage.success({
+      message: '已自动保存草稿',
+      duration: 1000
+    })
+  } catch (error) {
+    console.error('自动保存失败:', error)
+  }
+}
+
+/**
+ * 从本地存储加载草稿
+ */
+const loadDraft = () => {
+  try {
+    const draftData = localStorage.getItem('billDraft')
+    if (!draftData) return
+    
+    const draft = JSON.parse(draftData)
+    
+    // 填充表单
+    form.value.title = draft.title || ''
+    form.value.amount = draft.amount || ''
+    form.value.category = draft.category || ''
+    form.value.dueDate = draft.dueDate || ''
+    form.value.description = draft.description || ''
+    form.value.splitType = draft.splitType || 'equal'
+    
+    // 设置参与者
+    if (draft.participants && draft.participants.length > 0) {
+      selectedParticipants.value = draft.participants
+      tempSelectedParticipants.value = [...draft.participants]
+    }
+    
+    // 提示用户是否加载草稿
+    ElMessageBox.confirm(
+      '检测到未完成的账单草稿，是否加载？',
+      '加载草稿',
+      {
+        confirmButtonText: '加载',
+        cancelButtonText: '不加载',
+        type: 'info'
+      }
+    ).then(() => {
+      // 用户选择加载草稿
+      formChanged.value = false
+    }).catch(() => {
+      // 用户选择不加载草稿，清除草稿
+      localStorage.removeItem('billDraft')
+    })
+  } catch (error) {
+    console.error('加载草稿失败:', error)
+    localStorage.removeItem('billDraft')
+  }
+}
+
+/**
+ * 清除草稿
+ */
+const clearDraft = () => {
+  localStorage.removeItem('billDraft')
 }
 
 const triggerFileInput = () => {
@@ -469,58 +758,25 @@ const getParticipantShare = (participant) => {
 }
 
 const validateCustomShares = () => {
-  // 自定义分摊验证逻辑
-  // 这里可以添加实时验证逻辑
-}
-
-const validateForm = () => {
-  errors.value = {}
-  
-  // 验证标题
-  if (!form.value.title.trim()) {
-    errors.value.title = '请输入账单标题'
-  }
-  
-  // 验证金额
-  if (!form.value.amount || parseFloat(form.value.amount) <= 0) {
-    errors.value.amount = '请输入有效的金额'
-  }
-  
-  // 验证类别
-  if (!form.value.category) {
-    errors.value.category = '请选择类别'
-  }
-  
-  // 验证到期日期
-  if (!form.value.dueDate) {
-    errors.value.dueDate = '请选择到期日期'
-  } else {
-    const dueDate = new Date(form.value.dueDate)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    if (dueDate < today) {
-      errors.value.dueDate = '到期日期不能早于今天'
-    }
-  }
-  
-  // 验证参与者
-  if (selectedParticipants.value.length === 0) {
-    errors.value.participants = '请至少选择一个参与者'
-  }
-  
-  // 验证自定义分摊
+  // 实时验证自定义分摊
   if (form.value.splitType === 'custom') {
-    if (Math.abs(shareDifference.value) > 0.01) {
-      errors.value.customShares = '分摊总额必须等于账单金额'
-    }
+    validateField('customShares')
   }
-  
-  return Object.keys(errors.value).length === 0
 }
 
 const handleSubmit = async () => {
-  if (!validateForm()) return
+  if (!validateForm()) {
+    // 滚动到第一个错误字段
+    const firstErrorField = Object.keys(errors.value)[0]
+    if (firstErrorField) {
+      const element = document.getElementById(firstErrorField)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        element.focus()
+      }
+    }
+    return
+  }
   
   isSubmitting.value = true
   
@@ -555,6 +811,10 @@ const handleSubmit = async () => {
     
     // 检查响应是否成功
     if (response.success) {
+      // 清除草稿
+      clearDraft()
+      formChanged.value = false
+      
       ElMessage.success(isEditing.value ? '账单更新成功' : '账单创建成功')
       
       // 跳转到账单详情页
@@ -660,31 +920,129 @@ const uploadReceipt = async (event) => {
 
 // 监听器
 watch(() => form.value.splitType, (newType) => {
+  formChanged.value = true
   if (newType === 'equal') {
     // 切换到平均分摊时，重置自定义份额
     selectedParticipants.value.forEach(participant => {
       participant.customShare = getParticipantShare(participant).toFixed(2)
     })
   }
+  
+  // 触发自动保存
+  if (autoSaveTimer.value) {
+    clearTimeout(autoSaveTimer.value)
+  }
+  autoSaveTimer.value = setTimeout(() => {
+    autoSave()
+  }, 2000)
 })
 
 watch(() => form.value.amount, () => {
+  formChanged.value = true
   if (form.value.splitType === 'equal') {
     // 金额变化时，更新平均分摊
     selectedParticipants.value.forEach(participant => {
       participant.customShare = getParticipantShare(participant).toFixed(2)
     })
   }
+  
+  // 触发自动保存
+  if (autoSaveTimer.value) {
+    clearTimeout(autoSaveTimer.value)
+  }
+  autoSaveTimer.value = setTimeout(() => {
+    autoSave()
+  }, 2000)
 })
 
+// 监听表单字段变化，实现自动保存
+watch([
+  () => form.value.title,
+  () => form.value.category,
+  () => form.value.dueDate,
+  () => form.value.description,
+  () => selectedParticipants.value.length
+], () => {
+  formChanged.value = true
+  
+  // 清除之前的自动保存定时器
+  if (autoSaveTimer.value) {
+    clearTimeout(autoSaveTimer.value)
+  }
+  
+  // 设置新的自动保存定时器
+  autoSaveTimer.value = setTimeout(() => {
+    autoSave()
+  }, 2000)
+}, { deep: true })
+
+// 监听自定义分摊变化
+watch(() => totalCustomShares.value, () => {
+  if (form.value.splitType === 'custom') {
+    validateField('customShares')
+  }
+})
+
+// 格式化时间显示
+const formatTime = (timestamp) => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now - date
+  
+  // 如果是今天，只显示时间
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }
+  
+  // 如果是昨天，显示"昨天 HH:MM"
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `昨天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+  }
+  
+  // 其他情况显示日期和时间
+  return date.toLocaleString('zh-CN', { 
+    month: 'numeric', 
+    day: 'numeric',
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
+}
+
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+  // 加载草稿数据
+  loadDraft()
+  
   // 初始化临时选中的参与者
   tempSelectedParticipants.value = [...selectedParticipants.value]
   
   // 如果是编辑模式，加载账单详情
   if (isEditing.value) {
-    loadBillDetail()
+    await loadBillDetail()
+  } else {
+    // 如果不是编辑模式，初始化默认值
+    // 设置默认到期日期为7天后
+    const defaultDueDate = new Date()
+    defaultDueDate.setDate(defaultDueDate.getDate() + 7)
+    form.value.dueDate = defaultDueDate.toISOString().split('T')[0]
+  }
+  
+  // 初始化验证状态
+  Object.keys(validationStatus.value).forEach(key => {
+    validationStatus.value[key] = 'pending'
+  })
+  
+  // 初始表单状态设为未更改
+  formChanged.value = false
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  if (autoSaveTimer.value) {
+    clearTimeout(autoSaveTimer.value)
   }
 })
 </script>
@@ -698,28 +1056,47 @@ onMounted(() => {
 
 .form-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 16px;
   margin-bottom: 24px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.auto-save-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #67c23a;
+  background-color: rgba(103, 194, 58, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .back-button {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  background-color: white;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  background: none;
+  border: none;
+  color: #606266;
   cursor: pointer;
-  transition: background-color 0.3s;
+  font-size: 14px;
+  transition: color 0.3s;
 }
 
 .back-button:hover {
-  background-color: #f5f5f5;
+  color: #409eff;
 }
 
 .form-header h1 {

@@ -22,12 +22,13 @@ require('dotenv').config({ path: envPath2 });
 // 所有环境配置
 const config = {
   development: {
-    dialect: 'postgres',
+    dialect: process.env.DB_DIALECT || 'postgres',
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'test_expense_system',
     username: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '123456789',
+    storage: process.env.DB_STORAGE || undefined,
     logging: console.log,
     pool: {
       max: 5,
@@ -40,12 +41,9 @@ const config = {
     }
   },
   test: {
-    dialect: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'room_expense_test_db',
-    username: process.env.DB_USER || 'expense_user',
-    password: process.env.DB_PASSWORD || 'your_password',
+    dialect: process.env.DB_DIALECT || 'sqlite',
+    storage: process.env.DB_STORAGE || './database.sqlite',
+    database: process.env.DB_NAME || 'test_expense_system',
     logging: false,
     pool: {
       max: 5,
@@ -58,7 +56,7 @@ const config = {
     }
   },
   production: {
-    dialect: 'postgres',
+    dialect: process.env.DB_DIALECT || 'postgres',
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'room_expense_db',
@@ -82,6 +80,8 @@ const config = {
 console.log('当前环境:', env);
 console.log('配置对象:', config);
 console.log('环境变量:', {
+  DB_DIALECT: process.env.DB_DIALECT,
+  DB_STORAGE: process.env.DB_STORAGE,
   DB_HOST: process.env.DB_HOST,
   DB_PORT: process.env.DB_PORT,
   DB_NAME: process.env.DB_NAME,
@@ -92,17 +92,13 @@ console.log('环境变量:', {
 // 确保配置存在
 const dbConfig = config[env] || config.development;
 
-// 强制使用正确的用户名和密码
-dbConfig.username = 'postgres';
-dbConfig.password = '123456789';
-
 const sequelize = new Sequelize({
   dialect: dbConfig.dialect,
   host: dbConfig.host,
   port: dbConfig.port,
   database: dbConfig.database,
   username: dbConfig.username,
-  password: String(dbConfig.password), // 确保密码是字符串类型
+  password: dbConfig.password ? String(dbConfig.password) : undefined, // 确保密码是字符串类型
   storage: dbConfig.storage,
   logging: dbConfig.logging,
   pool: dbConfig.pool,

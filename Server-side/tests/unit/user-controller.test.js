@@ -3,9 +3,6 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// 解构赋值获取控制器实例
-const { register, login, refreshToken, getProfile, updateProfile, changePassword, getUsers, assignUserRole } = UserController;
-
 // 模拟数据库连接
 // 强制使用真实数据库，禁止 mock pg
 // jest.mock('pg', ...) 已移除
@@ -92,7 +89,7 @@ describe('UserController单元测试', () => {
       bcrypt.hash.mockResolvedValue('hashedPassword');
       
       // 调用控制器方法
-      await register(mockReq, mockRes);
+      await UserController.register(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(201);
@@ -125,7 +122,7 @@ describe('UserController单元测试', () => {
       };
       
       // 调用控制器方法
-      await userController.register(mockReq, mockRes);
+      await UserController.register(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(400);
@@ -152,7 +149,7 @@ describe('UserController单元测试', () => {
       mockPool.query.mockResolvedValueOnce({ rows: [{ id: 1 }] });
       
       // 调用控制器方法
-      await userController.register(mockReq, mockRes);
+      await UserController.register(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(409);
@@ -181,7 +178,7 @@ describe('UserController单元测试', () => {
         .mockResolvedValueOnce({ rows: [{ id: 1 }] }); // 邮箱已存在
       
       // 调用控制器方法
-      await userController.register(mockReq, mockRes);
+      await UserController.register(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(409);
@@ -208,7 +205,7 @@ describe('UserController单元测试', () => {
       mockPool.query.mockRejectedValueOnce(new Error('数据库连接错误'));
       
       // 调用控制器方法
-      await userController.register(mockReq, mockRes);
+      await UserController.register(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(500);
@@ -249,7 +246,7 @@ describe('UserController单元测试', () => {
         .mockReturnValueOnce('refreshToken');
       
       // 调用控制器方法
-      await userController.login(mockReq, mockRes);
+      await UserController.login(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -285,7 +282,7 @@ describe('UserController单元测试', () => {
       };
       
       // 调用控制器方法
-      await userController.login(mockReq, mockRes);
+      await UserController.login(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(400);
@@ -311,7 +308,7 @@ describe('UserController单元测试', () => {
       mockPool.query.mockResolvedValueOnce({ rows: [] });
       
       // 调用控制器方法
-      await userController.login(mockReq, mockRes);
+      await UserController.login(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(401);
@@ -349,7 +346,7 @@ describe('UserController单元测试', () => {
       bcrypt.compare.mockResolvedValue(false);
       
       // 调用控制器方法
-      await userController.login(mockReq, mockRes);
+      await UserController.login(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(401);
@@ -378,7 +375,7 @@ describe('UserController单元测试', () => {
       mockPool.query.mockRejectedValueOnce(new Error('数据库连接错误'));
       
       // 调用控制器方法
-      await userController.login(mockReq, mockRes);
+      await UserController.login(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(500);
@@ -414,7 +411,7 @@ describe('UserController单元测试', () => {
       });
       
       // 调用控制器方法
-      await userController.refreshToken(mockReq, mockRes);
+      await UserController.refreshToken(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -451,7 +448,7 @@ describe('UserController单元测试', () => {
       mockReq.body = {};
       
       // 调用控制器方法
-      await userController.refreshToken(mockReq, mockRes);
+      await UserController.refreshToken(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(400);
@@ -486,7 +483,7 @@ describe('UserController单元测试', () => {
       });
       
       // 调用控制器方法
-      await userController.getProfile(mockReq, mockRes);
+      await UserController.getProfile(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -512,7 +509,7 @@ describe('UserController单元测试', () => {
       mockPool.query.mockResolvedValueOnce({ rows: [] });
       
       // 调用控制器方法
-      await userController.getProfile(mockReq, mockRes);
+      await UserController.getProfile(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(404);
@@ -554,7 +551,7 @@ describe('UserController单元测试', () => {
         });
       
       // 调用控制器方法
-      await userController.updateProfile(mockReq, mockRes);
+      await UserController.updateProfile(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -589,7 +586,7 @@ describe('UserController单元测试', () => {
         .mockResolvedValueOnce({ rows: [{ id: 2 }] }); // 邮箱已被其他用户使用
       
       // 调用控制器方法
-      await userController.updateProfile(mockReq, mockRes);
+      await UserController.updateProfile(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(409);
@@ -625,7 +622,7 @@ describe('UserController单元测试', () => {
       bcrypt.hash.mockResolvedValue('hashedNewPassword');
       
       // 调用控制器方法
-      await userController.changePassword(mockReq, mockRes);
+      await UserController.changePassword(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -660,7 +657,7 @@ describe('UserController单元测试', () => {
       bcrypt.compare.mockResolvedValue(false);
       
       // 调用控制器方法
-      await userController.changePassword(mockReq, mockRes);
+      await UserController.changePassword(mockReq, mockRes);
       
       // 验证响应
       expect(mockRes.status).toHaveBeenCalledWith(400);

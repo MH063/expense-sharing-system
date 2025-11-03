@@ -27,6 +27,9 @@
       <el-tab-pane label="费用分析" name="expenses">
         <ExpenseAnalysisTab :date-range="dateRange" />
       </el-tab-pane>
+      <el-tab-pane label="账单分析" name="bills">
+        <BillAnalysisTab :date-range="dateRange" />
+      </el-tab-pane>
       <el-tab-pane label="用户分析" name="users">
         <UserAnalysisTab :date-range="dateRange" />
       </el-tab-pane>
@@ -42,6 +45,7 @@ import { ref, onMounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import OverviewTab from './tabs/OverviewTab.vue'
 import ExpenseAnalysisTab from './tabs/ExpenseAnalysisTab.vue'
+import BillAnalysisTab from './tabs/BillAnalysisTab.vue'
 import UserAnalysisTab from './tabs/UserAnalysisTab.vue'
 import RoomAnalysisTab from './tabs/RoomAnalysisTab.vue'
 

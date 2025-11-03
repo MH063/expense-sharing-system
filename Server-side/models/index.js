@@ -754,6 +754,9 @@ PaymentTransfer.belongsTo(Payment, { foreignKey: 'toPaymentId', as: 'toPayment' 
 User.hasMany(PaymentTransfer, { foreignKey: 'createdBy', as: 'createdPaymentTransfers' });
 PaymentTransfer.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
+User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
+Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 // 导出所有模型
 module.exports = {
   sequelize,
@@ -770,5 +773,6 @@ module.exports = {
   InviteCode,
   QRCode,
   SpecialPaymentRule,
-  PaymentTransfer
+  PaymentTransfer,
+  Notification
 };

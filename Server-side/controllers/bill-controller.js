@@ -49,6 +49,42 @@ class BillController {
       
       const user_id = req.user.id;
       
+      // 记录请求信息
+      logger.info(`创建账单请求 - 用户ID: ${user_id}, 房间ID: ${room_id}, 标题: ${title}, 金额: ${total_amount}, 分摊类型: ${split_type}`);
+      
+      // 验证必填字段
+      if (!title || !total_amount || !room_id || !due_date) {
+        return res.status(400).json({
+          success: false,
+          message: '标题、金额、房间ID和到期日期为必填项'
+        });
+      }
+      
+      // 验证金额格式
+      if (isNaN(total_amount) || parseFloat(total_amount) <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: '金额必须是大于0的数字'
+        });
+      }
+      
+      // 验证分摊类型
+      if (!['EQUAL', 'CUSTOM', 'PERCENTAGE'].includes(split_type)) {
+        return res.status(400).json({
+          success: false,
+          message: '分摊类型必须是 EQUAL、CUSTOM 或 PERCENTAGE'
+        });
+      }
+      
+      // 验证日期格式
+      const dueDateObj = new Date(due_date);
+      if (isNaN(dueDateObj.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: '到期日期格式无效'
+        });
+      }
+      
       // 验证用户是否为寝室成员
       const memberCheck = await client.query(
         'SELECT * FROM room_members WHERE room_id = $1 AND user_id = $2',
@@ -103,6 +139,32 @@ class BillController {
         }
       }
       
+      // 验证百分比分摊详情
+      if (split_type === 'PERCENTAGE' && split_details.length > 0) {
+        // 验证分摊成员是否为寝室成员
+        const memberIds = split_details.map(detail => detail.user_id);
+        const memberValidation = await client.query(
+          'SELECT COUNT(*) as count FROM room_members WHERE room_id = $1 AND user_id = ANY($2)',
+          [room_id, memberIds]
+        );
+        
+        if (parseInt(memberValidation.rows[0].count) !== memberIds.length) {
+          return res.status(400).json({
+            success: false,
+            message: '分摊成员包含非寝室成员'
+          });
+        }
+        
+        // 验证百分比总和是否等于100%
+        const percentageTotal = split_details.reduce((sum, detail) => sum + parseFloat(detail.amount), 0);
+        if (Math.abs(percentageTotal - 100) > 0.01) {
+          return res.status(400).json({
+            success: false,
+            message: '百分比总和必须等于100%'
+          });
+        }
+      }
+      
       // 处理收据上传
       let receipt_url = null;
       if (req.file) {
@@ -134,14 +196,24 @@ class BillController {
         }
       }
       
-      // 获取寝室所有成员
-      const membersResult = await client.query(
-        'SELECT user_id FROM room_members WHERE room_id = $1',
+      // 获取房间所有成员
+      const membersQuery = await client.query(
+        'SELECT rm.user_id, u.username FROM room_members rm JOIN users u ON rm.user_id = u.id WHERE rm.room_id = $1',
         [room_id]
       );
       
-      const members = membersResult.rows;
+      const members = membersQuery.rows;
       const memberCount = members.length;
+      
+      logger.info(`房间 ${room_id} 成员数量: ${memberCount}`);
+      
+      // 验证房间是否有成员
+      if (memberCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '该房间没有成员，无法创建账单'
+        });
+      }
       
       // 创建账单分摊记录
       if (split_type === 'EQUAL') {
@@ -237,7 +309,17 @@ class BillController {
     const client = await pool.connect();
     try {
       const user_id = req.user.id;
-      const { room_id, status, category, page = 1, limit = 10 } = req.query;
+      const { 
+        room_id, 
+        status, 
+        category, 
+        start_date, 
+        end_date,
+        min_amount,
+        max_amount,
+        page = 1, 
+        limit = 10 
+      } = req.query;
       
       let query = `
         SELECT b.*, u.username as creator_name, r.name as room_name
@@ -251,6 +333,7 @@ class BillController {
       const params = [user_id];
       let paramIndex = 2;
       
+      // 添加筛选条件
       if (room_id) {
         query += ` AND b.room_id = $${paramIndex++}`;
         params.push(room_id);
@@ -266,6 +349,27 @@ class BillController {
         params.push(category);
       }
       
+      if (start_date) {
+        query += ` AND b.due_date >= $${paramIndex++}`;
+        params.push(start_date);
+      }
+      
+      if (end_date) {
+        query += ` AND b.due_date <= $${paramIndex++}`;
+        params.push(end_date);
+      }
+      
+      if (min_amount) {
+        query += ` AND b.total_amount >= $${paramIndex++}`;
+        params.push(min_amount);
+      }
+      
+      if (max_amount) {
+        query += ` AND b.total_amount <= $${paramIndex++}`;
+        params.push(max_amount);
+      }
+      
+      // 默认按创建时间倒序排列
       query += ` ORDER BY b.created_at DESC`;
       
       // 分页
@@ -275,7 +379,7 @@ class BillController {
       
       const result = await client.query(query, params);
       
-      // 获取总数
+      // 获取总数（使用相同的筛选条件）
       let countQuery = `
         SELECT COUNT(*) as total
         FROM bills b
@@ -301,13 +405,69 @@ class BillController {
         countParams.push(category);
       }
       
+      if (start_date) {
+        countQuery += ` AND b.due_date >= $${countParamIndex++}`;
+        countParams.push(start_date);
+      }
+      
+      if (end_date) {
+        countQuery += ` AND b.due_date <= $${countParamIndex++}`;
+        countParams.push(end_date);
+      }
+      
+      if (min_amount) {
+        countQuery += ` AND b.total_amount >= $${countParamIndex++}`;
+        countParams.push(min_amount);
+      }
+      
+      if (max_amount) {
+        countQuery += ` AND b.total_amount <= $${countParamIndex++}`;
+        countParams.push(max_amount);
+      }
+      
       const countResult = await client.query(countQuery, countParams);
       const total = parseInt(countResult.rows[0].total);
+      
+      // 获取每个账单的分摊信息
+      const billsWithSplits = await Promise.all(
+        result.rows.map(async (bill) => {
+          const splitsQuery = `
+            SELECT bs.*, u.username as user_name
+            FROM bill_splits bs
+            JOIN users u ON bs.user_id = u.id
+            WHERE bs.bill_id = $1
+          `;
+          
+          const splitsResult = await client.query(splitsQuery, [bill.id]);
+          bill.splits = splitsResult.rows;
+          
+          // 计算支付状态
+          const totalSplits = splitsResult.rows.length;
+          const paidSplits = splitsResult.rows.filter(s => s.status === 'PAID').length;
+          
+          if (totalSplits === paidSplits && totalSplits > 0) {
+            bill.payment_status = 'paid';
+          } else if (paidSplits > 0) {
+            bill.payment_status = 'partial';
+          } else {
+            bill.payment_status = 'pending';
+          }
+          
+          // 检查是否逾期
+          const dueDate = new Date(bill.due_date);
+          const today = new Date();
+          if (dueDate < today && bill.payment_status !== 'paid') {
+            bill.status = 'overdue';
+          }
+          
+          return bill;
+        })
+      );
       
       res.status(200).json({
         success: true,
         data: {
-          bills: result.rows,
+          bills: billsWithSplits,
           pagination: {
             page: parseInt(page),
             limit: parseInt(limit),
@@ -792,6 +952,23 @@ class BillController {
       
       // 开始事务
       await client.query('BEGIN');
+      
+      // 创建支付记录
+      const paymentRecordQuery = `
+        INSERT INTO payments (bill_id, user_id, payer_id, amount, payment_method, payment_time, status)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, 'completed')
+        RETURNING id
+      `;
+      
+      const paymentResult = await client.query(paymentRecordQuery, [
+        id, 
+        user_id,
+        user_id, // payer_id与user_id相同，表示用户自己支付
+        split.amount, 
+        'ONLINE' // 默认支付方式，可根据实际情况调整
+      ]);
+      
+      const paymentId = paymentResult.rows[0].id;
       
       // 更新分摊状态为已支付
       await client.query(

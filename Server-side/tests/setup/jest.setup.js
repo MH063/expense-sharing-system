@@ -4,7 +4,8 @@
  */
 
 // 加载测试环境变量
-require('dotenv').config({ path: '.env.test' });
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env.test') });
 
 // 规范环境变量类型，避免 pg 要求字符串导致的报错
 if (process.env.DB_PASSWORD !== undefined) process.env.DB_PASSWORD = String(process.env.DB_PASSWORD);
@@ -21,6 +22,12 @@ process.env.PGDATABASE = process.env.PGDATABASE || process.env.DB_NAME;
 const td = require('./test-database');
 if (td && td.models) {
   global.models = td.models;
+} else {
+  // 如果模型未正确加载，设置一个空的模型对象
+  global.models = global.models || {};
+} else {
+  // 如果模型未正确加载，设置一个空的模型对象
+  global.models = global.models || {};
 }
 
 // 设置测试环境变量

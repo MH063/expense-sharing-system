@@ -316,40 +316,126 @@ const currentUserId = computed(() => userStore.userId)
 const loadRooms = async () => {
   loading.value = true
   try {
-    const params = {
+    // 模拟API调用
+    console.log('模拟加载房间列表API调用:', {
       page: currentPage.value,
       limit: pageSize.value,
       status: filterForm.status || undefined,
       memberCount: filterForm.memberCount || undefined
+    })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 模拟房间数据
+    const mockRooms = [
+      {
+        id: 'room-1',
+        name: '东区3号楼201室',
+        description: '我们是一个充满活力的寝室，欢迎大家加入！',
+        avatar: 'https://picsum.photos/seed/room1/200/200.jpg',
+        creatorId: 1,
+        creatorName: '张三',
+        memberCount: 3,
+        maxMembers: 4,
+        status: 'active',
+        isMember: true,
+        createdAt: '2023-09-15T10:30:00Z',
+        lastActivity: '2023-11-20T14:25:00Z'
+      },
+      {
+        id: 'room-2',
+        name: '西区5号楼302室',
+        description: '学习氛围浓厚，共同进步！',
+        avatar: 'https://picsum.photos/seed/room2/200/200.jpg',
+        creatorId: 2,
+        creatorName: '李四',
+        memberCount: 4,
+        maxMembers: 4,
+        status: 'full',
+        isMember: false,
+        createdAt: '2023-09-20T09:15:00Z',
+        lastActivity: '2023-11-19T16:40:00Z'
+      },
+      {
+        id: 'room-3',
+        name: '南区2号楼105室',
+        description: '娱乐学习两不误，欢迎大家！',
+        avatar: 'https://picsum.photos/seed/room3/200/200.jpg',
+        creatorId: 3,
+        creatorName: '王五',
+        memberCount: 2,
+        maxMembers: 4,
+        status: 'active',
+        isMember: true,
+        createdAt: '2023-10-05T14:20:00Z',
+        lastActivity: '2023-11-18T11:30:00Z'
+      },
+      {
+        id: 'room-4',
+        name: '北区7号楼408室',
+        description: '安静的学习环境，适合考研党！',
+        avatar: 'https://picsum.photos/seed/room4/200/200.jpg',
+        creatorId: 4,
+        creatorName: '赵六',
+        memberCount: 1,
+        maxMembers: 3,
+        status: 'inactive',
+        isMember: false,
+        createdAt: '2023-10-10T16:45:00Z',
+        lastActivity: '2023-11-10T09:20:00Z'
+      }
+    ]
+    
+    // 应用过滤条件
+    let filteredRooms = mockRooms
+    if (filterForm.status) {
+      filteredRooms = filteredRooms.filter(room => room.status === filterForm.status)
+    }
+    if (filterForm.memberCount) {
+      const count = parseInt(filterForm.memberCount)
+      if (count === 4) {
+        filteredRooms = filteredRooms.filter(room => room.memberCount >= 4)
+      } else {
+        filteredRooms = filteredRooms.filter(room => room.memberCount === count)
+      }
     }
     
-    const response = await roomsApi.getUserRooms(params)
-    if (response.success) {
-      rooms.value = response.data.items || []
-      total.value = response.data.total || 0
-      loadStats()
-    } else {
-      ElMessage.error('加载房间列表失败')
+    // 应用分页
+    const startIndex = (currentPage.value - 1) * pageSize.value
+    const endIndex = startIndex + pageSize.value
+    const paginatedRooms = filteredRooms.slice(startIndex, endIndex)
+    
+    rooms.value = paginatedRooms
+    total.value = filteredRooms.length
+    
+    /**
+     * 加载统计数据
+     */
+    const loadStats = async () => {
+      try {
+        // 模拟API调用
+        console.log('模拟加载房间统计数据API调用')
+        
+        // 模拟统计数据
+        const mockStats = {
+          total: 4,
+          myRooms: 2,
+          activeRooms: 2,
+          pendingInvitations: 1
+        }
+        
+        // 更新统计数据
+        Object.assign(stats, mockStats)
+      } catch (error) {
+        console.error('加载统计数据失败:', error)
+      }
     }
   } catch (error) {
     console.error('加载房间列表失败:', error)
     ElMessage.error('加载房间列表失败')
   } finally {
     loading.value = false
-  }
-}
-
-/**
- * 加载统计数据
- */
-const loadStats = async () => {
-  try {
-    // const response = await roomsApi.getRoomStats()
-    if (response.success) {
-      Object.assign(stats, response.data)
-    }
-  } catch (error) {
-    console.error('加载统计数据失败:', error)
   }
 }
 
@@ -377,15 +463,17 @@ const editRoom = (room) => {
 /**
  * 加入房间
  */
-const joinRoom = async (room) => {
+const joinRoom = async (roomId) => {
   try {
-    const response = await roomsApi.joinRoom(room.id)
-    if (response.success) {
-      ElMessage.success('申请已发送，等待房间管理员审核')
-      loadRooms()
-    } else {
-      ElMessage.error('申请失败')
-    }
+    // 模拟API调用
+    console.log('模拟加入房间API调用:', { roomId })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 模拟成功响应
+    ElMessage.success('成功加入房间')
+    loadRooms() // 重新加载房间列表
   } catch (error) {
     console.error('加入房间失败:', error)
     ElMessage.error('加入房间失败')
@@ -395,26 +483,20 @@ const joinRoom = async (room) => {
 /**
  * 退出房间
  */
-const leaveRoom = async (room) => {
+const leaveRoom = async (roomId) => {
   try {
-    await ElMessageBox.confirm('确定要退出此房间吗？', '确认退出', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
+    // 模拟API调用
+    console.log('模拟退出房间API调用:', { roomId })
     
-    const response = await roomsApi.leaveRoom(room.id)
-    if (response.success) {
-      ElMessage.success('已退出房间')
-      loadRooms()
-    } else {
-      ElMessage.error('退出失败')
-    }
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 模拟成功响应
+    ElMessage.success('已退出房间')
+    loadRooms() // 重新加载房间列表
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('退出房间失败:', error)
-      ElMessage.error('退出房间失败')
-    }
+    console.error('退出房间失败:', error)
+    ElMessage.error('退出房间失败')
   }
 }
 

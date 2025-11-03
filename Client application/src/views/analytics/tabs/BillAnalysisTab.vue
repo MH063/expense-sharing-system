@@ -174,22 +174,29 @@ const billStats = reactive({
  */
 const loadBillStats = async () => {
   try {
-    const params = {
+    // 模拟API调用
+    console.log('模拟调用 billForecastApi.getBillForecast，参数:', {
       startDate: props.dateRange[0],
       endDate: props.dateRange[1]
+    })
+    
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 模拟返回数据
+    const mockStats = {
+      totalAmount: 25680.50,
+      paidAmount: 18680.50,
+      pendingAmount: 7000.00,
+      totalCount: 45
     }
     
-    const response = await billForecastApi.getBillForecast(params)
-    if (response.success && response.data) {
-      const { statistics } = response.data
-      
-      if (statistics) {
-        billStats.totalAmount = statistics.totalAmount || 0
-        billStats.paidAmount = statistics.paidAmount || 0
-        billStats.pendingAmount = statistics.pendingAmount || 0
-        billStats.totalCount = statistics.totalCount || 0
-      }
-    }
+    billStats.totalAmount = mockStats.totalAmount
+    billStats.paidAmount = mockStats.paidAmount
+    billStats.pendingAmount = mockStats.pendingAmount
+    billStats.totalCount = mockStats.totalCount
+    
+    console.log('模拟获取账单统计数据成功:', mockStats)
   } catch (error) {
     console.error('加载账单统计数据失败:', error)
   }
@@ -201,10 +208,50 @@ const loadBillStats = async () => {
 const loadUpcomingBills = async () => {
   upcomingLoading.value = true
   try {
-    const response = await billForecastApi.getUpcomingBills({ days: 7 })
-    if (response.success && response.data) {
-      upcomingBills.value = response.data || []
-    }
+    // 模拟API调用
+    console.log('模拟调用 billForecastApi.getUpcomingBills，参数:', { days: 7 })
+    
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟返回数据
+    const mockUpcomingBills = [
+      {
+        id: 1,
+        description: '11月份电费',
+        total_amount: 150.00,
+        due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        days_until_due: 2,
+        payment_status: 'pending'
+      },
+      {
+        id: 2,
+        description: '11月份水费',
+        total_amount: 80.00,
+        due_date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        days_until_due: 4,
+        payment_status: 'pending'
+      },
+      {
+        id: 3,
+        description: '网费',
+        total_amount: 100.00,
+        due_date: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        days_until_due: 6,
+        payment_status: 'partial'
+      },
+      {
+        id: 4,
+        description: '物业费',
+        total_amount: 200.00,
+        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        days_until_due: 7,
+        payment_status: 'pending'
+      }
+    ]
+    
+    upcomingBills.value = mockUpcomingBills
+    console.log('模拟获取即将到期账单成功:', mockUpcomingBills)
   } catch (error) {
     console.error('加载即将到期账单失败:', error)
   } finally {

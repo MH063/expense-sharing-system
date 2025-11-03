@@ -214,15 +214,25 @@ const filteredExpenses = computed(() => {
 const loadExpenseStats = async () => {
   loading.value = true
   try {
-    const params = {
+    // 模拟API调用
+    console.log('模拟调用 expenseApi.getExpenseStatistics，参数:', {
       startDate: props.dateRange[0],
       endDate: props.dateRange[1]
+    })
+    
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 模拟返回数据
+    const mockStats = {
+      totalAmount: 15680.50,
+      averageAmount: 522.68,
+      totalCount: 30,
+      maxAmount: 2500.00
     }
     
-    const response = await expenseApi.getExpenseStatistics(params)
-    if (response.success) {
-      Object.assign(expenseStats, response.data)
-    }
+    Object.assign(expenseStats, mockStats)
+    console.log('模拟获取费用统计数据成功:', mockStats)
   } catch (error) {
     console.error('加载费用统计数据失败:', error)
   } finally {
@@ -236,18 +246,94 @@ const loadExpenseStats = async () => {
 const loadExpenses = async () => {
   loading.value = true
   try {
-    const params = {
+    // 模拟API调用
+    console.log('模拟调用 expenseApi.getExpenses，参数:', {
       startDate: props.dateRange[0],
       endDate: props.dateRange[1],
       page: currentPage.value,
       pageSize: pageSize.value
-    }
+    })
     
-    const response = await expenseApi.getExpenses(params)
-    if (response.success) {
-      expenses.value = response.data.items || []
-      totalExpenses.value = response.data.total || 0
-    }
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟返回数据
+    const mockExpenses = [
+      {
+        id: 1,
+        date: '2023-10-15',
+        description: '10月份电费',
+        category: '电费',
+        categoryId: 1,
+        amount: 150.00,
+        paidBy: '张三',
+        participants: [
+          { id: 1, name: '张三' },
+          { id: 2, name: '李四' },
+          { id: 3, name: '王五' }
+        ]
+      },
+      {
+        id: 2,
+        date: '2023-10-10',
+        description: '10月份水费',
+        category: '水费',
+        categoryId: 2,
+        amount: 80.00,
+        paidBy: '李四',
+        participants: [
+          { id: 1, name: '张三' },
+          { id: 2, name: '李四' },
+          { id: 3, name: '王五' }
+        ]
+      },
+      {
+        id: 3,
+        date: '2023-10-05',
+        description: '网费',
+        category: '网费',
+        categoryId: 3,
+        amount: 100.00,
+        paidBy: '王五',
+        participants: [
+          { id: 1, name: '张三' },
+          { id: 2, name: '李四' },
+          { id: 3, name: '王五' }
+        ]
+      },
+      {
+        id: 4,
+        date: '2023-09-28',
+        description: '物业费',
+        category: '物业费',
+        categoryId: 4,
+        amount: 200.00,
+        paidBy: '张三',
+        participants: [
+          { id: 1, name: '张三' },
+          { id: 2, name: '李四' },
+          { id: 3, name: '王五' }
+        ]
+      },
+      {
+        id: 5,
+        date: '2023-09-15',
+        description: '燃气费',
+        category: '燃气费',
+        categoryId: 5,
+        amount: 120.00,
+        paidBy: '李四',
+        participants: [
+          { id: 1, name: '张三' },
+          { id: 2, name: '李四' },
+          { id: 3, name: '王五' }
+        ]
+      }
+    ]
+    
+    expenses.value = mockExpenses
+    totalExpenses.value = 30 // 模拟总数
+    console.log('模拟获取费用明细成功:', mockExpenses)
   } catch (error) {
     console.error('加载费用明细失败:', error)
   } finally {
@@ -260,10 +346,23 @@ const loadExpenses = async () => {
  */
 const loadCategories = async () => {
   try {
-    const response = await expenseApi.getExpenseCategories()
-    if (response.success) {
-      categories.value = response.data || []
-    }
+    // 模拟API调用
+    console.log('模拟调用 expenseApi.getExpenseCategories')
+    
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // 模拟返回数据
+    const mockCategories = [
+      { id: 1, name: '电费' },
+      { id: 2, name: '水费' },
+      { id: 3, name: '网费' },
+      { id: 4, name: '物业费' },
+      { id: 5, name: '燃气费' }
+    ]
+    
+    categories.value = mockCategories
+    console.log('模拟获取费用分类成功:', mockCategories)
   } catch (error) {
     console.error('加载费用分类失败:', error)
   }

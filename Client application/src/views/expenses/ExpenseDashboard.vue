@@ -346,14 +346,101 @@ const loadExpenses = async () => {
       endDate: filterForm.dateRange?.[1] || undefined
     }
     
-    const response = await expenseApi.getExpenses(params)
-    if (response.success) {
-      expenses.value = response.data.items || []
-      total.value = response.data.total || 0
-      loadStats()
-    } else {
-      ElMessage.error('加载费用列表失败')
+    // 模拟API调用
+    console.log('加载费用列表，参数:', params)
+    
+    // 模拟费用数据
+    const mockExpenses = [
+      {
+        id: 'expense-1',
+        title: '超市购物',
+        amount: 256.8,
+        category: 'daily',
+        payerId: 'user-1',
+        payerName: '张三',
+        paymentDate: '2023-11-05',
+        splitMembers: [
+          { userId: 'user-1', userName: '张三', amount: 85.6, paid: true },
+          { userId: 'user-2', userName: '李四', amount: 85.6, paid: false },
+          { userId: 'user-3', userName: '王五', amount: 85.6, paid: true }
+        ],
+        createdAt: '2023-11-05T10:30:00Z'
+      },
+      {
+        id: 'expense-2',
+        title: '水电费',
+        amount: 420.0,
+        category: 'utilities',
+        payerId: 'user-2',
+        payerName: '李四',
+        paymentDate: '2023-11-01',
+        splitMembers: [
+          { userId: 'user-1', userName: '张三', amount: 140.0, paid: true },
+          { userId: 'user-2', userName: '李四', amount: 140.0, paid: true },
+          { userId: 'user-3', userName: '王五', amount: 140.0, paid: false }
+        ],
+        createdAt: '2023-11-01T09:15:00Z'
+      },
+      {
+        id: 'expense-3',
+        title: '聚餐',
+        amount: 580.0,
+        category: 'food',
+        payerId: 'user-3',
+        payerName: '王五',
+        paymentDate: '2023-10-28',
+        splitMembers: [
+          { userId: 'user-1', userName: '张三', amount: 193.33, paid: true },
+          { userId: 'user-2', userName: '李四', amount: 193.33, paid: true },
+          { userId: 'user-3', userName: '王五', amount: 193.34, paid: true }
+        ],
+        createdAt: '2023-10-28T18:45:00Z'
+      },
+      {
+        id: 'expense-4',
+        title: '网费',
+        amount: 99.0,
+        category: 'other',
+        payerId: 'user-1',
+        payerName: '张三',
+        paymentDate: '2023-10-15',
+        splitMembers: [
+          { userId: 'user-1', userName: '张三', amount: 33.0, paid: true },
+          { userId: 'user-2', userName: '李四', amount: 33.0, paid: true },
+          { userId: 'user-3', userName: '王五', amount: 33.0, paid: true }
+        ],
+        createdAt: '2023-10-15T14:20:00Z'
+      }
+    ]
+    
+    // 应用筛选条件
+    let filteredExpenses = [...mockExpenses]
+    
+    if (filterForm.roomId) {
+      filteredExpenses = filteredExpenses.filter(expense => expense.roomId === filterForm.roomId)
     }
+    
+    if (filterForm.category) {
+      filteredExpenses = filteredExpenses.filter(expense => expense.category === filterForm.category)
+    }
+    
+    if (filterForm.dateRange && filterForm.dateRange.length === 2) {
+      const startDate = new Date(filterForm.dateRange[0])
+      const endDate = new Date(filterForm.dateRange[1])
+      filteredExpenses = filteredExpenses.filter(expense => {
+        const expenseDate = new Date(expense.paymentDate)
+        return expenseDate >= startDate && expenseDate <= endDate
+      })
+    }
+    
+    // 分页处理
+    total.value = filteredExpenses.length
+    const startIndex = (currentPage.value - 1) * pageSize.value
+    const endIndex = startIndex + pageSize.value
+    expenses.value = filteredExpenses.slice(startIndex, endIndex)
+    
+    // 加载统计数据
+    loadStats()
   } catch (error) {
     console.error('加载费用列表失败:', error)
     ElMessage.error('加载费用列表失败')
@@ -373,10 +460,18 @@ const loadStats = async () => {
       endDate: filterForm.dateRange?.[1] || undefined
     }
     
-    const response = await expenseApi.getExpenseStats(params)
-    if (response.success) {
-      Object.assign(stats, response.data)
+    // 模拟API调用
+    console.log('加载统计数据，参数:', params)
+    
+    // 模拟统计数据
+    const mockStats = {
+      totalAmount: 1355.8,
+      myAmount: 511.93,
+      owedAmount: 140.0,
+      owingAmount: 85.6
     }
+    
+    Object.assign(stats, mockStats)
   } catch (error) {
     console.error('加载统计数据失败:', error)
   }
@@ -387,10 +482,28 @@ const loadStats = async () => {
  */
 const loadRooms = async () => {
   try {
-    const response = await roomsApi.getUserRooms()
-    if (response.success) {
-      rooms.value = response.data || []
-    }
+    // 模拟API调用
+    console.log('加载房间列表')
+    
+    // 模拟房间数据
+    const mockRooms = [
+      {
+        id: 'room-1',
+        name: '我的寝室',
+        description: '404寝室',
+        memberCount: 3,
+        createdAt: '2023-09-01T00:00:00Z'
+      },
+      {
+        id: 'room-2',
+        name: '家庭账本',
+        description: '家庭日常开销',
+        memberCount: 5,
+        createdAt: '2023-08-15T00:00:00Z'
+      }
+    ]
+    
+    rooms.value = mockRooms
   } catch (error) {
     console.error('加载房间列表失败:', error)
   }
@@ -428,13 +541,12 @@ const deleteExpense = async (expense) => {
       type: 'warning'
     })
     
-    const response = await expenseApi.deleteExpense(expense.id)
-    if (response.success) {
-      ElMessage.success('删除成功')
-      loadExpenses()
-    } else {
-      ElMessage.error('删除失败')
-    }
+    // 模拟API调用
+    console.log('删除费用记录:', expense.id)
+    
+    // 模拟删除成功
+    ElMessage.success('删除成功')
+    loadExpenses()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除费用记录失败:', error)

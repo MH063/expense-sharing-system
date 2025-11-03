@@ -123,30 +123,87 @@ const filteredNotifications = computed(() => {
 const loadNotifications = async () => {
   loading.value = true;
   try {
-    const params = {
-      page: currentPage.value,
-      limit: pageSize.value
-    };
-
-    if (filterType.value !== 'all' && filterType.value !== 'unread') {
-      params.type = filterType.value;
-    } else if (filterType.value === 'unread') {
-      params.isRead = false;
-    }
-
-    const response = await notificationApi.getNotifications(params);
-    console.log('获取通知列表响应:', response);
+    console.log('模拟API调用 - 获取通知列表');
     
-    if (response.data && response.data.success) {
-      notifications.value = response.data.data.notifications || [];
-      total.value = response.data.data.total || 0;
-    } else {
-      console.error('获取通知列表失败:', response);
-      ElMessage.error('获取通知列表失败');
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // 模拟数据
+    const mockNotifications = [
+      {
+        id: 1,
+        title: '11月份电费账单已生成',
+        content: '您本月的电费账单已生成，请及时查看并完成支付。',
+        type: 'bill_due',
+        isRead: false,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2小时前
+        actionUrl: '/bills'
+      },
+      {
+        id: 2,
+        title: '张三已完成支付',
+        content: '张三已支付11月份电费，金额为85.50元。',
+        type: 'payment_status',
+        isRead: true,
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5小时前
+        actionUrl: '/payment-history'
+      },
+      {
+        id: 3,
+        title: '新增费用：网费',
+        content: '李四添加了一笔网费，金额为50元，分摊给寝室所有成员。',
+        type: 'expense_added',
+        isRead: false,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1天前
+        actionUrl: '/expenses'
+      },
+      {
+        id: 4,
+        title: '系统维护通知',
+        content: '系统将于本周六凌晨2:00-4:00进行维护升级，期间可能无法正常访问。',
+        type: 'system',
+        isRead: true,
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2天前
+        actionUrl: null
+      },
+      {
+        id: 5,
+        title: '账单即将到期提醒',
+        content: '您有3笔账单将在3天内到期，请及时完成支付。',
+        type: 'bill_due',
+        isRead: false,
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3天前
+        actionUrl: '/bills'
+      }
+    ];
+    
+    // 根据过滤条件筛选数据
+    let filteredData = [...mockNotifications];
+    
+    if (filterType.value === 'unread') {
+      filteredData = filteredData.filter(n => !n.isRead);
+    } else if (filterType.value !== 'all') {
+      filteredData = filteredData.filter(n => n.type === filterType.value);
     }
+    
+    // 分页处理
+    const startIndex = (currentPage.value - 1) * pageSize.value;
+    const endIndex = startIndex + pageSize.value;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+    
+    notifications.value = paginatedData;
+    total.value = filteredData.length;
+    
+    // 更新未读数量
+    unreadCount.value = mockNotifications.filter(n => !n.isRead).length;
+    
+    console.log('模拟获取通知列表成功:', { 
+      通知数量: paginatedData.length, 
+      总数量: filteredData.length,
+      未读数量: unreadCount.value
+    });
   } catch (error) {
     console.error('获取通知列表出错:', error);
-    ElMessage.error('获取通知列表出错');
   } finally {
     loading.value = false;
   }
@@ -154,12 +211,16 @@ const loadNotifications = async () => {
 
 const loadUnreadCount = async () => {
   try {
-    const response = await notificationApi.getUnreadCount();
-    console.log('获取未读通知数量响应:', response);
+    console.log('模拟API调用 - 获取未读通知数量');
     
-    if (response.data && response.data.success) {
-      unreadCount.value = response.data.data.count || 0;
-    }
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // 模拟数据 - 从已有的通知中计算未读数量
+    const mockUnreadCount = 3;
+    
+    unreadCount.value = mockUnreadCount;
+    console.log('模拟获取未读通知数量成功:', mockUnreadCount);
   } catch (error) {
     console.error('获取未读通知数量出错:', error);
   }
@@ -167,10 +228,15 @@ const loadUnreadCount = async () => {
 
 const markAsRead = async (id) => {
   try {
-    const response = await notificationApi.markAsRead(id);
-    console.log('标记通知已读响应:', response);
+    console.log('模拟API调用 - 标记通知已读:', id);
     
-    if (response.data && response.data.success) {
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 400));
+    
+    // 模拟成功响应
+    const success = true;
+    
+    if (success) {
       // 更新本地状态
       const notification = notifications.value.find(n => n.id === id);
       if (notification) {
@@ -178,6 +244,7 @@ const markAsRead = async (id) => {
       }
       unreadCount.value = Math.max(0, unreadCount.value - 1);
       ElMessage.success('已标记为已读');
+      console.log('模拟标记通知已读成功:', id);
     } else {
       ElMessage.error('标记已读失败');
     }
@@ -189,16 +256,22 @@ const markAsRead = async (id) => {
 
 const markAllAsRead = async () => {
   try {
-    const response = await notificationApi.markAllAsRead();
-    console.log('批量标记已读响应:', response);
+    console.log('模拟API调用 - 批量标记已读');
     
-    if (response.data && response.data.success) {
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    // 模拟成功响应
+    const success = true;
+    
+    if (success) {
       // 更新本地状态
       notifications.value.forEach(n => {
         n.isRead = true;
       });
       unreadCount.value = 0;
       ElMessage.success('已全部标记为已读');
+      console.log('模拟批量标记已读成功');
     } else {
       ElMessage.error('批量标记已读失败');
     }
@@ -216,10 +289,15 @@ const deleteNotification = async (id) => {
       type: 'warning'
     });
 
-    const response = await notificationApi.deleteNotification(id);
-    console.log('删除通知响应:', response);
+    console.log('模拟API调用 - 删除通知:', id);
     
-    if (response.data && response.data.success) {
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 模拟成功响应
+    const success = true;
+    
+    if (success) {
       // 更新本地状态
       const index = notifications.value.findIndex(n => n.id === id);
       if (index !== -1) {
@@ -231,6 +309,7 @@ const deleteNotification = async (id) => {
         total.value = Math.max(0, total.value - 1);
       }
       ElMessage.success('通知已删除');
+      console.log('模拟删除通知成功:', id);
     } else {
       ElMessage.error('删除通知失败');
     }

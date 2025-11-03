@@ -209,47 +209,76 @@ export default {
       try {
         loading.value = true
         
-        const response = await axios.get(`/api/bills/${props.billId}`)
-        console.log('获取账单详情:', response.data)
+        // 模拟API调用
+        console.log('获取账单详情:', props.billId)
         
-        if (response.data.success) {
-          // 处理后端返回的数据结构
-          const billData = response.data.data.bill
-          
-          // 转换数据格式以匹配前端需求
-          bill.value = {
-            id: billData.id,
-            title: billData.title,
-            description: billData.description,
-            totalAmount: parseFloat(billData.total_amount),
-            dueDate: billData.due_date,
-            createdAt: billData.created_at,
-            status: billData.status.toLowerCase(),
-            creator: {
-              id: billData.creator_id,
-              name: billData.creator_name || '未知用户'
+        // 模拟账单数据
+        const billData = {
+          id: props.billId,
+          title: '11月水电费',
+          description: '11月份的水电费账单，包含水费和电费',
+          total_amount: 156.50,
+          due_date: '2023-11-30',
+          created_at: '2023-11-01T10:00:00Z',
+          status: 'pending',
+          creator_id: 'user-1',
+          creator_name: '张三',
+          splits: [
+            {
+              user_id: 'user-1',
+              user_name: '张三',
+              amount: 52.17,
+              status: 'PAID',
+              paid_at: '2023-11-02T14:30:00Z'
             },
-            // 转换分摊记录为参与者信息
-            participants: billData.splits.map(split => ({
-              id: split.user_id,
-              name: split.user_name,
-              share: parseFloat(split.amount),
-              paid: split.status === 'PAID',
-              paymentTime: split.paid_at
-            }))
-          }
-          
-          // 检查当前用户是否已支付
-          const participant = bill.value.participants.find(
-            p => p.id === currentUser.value.id
-          )
-          if (participant && participant.paid) {
-            paymentTime.value = participant.paymentTime
-          }
-        } else {
-          console.error('获取账单详情失败:', response.data.message)
-          bill.value = null
+            {
+              user_id: 'user-2',
+              user_name: '李四',
+              amount: 52.17,
+              status: 'PENDING',
+              paid_at: null
+            },
+            {
+              user_id: 'user-3',
+              user_name: '王五',
+              amount: 52.16,
+              status: 'PENDING',
+              paid_at: null
+            }
+          ]
         }
+        
+        // 转换数据格式以匹配前端需求
+        bill.value = {
+          id: billData.id,
+          title: billData.title,
+          description: billData.description,
+          totalAmount: parseFloat(billData.total_amount),
+          dueDate: billData.due_date,
+          createdAt: billData.created_at,
+          status: billData.status.toLowerCase(),
+          creator: {
+            id: billData.creator_id,
+            name: billData.creator_name || '未知用户'
+          },
+          // 转换分摊记录为参与者信息
+          participants: billData.splits.map(split => ({
+            id: split.user_id,
+            name: split.user_name,
+            share: parseFloat(split.amount),
+            paid: split.status === 'PAID',
+            paymentTime: split.paid_at
+          }))
+        }
+        
+        // 检查当前用户是否已支付
+        const participant = bill.value.participants.find(
+          p => p.id === currentUser.value.id
+        )
+        if (participant && participant.paid) {
+          paymentTime.value = participant.paymentTime
+        }
+        
       } catch (error) {
         console.error('获取账单详情出错:', error)
         bill.value = null
@@ -268,34 +297,29 @@ export default {
       try {
         processing.value = true
         
-        // 模拟支付处理 - 在实际应用中，这里会调用支付网关
+        // 模拟支付处理
+        console.log('处理支付:', selectedPaymentMethod.value)
         await new Promise(resolve => setTimeout(resolve, 2000))
         
-        // 调用后端API确认支付
-        const response = await axios.post(`/api/bills/${props.billId}/payment`)
+        // 模拟成功响应
+        console.log('支付成功')
         
-        console.log('支付结果:', response.data)
-        
-        if (response.data.success) {
-          // 更新账单状态
-          const participant = bill.value.participants.find(
-            p => p.id === currentUser.value.id
-          )
-          if (participant) {
-            participant.paid = true
-            participant.paymentTime = new Date().toISOString()
-            paymentTime.value = participant.paymentTime
-          }
-          
-          // 显示成功消息
-          ElMessage.success('支付成功！')
-          
-          // 跳转到账单详情页
-          router.push(`/bills/${props.billId}`)
-        } else {
-          console.error('支付失败:', response.data.message)
-          ElMessage.error(response.data.message || '支付失败，请重试')
+        // 更新账单状态
+        const participant = bill.value.participants.find(
+          p => p.id === currentUser.value.id
+        )
+        if (participant) {
+          participant.paid = true
+          participant.paymentTime = new Date().toISOString()
+          paymentTime.value = participant.paymentTime
         }
+        
+        // 显示成功消息
+        ElMessage.success('支付成功！')
+        
+        // 跳转到账单详情页
+        router.push(`/bills/${props.billId}`)
+        
       } catch (error) {
         console.error('支付出错:', error)
         ElMessage.error('支付出错，请重试')

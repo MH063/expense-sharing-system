@@ -262,10 +262,8 @@ const paymentMethods = [
 ]
 
 // 上传配置
-const uploadUrl = '/api/expenses/upload-receipt'
-const uploadHeaders = computed(() => ({
-  Authorization: `Bearer ${userStore.token}`
-}))
+const uploadUrl = '' // 不使用真实上传URL
+const uploadHeaders = computed(() => ({})) // 不使用真实上传头
 
 // 计算属性
 const selectedMembers = computed(() => {
@@ -302,17 +300,14 @@ const loadRoomMembers = async () => {
   }
 
   try {
-    const response = await roomsApi.getRoomMembers(roomId.value)
-    if (response.success) {
-      roomMembers.value = response.data.map(member => ({
-        ...member,
-        selected: false,
-        customAmount: 0,
-        percentage: 0
-      }))
-    } else {
-      ElMessage.error('加载房间成员失败')
-    }
+    // 模拟房间成员数据
+    roomMembers.value = [
+      { id: 'user-1', name: '张三', avatar: '', selected: false, customAmount: 0, percentage: 0 },
+      { id: 'user-2', name: '李四', avatar: '', selected: false, customAmount: 0, percentage: 0 },
+      { id: 'user-3', name: '王五', avatar: '', selected: false, customAmount: 0, percentage: 0 }
+    ]
+    
+    console.log('加载房间成员成功:', roomMembers.value)
   } catch (error) {
     console.error('加载房间成员失败:', error)
     ElMessage.error('加载房间成员失败')
@@ -348,12 +343,11 @@ const beforeUpload = (file) => {
  * 上传成功回调
  */
 const handleUploadSuccess = (response, uploadFile) => {
-  if (response.success) {
-    expenseForm.receipt.push(response.data.url)
-    ElMessage.success('上传成功')
-  } else {
-    ElMessage.error('上传失败')
-  }
+  // 模拟上传成功
+  const mockUrl = `https://picsum.photos/seed/receipt${Date.now()}/400/600.jpg`
+  expenseForm.receipt.push(mockUrl)
+  ElMessage.success('上传成功')
+  console.log('上传成功，图片URL:', mockUrl)
 }
 
 /**
@@ -424,8 +418,22 @@ const submitExpense = async () => {
     }
 
     submitting.value = true
-    const response = await expenseApi.createExpense(data)
-    if (response.success) {
+    
+    // 模拟创建费用记录
+    console.log('提交费用记录:', data)
+    
+    // 模拟API响应
+    const mockResponse = {
+      success: true,
+      data: {
+        id: 'expense-' + Date.now(),
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    }
+    
+    if (mockResponse.success) {
       ElMessage.success('费用记录创建成功')
       router.push(`/rooms/${roomId.value}/expenses`)
     } else {

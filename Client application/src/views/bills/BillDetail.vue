@@ -620,74 +620,126 @@ const addComment = async () => {
 
 // 加载账单详情
 const loadBillDetail = async () => {
-  const billId = route.params.id
   loading.value = true
   
   try {
-    // bill.value = await api.getBill(billId)
-    // comments.value = await api.getBillComments(billId)
+    // 模拟API调用
+    console.log('加载账单详情:', route.params.id)
     
-    // 模拟账单详情数据
-    bill.value = {
-      id: billId,
+    // 模拟账单数据
+    const bill = {
+      id: route.params.id,
       title: '11月水电费',
       amount: 156.50,
       category: 'utilities',
-      dueDate: new Date('2023-11-30').toISOString(),
-      status: 'pending',
-      creatorId: 'user-1',
-      creatorName: '张三',
-      myShare: 52.17,
+      due_date: '2023-11-30',
       description: '11月份的水电费账单，包含水费和电费',
-      receipt: 'https://picsum.photos/seed/bill123/400/600.jpg',
-      createdAt: new Date('2023-11-01T10:30:00').toISOString(),
-      updatedAt: new Date('2023-11-01T10:30:00').toISOString(),
-      paidAt: null,
+      receipt_url: 'https://picsum.photos/seed/bill123/400/600.jpg',
+      split_type: 'equal',
+      status: 'pending',
+      created_at: '2023-11-01T10:00:00Z',
+      creator: {
+        id: 'user-1',
+        name: '张三'
+      },
       participants: [
         {
-          id: 'user-1',
-          name: '张三',
+          user_id: 'user-1',
+          user_name: '张三',
           share: 52.17,
-          paymentStatus: 'paid'
+          paid: true,
+          paid_at: '2023-11-02T14:30:00Z'
         },
         {
-          id: 'user-2',
-          name: '李四',
+          user_id: 'user-2',
+          user_name: '李四',
           share: 52.17,
-          paymentStatus: 'unpaid'
+          paid: false,
+          paid_at: null
         },
         {
-          id: 'user-3',
-          name: '王五',
+          user_id: 'user-3',
+          user_name: '王五',
           share: 52.16,
-          paymentStatus: 'unpaid'
+          paid: false,
+          paid_at: null
         }
       ]
     }
     
-    // 模拟评论数据
-    comments.value = [
-      {
-        id: 'comment-1',
-        authorId: 'user-2',
-        authorName: '李四',
-        text: '这个月电费有点高啊',
-        createdAt: new Date('2023-11-02T14:20:00').toISOString()
-      },
-      {
-        id: 'comment-2',
-        authorId: 'user-3',
-        authorName: '王五',
-        text: '是的，可能是开空调的时间长了',
-        createdAt: new Date('2023-11-02T16:45:00').toISOString()
-      }
-    ]
+    // 获取类别名称
+    const category = categories.value.find(c => c.id === bill.category)
+    bill.category_name = category ? category.name : bill.category
+    
+    // 获取状态名称
+    const status = billStatuses.value.find(s => s.id === bill.status)
+    bill.status_name = status ? status.name : bill.status
+    
+    bill.value = bill
     
   } catch (error) {
     console.error('加载账单详情失败:', error)
-    bill.value = null
+    ElMessage.error('加载账单详情失败，请稍后再试')
   } finally {
     loading.value = false
+  }
+}
+
+// 删除账单
+const deleteBill = async () => {
+  try {
+    // 模拟API调用
+    console.log('删除账单:', route.params.id)
+    
+    // 模拟成功响应
+    ElMessage.success('账单删除成功')
+    router.push('/bills')
+    
+  } catch (error) {
+    console.error('删除账单失败:', error)
+    ElMessage.error('删除账单失败，请稍后再试')
+  }
+}
+
+// 标记为已支付
+const markAsPaid = async () => {
+  try {
+    // 模拟API调用
+    console.log('标记账单为已支付:', route.params.id)
+    
+    // 模拟成功响应
+    ElMessage.success('已标记为已支付')
+    
+    // 更新账单状态
+    bill.value.status = 'paid'
+    bill.value.status_name = '已支付'
+    
+    // 更新当前用户的支付状态
+    const currentUser = authStore.user
+    const participant = bill.value.participants.find(p => p.user_id === currentUser.id)
+    if (participant) {
+      participant.paid = true
+      participant.paid_at = new Date().toISOString()
+    }
+    
+  } catch (error) {
+    console.error('标记支付状态失败:', error)
+    ElMessage.error('标记支付状态失败，请稍后再试')
+  }
+}
+
+// 发送支付提醒
+const sendReminder = async (participant) => {
+  try {
+    // 模拟API调用
+    console.log('发送支付提醒:', participant.user_name)
+    
+    // 模拟成功响应
+    ElMessage.success(`已向${participant.user_name}发送支付提醒`)
+    
+  } catch (error) {
+    console.error('发送支付提醒失败:', error)
+    ElMessage.error('发送支付提醒失败，请稍后再试')
   }
 }
 

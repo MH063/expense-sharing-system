@@ -150,12 +150,44 @@ const handleLogin = async () => {
   errorMessage.value = ''
   
   try {
-    // 调用登录API
-    await authStore.login({
+    // 模拟API调用
+    console.log('模拟登录API调用:', {
       username: loginForm.username,
       password: loginForm.password,
       remember: loginForm.remember
     })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 模拟登录成功响应
+    const mockResponse = {
+      success: true,
+      data: {
+        token: 'mock-jwt-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        user: {
+          id: 1,
+          username: loginForm.username,
+          name: loginForm.username === 'admin' ? '管理员' : '普通用户',
+          email: loginForm.username + '@example.com',
+          avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
+          roles: loginForm.username === 'admin' ? ['admin'] : ['user'],
+          permissions: loginForm.username === 'admin' ? ['all'] : ['read', 'write'],
+          roomId: 1
+        }
+      }
+    }
+    
+    // 更新authStore状态
+    authStore.accessToken = mockResponse.data.token
+    authStore.refreshToken = mockResponse.data.refreshToken
+    authStore.currentUser = mockResponse.data.user
+    authStore.roles = mockResponse.data.user.roles
+    authStore.permissions = mockResponse.data.user.permissions
+    
+    // 模拟连接WebSocket
+    console.log('模拟WebSocket连接')
     
     // 登录成功，跳转到首页或之前访问的页面
     const redirectPath = router.currentRoute.value.query.redirect || '/'

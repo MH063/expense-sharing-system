@@ -173,10 +173,57 @@ export default {
     async fetchRules() {
       this.loading = true;
       try {
-        const response = await billApi.getSpecialPaymentRules(this.roomId);
-        if (response.data.success) {
-          this.rules = response.data.data.rules;
-        }
+        // 模拟API调用
+        console.log('模拟获取特殊支付规则API调用:', { roomId: this.roomId });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 模拟规则数据
+        this.rules = [
+          {
+            id: 1,
+            name: '电费仅本人支付',
+            rule_type: 'self_only',
+            description: '电费只能由缴费人本人支付',
+            priority: 1,
+            is_active: true,
+            creator_name: '张三',
+            conditions: {
+              expense_types: ['电费'],
+              min_amount: 0,
+              max_amount: null
+            }
+          },
+          {
+            id: 2,
+            name: '水费多人支付',
+            rule_type: 'multiple_payers',
+            description: '水费允许多人共同支付',
+            priority: 2,
+            is_active: true,
+            creator_name: '李四',
+            conditions: {
+              expense_types: ['水费'],
+              min_amount: 0,
+              max_amount: 100
+            }
+          },
+          {
+            id: 3,
+            name: '大额费用可转移',
+            rule_type: 'payer_to_payer',
+            description: '超过200元的费用允许缴费人之间转移',
+            priority: 3,
+            is_active: false,
+            creator_name: '王五',
+            conditions: {
+              expense_types: ['电费', '水费', '网费'],
+              min_amount: 200,
+              max_amount: null
+            }
+          }
+        ];
       } catch (error) {
         console.error('获取支付规则失败:', error);
         this.$message.error('获取支付规则失败');
@@ -186,10 +233,20 @@ export default {
     },
     async fetchExpenseTypes() {
       try {
-        const response = await billApi.getExpenseTypes(this.roomId);
-        if (response.data.success) {
-          this.expenseTypes = response.data.data.expenseTypes;
-        }
+        // 模拟API调用
+        console.log('模拟获取费用类型API调用:', { roomId: this.roomId });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // 模拟费用类型数据
+        this.expenseTypes = [
+          { id: 1, name: '电费' },
+          { id: 2, name: '水费' },
+          { id: 3, name: '网费' },
+          { id: 4, name: '物业费' },
+          { id: 5, name: '燃气费' }
+        ];
       } catch (error) {
         console.error('获取费用类型失败:', error);
       }
@@ -208,9 +265,13 @@ export default {
     },
     async toggleRuleStatus(rule) {
       try {
-        await billApi.updateSpecialPaymentRule(rule.id, {
-          is_active: rule.is_active
-        });
+        // 模拟API调用
+        console.log('模拟更新规则状态API调用:', { ruleId: rule.id, isActive: rule.is_active });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // 模拟更新成功
         this.$message.success('规则状态更新成功');
       } catch (error) {
         console.error('更新规则状态失败:', error);
@@ -243,7 +304,13 @@ export default {
           type: 'warning'
         });
         
-        await billApi.deleteSpecialPaymentRule(rule.id);
+        // 模拟API调用
+        console.log('模拟删除规则API调用:', { ruleId: rule.id });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 模拟删除成功
         this.$message.success('规则删除成功');
         this.fetchRules();
       } catch (error) {
@@ -259,11 +326,21 @@ export default {
           try {
             const data = { ...this.ruleForm };
             
+            // 模拟API调用
+            console.log('模拟保存规则API调用:', { 
+              isEditing: this.isEditing, 
+              ruleId: this.currentRuleId, 
+              roomId: this.roomId, 
+              data 
+            });
+            
+            // 模拟API响应延迟
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 模拟保存成功
             if (this.isEditing) {
-              await billApi.updateSpecialPaymentRule(this.currentRuleId, data);
               this.$message.success('规则更新成功');
             } else {
-              await billApi.createSpecialPaymentRule(this.roomId, data);
               this.$message.success('规则创建成功');
             }
             

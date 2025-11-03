@@ -191,12 +191,24 @@ export default {
   methods: {
     async fetchBillInfo() {
       try {
-        const response = await billApi.getBillById(this.billId);
-        if (response.data.success) {
-          this.bill = response.data.data.bill;
-          // 获取账单分摊用户
-          await this.fetchBillUsers();
-        }
+        // 模拟API调用
+        console.log('模拟获取账单信息API调用:', { billId: this.billId });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 模拟账单数据
+        this.bill = {
+          id: this.billId,
+          title: '10月份电费',
+          total_amount: 150.00,
+          status: 'partial',
+          due_date: '2023-11-05',
+          created_at: '2023-10-25T10:00:00Z'
+        };
+        
+        // 获取账单分摊用户
+        await this.fetchBillUsers();
       } catch (error) {
         console.error('获取账单信息失败:', error);
         this.$message.error('获取账单信息失败');
@@ -204,15 +216,18 @@ export default {
     },
     async fetchBillUsers() {
       try {
-        const response = await billApi.getBillSplits(this.billId);
-        if (response.data.success) {
-          this.billUsers = response.data.data.splits.map(split => ({
-            user_id: split.user_id,
-            username: split.username,
-            amount: split.amount,
-            status: split.status
-          }));
-        }
+        // 模拟API调用
+        console.log('模拟获取账单用户API调用:', { billId: this.billId });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // 模拟账单用户数据
+        this.billUsers = [
+          { user_id: 1, username: '张三', amount: 50.00, status: 'paid' },
+          { user_id: 2, username: '李四', amount: 50.00, status: 'paid' },
+          { user_id: 3, username: '王五', amount: 50.00, status: 'pending' }
+        ];
       } catch (error) {
         console.error('获取账单用户失败:', error);
       }
@@ -220,10 +235,39 @@ export default {
     async fetchTransfers() {
       this.loading = true;
       try {
-        const response = await billApi.getPaymentTransfers(this.billId);
-        if (response.data.success) {
-          this.transfers = response.data.data.transfers;
-        }
+        // 模拟API调用
+        console.log('模拟获取支付转移记录API调用:', { billId: this.billId });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 模拟支付转移记录数据
+        this.transfers = [
+          {
+            id: 1,
+            from_user_id: 1,
+            from_user_name: '张三',
+            to_user_id: 3,
+            to_user_name: '王五',
+            amount: 25.00,
+            payment_method: 'wechat',
+            transaction_id: 'WX20231025001',
+            notes: '代付电费',
+            transfer_time: '2023-10-25T14:30:00Z'
+          },
+          {
+            id: 2,
+            from_user_id: 2,
+            from_user_name: '李四',
+            to_user_id: 3,
+            to_user_name: '王五',
+            amount: 25.00,
+            payment_method: 'alipay',
+            transaction_id: 'AL20231024002',
+            notes: '代付电费',
+            transfer_time: '2023-10-24T10:15:00Z'
+          }
+        ];
       } catch (error) {
         console.error('获取支付转移记录失败:', error);
         this.$message.error('获取支付转移记录失败');
@@ -233,11 +277,14 @@ export default {
     },
     async checkPayerToPayerRule() {
       try {
-        const response = await billApi.getApplicableRules(this.billId);
-        if (response.data.success) {
-          const rules = response.data.data.applicable_rules;
-          this.hasPayerToPayerRule = rules.some(rule => rule.rule_type === 'payer_to_payer');
-        }
+        // 模拟API调用
+        console.log('模拟检查支付规则API调用:', { billId: this.billId });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // 模拟规则检查结果
+        this.hasPayerToPayerRule = true;
       } catch (error) {
         console.error('检查支付规则失败:', error);
       }
@@ -278,9 +325,20 @@ export default {
       this.$refs.transferForm.validate(async (valid) => {
         if (valid) {
           try {
-            await billApi.createPaymentTransfer(this.billId, this.transferForm);
+            // 模拟API调用
+            console.log('模拟创建支付转移记录API调用:', { 
+              billId: this.billId, 
+              transferData: this.transferForm 
+            });
+            
+            // 模拟API响应延迟
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 模拟创建成功
             this.$message.success('支付转移记录创建成功');
             this.showTransferDialog = false;
+            
+            // 刷新数据
             this.fetchTransfers();
             this.fetchBillInfo(); // 刷新账单状态
           } catch (error) {

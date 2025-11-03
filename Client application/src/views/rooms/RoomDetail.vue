@@ -354,13 +354,31 @@ const canManageBills = computed(() => {
 const loadRoomDetail = async () => {
   loading.value = true
   try {
-    const response = await roomsApi.getRoomDetail(roomId.value)
-    if (response.success) {
-      room.value = response.data
-      loadTabData()
-    } else {
-      ElMessage.error('加载房间详情失败')
+    // 模拟API调用
+    console.log('模拟加载房间详情API调用:', { roomId: roomId.value })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 模拟房间详情数据
+    const mockRoom = {
+      id: roomId.value,
+      name: '东区3号楼201室',
+      description: '我们是一个充满活力的寝室，欢迎大家加入！',
+      avatar: 'https://picsum.photos/seed/room1/200/200.jpg',
+      creatorId: 1,
+      creatorName: '张三',
+      memberCount: 3,
+      maxMembers: 4,
+      status: 'active',
+      isMember: true,
+      isAdmin: true,
+      createdAt: '2023-09-15T10:30:00Z',
+      lastActivity: '2023-11-20T14:25:00Z'
     }
+    
+    room.value = mockRoom
+    loadTabData()
   } catch (error) {
     console.error('加载房间详情失败:', error)
     ElMessage.error('加载房间详情失败')
@@ -387,10 +405,38 @@ const loadTabData = async () => {
  */
 const loadRoomMembers = async () => {
   try {
-    const response = await roomsApi.getRoomMembers(roomId.value)
-    if (response.success) {
-      roomMembers.value = response.data || []
-    }
+    // 模拟API调用
+    console.log('模拟加载房间成员API调用:', { roomId: roomId.value })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟房间成员数据
+    const mockMembers = [
+      {
+        userId: 1,
+        userName: 'zhangsan',
+        realName: '张三',
+        role: 'creator',
+        joinedAt: '2023-09-15T10:30:00Z'
+      },
+      {
+        userId: 2,
+        userName: 'lisi',
+        realName: '李四',
+        role: 'admin',
+        joinedAt: '2023-09-16T14:20:00Z'
+      },
+      {
+        userId: 3,
+        userName: 'wangwu',
+        realName: '王五',
+        role: 'member',
+        joinedAt: '2023-09-18T09:15:00Z'
+      }
+    ]
+    
+    roomMembers.value = mockMembers
   } catch (error) {
     console.error('加载房间成员失败:', error)
   }
@@ -401,10 +447,56 @@ const loadRoomMembers = async () => {
  */
 const loadRoomExpenses = async () => {
   try {
-    const response = await expenseApi.getExpenses({ roomId: roomId.value })
-    if (response.success) {
-      expenses.value = response.data.items || []
-    }
+    // 模拟API调用
+    console.log('模拟加载房间费用API调用:', { roomId: roomId.value })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟房间费用数据
+    const mockExpenses = [
+      {
+        id: 'exp-1',
+        title: '超市购物',
+        amount: 156.80,
+        category: 'daily',
+        payerName: '张三',
+        paymentDate: '2023-11-18T14:30:00Z',
+        splitMembers: [
+          { userId: 1, amount: 52.27 },
+          { userId: 2, amount: 52.27 },
+          { userId: 3, amount: 52.26 }
+        ]
+      },
+      {
+        id: 'exp-2',
+        title: '水电费',
+        amount: 240.00,
+        category: 'utilities',
+        payerName: '李四',
+        paymentDate: '2023-11-15T10:20:00Z',
+        splitMembers: [
+          { userId: 1, amount: 80.00 },
+          { userId: 2, amount: 80.00 },
+          { userId: 3, amount: 80.00 }
+        ]
+      },
+      {
+        id: 'exp-3',
+        title: '聚餐',
+        amount: 320.50,
+        category: 'food',
+        payerName: '王五',
+        paymentDate: '2023-11-12T19:15:00Z',
+        splitMembers: [
+          { userId: 1, amount: 106.83 },
+          { userId: 2, amount: 106.83 },
+          { userId: 3, amount: 106.84 }
+        ]
+      }
+    ]
+    
+    expenses.value = mockExpenses
   } catch (error) {
     console.error('加载房间费用失败:', error)
   }
@@ -415,10 +507,41 @@ const loadRoomExpenses = async () => {
  */
 const loadRoomBills = async () => {
   try {
-    const response = await billApi.getBills({ roomId: roomId.value })
-    if (response.success) {
-      bills.value = response.data.items || []
-    }
+    // 模拟API调用
+    console.log('模拟加载房间账单API调用:', { roomId: roomId.value })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟房间账单数据
+    const mockBills = [
+      {
+        id: 'bill-1',
+        title: '11月份水电费账单',
+        totalAmount: 240.00,
+        status: 'pending',
+        dueDate: '2023-12-05T23:59:59Z',
+        createdAt: '2023-11-25T10:30:00Z'
+      },
+      {
+        id: 'bill-2',
+        title: '10月份公共用品账单',
+        totalAmount: 156.80,
+        status: 'paid',
+        dueDate: '2023-11-20T23:59:59Z',
+        createdAt: '2023-11-05T14:20:00Z'
+      },
+      {
+        id: 'bill-3',
+        title: '12月份房租账单',
+        totalAmount: 1200.00,
+        status: 'draft',
+        dueDate: '2023-12-31T23:59:59Z',
+        createdAt: '2023-11-28T16:45:00Z'
+      }
+    ]
+    
+    bills.value = mockBills
   } catch (error) {
     console.error('加载房间账单失败:', error)
   }
@@ -443,13 +566,15 @@ const editRoom = () => {
  */
 const joinRoom = async () => {
   try {
-    const response = await roomsApi.joinRoom(roomId.value)
-    if (response.success) {
-      ElMessage.success('申请已发送，等待房间管理员审核')
-      loadRoomDetail()
-    } else {
-      ElMessage.error('申请失败')
-    }
+    // 模拟API调用
+    console.log('模拟加入房间API调用:', { roomId: roomId.value })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 模拟成功响应
+    ElMessage.success('申请已发送，等待房间管理员审核')
+    loadRoomDetail()
   } catch (error) {
     console.error('加入房间失败:', error)
     ElMessage.error('加入房间失败')
@@ -467,13 +592,15 @@ const leaveRoom = async () => {
       type: 'warning'
     })
     
-    const response = await roomsApi.leaveRoom(roomId.value)
-    if (response.success) {
-      ElMessage.success('已退出房间')
-      loadRoomDetail()
-    } else {
-      ElMessage.error('退出失败')
-    }
+    // 模拟API调用
+    console.log('模拟退出房间API调用:', { roomId: roomId.value })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 模拟成功响应
+    ElMessage.success('已退出房间')
+    loadRoomDetail()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('退出房间失败:', error)
@@ -540,13 +667,19 @@ const changeMemberRole = async (member) => {
       inputValue: member.role
     })
     
-    const response = await roomsApi.updateRoomMember(roomId.value, member.userId, { role: newRole })
-    if (response.success) {
-      ElMessage.success('角色更改成功')
-      loadRoomMembers()
-    } else {
-      ElMessage.error('角色更改失败')
-    }
+    // 模拟API调用
+    console.log('模拟更改成员角色API调用:', { 
+      roomId: roomId.value, 
+      userId: member.userId, 
+      newRole 
+    })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 模拟成功响应
+    ElMessage.success('角色更改成功')
+    loadRoomMembers()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('更改成员角色失败:', error)
@@ -566,13 +699,18 @@ const removeMember = async (member) => {
       type: 'warning'
     })
     
-    const response = await roomsApi.removeRoomMember(roomId.value, member.userId)
-    if (response.success) {
-      ElMessage.success('成员已移除')
-      loadRoomMembers()
-    } else {
-      ElMessage.error('移除失败')
-    }
+    // 模拟API调用
+    console.log('模拟移除成员API调用:', { 
+      roomId: roomId.value, 
+      userId: member.userId 
+    })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 模拟成功响应
+    ElMessage.success('成员已移除')
+    loadRoomMembers()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('移除成员失败:', error)
@@ -590,16 +728,22 @@ const submitInvite = async () => {
   try {
     await inviteFormRef.value.validate()
     
-    const response = await roomsApi.createRoomInvitation(inviteForm)
-    if (response.success) {
-      ElMessage.success('邀请已发送')
-      showInviteDialog.value = false
-      inviteForm.username = ''
-      inviteForm.role = 'member'
-      loadRoomMembers()
-    } else {
-      ElMessage.error('邀请发送失败')
-    }
+    // 模拟API调用
+    console.log('模拟创建房间邀请API调用:', { 
+      roomId: roomId.value,
+      username: inviteForm.username,
+      role: inviteForm.role
+    })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 模拟成功响应
+    ElMessage.success('邀请已发送')
+    showInviteDialog.value = false
+    inviteForm.username = ''
+    inviteForm.role = 'member'
+    loadRoomMembers()
   } catch (error) {
     console.error('邀请成员失败:', error)
     ElMessage.error('邀请成员失败')

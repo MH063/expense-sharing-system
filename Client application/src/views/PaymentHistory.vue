@@ -121,23 +121,88 @@ export default {
       loading.value = true;
       
       try {
-        const params = {
-          page: pagination.value.page,
-          limit: pagination.value.limit
-        };
+        // 模拟API调用
+        console.log('模拟获取支付记录API调用:', { 
+          page: pagination.value.page, 
+          limit: pagination.value.limit,
+          status: statusFilter.value 
+        });
         
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 模拟支付记录数据
+        const mockPayments = [
+          {
+            id: 1,
+            bill_id: 101,
+            bill_title: '10月份电费',
+            room_name: '东区3号楼201室',
+            amount: 45.50,
+            status: 'completed',
+            payment_method: 'wechat',
+            transaction_id: 'WX20231025001',
+            created_at: '2023-10-25T14:30:00Z',
+            payment_time: '2023-10-25T14:32:15Z'
+          },
+          {
+            id: 2,
+            bill_id: 102,
+            bill_title: '10月份水费',
+            room_name: '东区3号楼201室',
+            amount: 32.80,
+            status: 'completed',
+            payment_method: 'alipay',
+            transaction_id: 'AL20231024002',
+            created_at: '2023-10-24T10:15:00Z',
+            payment_time: '2023-10-24T10:16:42Z'
+          },
+          {
+            id: 3,
+            bill_id: 103,
+            bill_title: '9月份网费',
+            room_name: '东区3号楼201室',
+            amount: 50.00,
+            status: 'pending',
+            payment_method: 'bank_transfer',
+            transaction_id: 'BK20231020003',
+            created_at: '2023-10-20T16:45:00Z',
+            payment_time: null
+          },
+          {
+            id: 4,
+            bill_id: 104,
+            bill_title: '9月份物业费',
+            room_name: '东区3号楼201室',
+            amount: 120.00,
+            status: 'failed',
+            payment_method: 'alipay',
+            transaction_id: 'AL20231015004',
+            created_at: '2023-10-15T09:20:00Z',
+            payment_time: null
+          }
+        ];
+        
+        // 根据状态筛选
+        let filteredPayments = mockPayments;
         if (statusFilter.value) {
-          params.status = statusFilter.value;
+          filteredPayments = mockPayments.filter(payment => payment.status === statusFilter.value);
         }
         
-        const response = await paymentApi.getUserPayments(params);
+        // 计算分页
+        const total = filteredPayments.length;
+        const pages = Math.ceil(total / pagination.value.limit);
+        const startIndex = (pagination.value.page - 1) * pagination.value.limit;
+        const endIndex = startIndex + pagination.value.limit;
+        const paginatedPayments = filteredPayments.slice(startIndex, endIndex);
         
-        if (response.data.success) {
-          payments.value = response.data.data.payments;
-          pagination.value = response.data.data.pagination;
-        } else {
-          console.error('获取支付记录失败:', response.data.message);
-        }
+        // 更新状态
+        payments.value = paginatedPayments;
+        pagination.value = {
+          ...pagination.value,
+          total,
+          pages
+        };
       } catch (error) {
         console.error('获取支付记录失败:', error);
       } finally {

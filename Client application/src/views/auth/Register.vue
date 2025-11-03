@@ -288,12 +288,33 @@ const handleRegister = async () => {
   errorMessage.value = ''
   
   try {
-    // 调用注册API
-    await userStore.register({
+    // 模拟API调用
+    console.log('模拟注册API调用:', {
       username: registerForm.username,
       email: registerForm.email,
       password: registerForm.password
     })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    // 模拟注册成功响应
+    const mockResponse = {
+      success: true,
+      data: {
+        user: {
+          id: Date.now(),
+          username: registerForm.username,
+          email: registerForm.email,
+          avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
+          roles: ['user'],
+          permissions: ['read', 'write']
+        },
+        message: '注册成功'
+      }
+    }
+    
+    console.log('模拟注册成功:', mockResponse)
     
     // 注册成功，跳转到登录页面
     router.push({

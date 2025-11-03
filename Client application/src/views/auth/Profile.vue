@@ -434,13 +434,42 @@ const loadProfile = async () => {
       profileForm.bio = profile.bio
     }
     
-    // 加载登录活动记录
-    // 这里应该调用API获取登录活动记录
-    // loginActivities.value = await api.getLoginActivities()
+    // 模拟加载登录活动记录
+    console.log('加载登录活动记录')
+    const mockLoginActivities = [
+      {
+        id: 'activity-1',
+        device: 'Chrome浏览器 / Windows 10',
+        location: '北京市朝阳区',
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        status: 'current'
+      },
+      {
+        id: 'activity-2',
+        device: 'Safari浏览器 / iPhone 14',
+        location: '北京市海淀区',
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        status: 'exited'
+      },
+      {
+        id: 'activity-3',
+        device: 'Chrome浏览器 / macOS',
+        location: '上海市浦东新区',
+        timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'exited'
+      }
+    ]
+    loginActivities.value = mockLoginActivities
     
-    // 加载通知设置
-    // 这里应该调用API获取通知设置
-    // Object.assign(notificationSettings, await api.getNotificationSettings())
+    // 模拟加载通知设置
+    console.log('加载通知设置')
+    const mockNotificationSettings = {
+      browserNotifications: false,
+      emailNotifications: true,
+      expenseNotifications: true,
+      invitationNotifications: true
+    }
+    Object.assign(notificationSettings, mockNotificationSettings)
     
   } catch (error) {
     console.error('加载用户资料失败:', error)
@@ -477,22 +506,34 @@ const updateProfile = async () => {
   successMessage.value = ''
   
   try {
-    // 这里应该调用API更新个人资料
-    // await api.updateProfile(profileForm)
+    // 模拟API调用
+    console.log('更新个人资料:', profileForm)
     
-    // 更新本地状态
-    profile.username = profileForm.username
-    profile.email = profileForm.email
-    profile.displayName = profileForm.displayName
-    profile.bio = profileForm.bio
+    // 模拟API响应
+    const mockResponse = {
+      success: true,
+      data: {
+        ...profileForm,
+        updatedAt: new Date().toISOString()
+      }
+    }
     
-    successMessage.value = '个人资料更新成功'
-    
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
+    if (mockResponse.success) {
+      // 更新本地状态
+      profile.username = profileForm.username
+      profile.email = profileForm.email
+      profile.displayName = profileForm.displayName
+      profile.bio = profileForm.bio
+      
+      successMessage.value = '个人资料更新成功'
+      
+      // 3秒后隐藏成功消息
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      errorMessage.value = '更新个人资料失败'
+    }
   } catch (error) {
     console.error('更新个人资料失败:', error)
     errorMessage.value = error.message || '更新个人资料失败'
@@ -539,21 +580,30 @@ const changePassword = async () => {
   successMessage.value = ''
   
   try {
-    // 这里应该调用API修改密码
-    // await api.changePassword(passwordForm)
+    // 模拟API调用
+    console.log('修改密码')
     
-    // 重置表单
-    passwordForm.currentPassword = ''
-    passwordForm.newPassword = ''
-    passwordForm.confirmPassword = ''
+    // 模拟API响应
+    const mockResponse = {
+      success: true,
+      message: '密码修改成功'
+    }
     
-    successMessage.value = '密码修改成功'
-    
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
+    if (mockResponse.success) {
+      // 重置表单
+      passwordForm.currentPassword = ''
+      passwordForm.newPassword = ''
+      passwordForm.confirmPassword = ''
+      
+      successMessage.value = '密码修改成功'
+      
+      // 3秒后隐藏成功消息
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      errorMessage.value = mockResponse.message || '密码修改失败'
+    }
   } catch (error) {
     console.error('修改密码失败:', error)
     errorMessage.value = error.message || '修改密码失败'
@@ -565,16 +615,25 @@ const changePassword = async () => {
 // 更新通知设置
 const updateNotificationSettings = async () => {
   try {
-    // 这里应该调用API更新通知设置
-    // await api.updateNotificationSettings(notificationSettings)
+    // 模拟API调用
+    console.log('更新通知设置:', notificationSettings)
     
-    successMessage.value = '通知设置已更新'
+    // 模拟API响应
+    const mockResponse = {
+      success: true,
+      message: '通知设置已更新'
+    }
     
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
+    if (mockResponse.success) {
+      successMessage.value = '通知设置已更新'
+      
+      // 3秒后隐藏成功消息
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      errorMessage.value = mockResponse.message || '更新通知设置失败'
+    }
   } catch (error) {
     console.error('更新通知设置失败:', error)
     errorMessage.value = '更新通知设置失败'
@@ -644,11 +703,14 @@ const uploadAvatar = async () => {
   errorMessage.value = ''
   
   try {
-    // 这里应该调用API上传头像
-    // const avatarUrl = await api.uploadAvatar(file)
+    // 模拟API调用
+    console.log('上传头像')
+    
+    // 模拟上传成功，生成一个随机头像URL
+    const avatarUrl = `https://picsum.photos/seed/avatar${Date.now()}/200/200.jpg`
     
     // 更新头像
-    // profile.avatar = avatarUrl
+    profile.avatar = avatarUrl
     
     // 关闭弹窗
     showAvatarUpload.value = false

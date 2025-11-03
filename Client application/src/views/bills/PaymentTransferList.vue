@@ -376,27 +376,103 @@ const loadTransfers = async () => {
   try {
     console.log(`加载账单 ${billId} 的支付转移记录`)
     
-    // 构建查询参数
-    const params = {
-      billId,
-      page: pagination.currentPage,
-      pageSize: pagination.pageSize,
-      transferType: filterForm.transferType || undefined,
-      status: filterForm.status || undefined,
-      startDate: filterForm.dateRange?.[0] || undefined,
-      endDate: filterForm.dateRange?.[1] || undefined
+    // 模拟API调用
+    console.log('模拟获取转移记录')
+    
+    // 模拟转移记录数据
+    const mockTransfers = [
+      {
+        id: 'transfer-1',
+        transferType: 'self_pay',
+        amount: 52.17,
+        status: 'completed',
+        createdAt: '2023-11-02T14:30:00Z',
+        updatedAt: '2023-11-02T14:30:00Z',
+        fromUser: {
+          id: 'user-1',
+          name: '张三',
+          avatar: 'https://picsum.photos/seed/user1/100/100.jpg'
+        },
+        toUser: {
+          id: 'user-1',
+          name: '张三',
+          avatar: 'https://picsum.photos/seed/user1/100/100.jpg'
+        },
+        note: '本人支付水电费',
+        fromUserId: 'user-1',
+        toUserId: 'user-1'
+      },
+      {
+        id: 'transfer-2',
+        transferType: 'proxy_pay',
+        amount: 52.17,
+        status: 'pending',
+        createdAt: '2023-11-03T10:15:00Z',
+        updatedAt: '2023-11-03T10:15:00Z',
+        fromUser: {
+          id: 'user-1',
+          name: '张三',
+          avatar: 'https://picsum.photos/seed/user1/100/100.jpg'
+        },
+        toUser: {
+          id: 'user-2',
+          name: '李四',
+          avatar: 'https://picsum.photos/seed/user2/100/100.jpg'
+        },
+        note: '代付水电费',
+        fromUserId: 'user-1',
+        toUserId: 'user-2'
+      },
+      {
+        id: 'transfer-3',
+        transferType: 'multi_pay',
+        amount: 52.16,
+        status: 'pending',
+        createdAt: '2023-11-04T09:20:00Z',
+        updatedAt: '2023-11-04T09:20:00Z',
+        fromUser: {
+          id: 'user-3',
+          name: '王五',
+          avatar: 'https://picsum.photos/seed/user3/100/100.jpg'
+        },
+        toUser: {
+          id: 'user-1',
+          name: '张三',
+          avatar: 'https://picsum.photos/seed/user1/100/100.jpg'
+        },
+        note: '多人支付水电费',
+        fromUserId: 'user-3',
+        toUserId: 'user-1'
+      }
+    ]
+    
+    // 应用筛选条件
+    let filteredTransfers = mockTransfers
+    
+    if (filterForm.transferType) {
+      filteredTransfers = filteredTransfers.filter(t => t.transferType === filterForm.transferType)
     }
     
-    // 调用API获取转移记录
-    const response = await billApi.getPaymentTransfers(params)
-    
-    if (response.data.success) {
-      transfers.value = response.data.data.items || []
-      pagination.total = response.data.data.total || 0
-      console.log(`成功加载 ${transfers.value.length} 条转移记录`)
-    } else {
-      ElMessage.error(response.data.message || '加载转移记录失败')
+    if (filterForm.status) {
+      filteredTransfers = filteredTransfers.filter(t => t.status === filterForm.status)
     }
+    
+    if (filterForm.dateRange && filterForm.dateRange.length === 2) {
+      const startDate = new Date(filterForm.dateRange[0])
+      const endDate = new Date(filterForm.dateRange[1])
+      filteredTransfers = filteredTransfers.filter(t => {
+        const transferDate = new Date(t.createdAt)
+        return transferDate >= startDate && transferDate <= endDate
+      })
+    }
+    
+    // 应用分页
+    const startIndex = (pagination.currentPage - 1) * pagination.pageSize
+    const endIndex = startIndex + pagination.pageSize
+    transfers.value = filteredTransfers.slice(startIndex, endIndex)
+    pagination.total = filteredTransfers.length
+    
+    console.log(`成功加载 ${transfers.value.length} 条转移记录`)
   } catch (error) {
     console.error('加载转移记录失败:', error)
     ElMessage.error('加载转移记录失败')
@@ -410,21 +486,33 @@ const loadBillParticipants = async () => {
   try {
     console.log(`加载账单 ${billId} 的参与者信息`)
     
-    // 调用API获取账单详情，从中提取参与者信息
-    const response = await billApi.getBillDetail(billId)
+    // 模拟API调用
+    console.log('模拟获取账单参与者信息')
     
-    if (response.data.success) {
-      const bill = response.data.data
-      // 构建参与者列表（创建者和所有参与者）
-      const participants = [bill.creator, ...(bill.participants || [])]
-      // 去重
-      billParticipants.value = participants.filter((user, index, self) =>
-        index === self.findIndex((u) => u.id === user.id)
-      )
-      console.log(`成功加载 ${billParticipants.value.length} 位参与者`)
-    } else {
-      ElMessage.error(response.data.message || '加载参与者信息失败')
-    }
+    // 模拟参与者数据
+    const mockParticipants = [
+      {
+        id: 'user-1',
+        name: '张三',
+        avatar: 'https://picsum.photos/seed/user1/100/100.jpg',
+        isAdmin: true
+      },
+      {
+        id: 'user-2',
+        name: '李四',
+        avatar: 'https://picsum.photos/seed/user2/100/100.jpg',
+        isAdmin: false
+      },
+      {
+        id: 'user-3',
+        name: '王五',
+        avatar: 'https://picsum.photos/seed/user3/100/100.jpg',
+        isAdmin: false
+      }
+    ]
+    
+    billParticipants.value = mockParticipants
+    console.log(`成功加载 ${billParticipants.value.length} 位参与者`)
   } catch (error) {
     console.error('加载参与者信息失败:', error)
     ElMessage.error('加载参与者信息失败')
@@ -498,17 +586,31 @@ const submitTransfer = async () => {
       note: transferForm.note
     }
     
-    // 调用API创建转移记录
-    const response = await billApi.createPaymentTransfer(data)
+    // 模拟API调用
+    console.log('模拟创建转移记录:', data)
     
-    if (response.data.success) {
-      ElMessage.success('转移记录创建成功')
-      showAddTransferDialog.value = false
-      resetTransferForm()
-      loadTransfers() // 重新加载列表
-    } else {
-      ElMessage.error(response.data.message || '创建转移记录失败')
+    // 模拟创建成功
+    const newTransfer = {
+      id: `transfer-${Date.now()}`,
+      transferType: data.transferType,
+      amount: data.amount,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      fromUser: billParticipants.value.find(user => user.id === data.fromUserId),
+      toUser: billParticipants.value.find(user => user.id === data.toUserId),
+      note: data.note,
+      fromUserId: data.fromUserId,
+      toUserId: data.toUserId
     }
+    
+    // 添加到本地数据
+    transfers.value.unshift(newTransfer)
+    pagination.total += 1
+    
+    ElMessage.success('转移记录创建成功')
+    showAddTransferDialog.value = false
+    resetTransferForm()
   } catch (error) {
     console.error('创建转移记录失败:', error)
     ElMessage.error('创建转移记录失败')
@@ -536,16 +638,24 @@ const confirmTransfer = async (transfer) => {
     
     console.log(`确认转移记录: ${transfer.id}`)
     
-    // 调用API确认转移
-    const response = await billApi.confirmPaymentTransfer(transfer.id)
+    // 模拟API调用
+    console.log('模拟确认转移记录:', transfer.id)
     
-    if (response.data.success) {
-      ElMessage.success('转移记录已确认')
-      showDetailDialog.value = false
-      loadTransfers() // 重新加载列表
-    } else {
-      ElMessage.error(response.data.message || '确认转移失败')
+    // 更新本地数据
+    const index = transfers.value.findIndex(t => t.id === transfer.id)
+    if (index !== -1) {
+      transfers.value[index].status = 'completed'
+      transfers.value[index].updatedAt = new Date().toISOString()
     }
+    
+    // 如果是从详情页确认，也要更新selectedTransfer
+    if (selectedTransfer.value && selectedTransfer.value.id === transfer.id) {
+      selectedTransfer.value.status = 'completed'
+      selectedTransfer.value.updatedAt = new Date().toISOString()
+    }
+    
+    ElMessage.success('转移记录已确认')
+    showDetailDialog.value = false
   } catch (error) {
     if (error !== 'cancel') {
       console.error('确认转移失败:', error)
@@ -569,16 +679,24 @@ const cancelTransfer = async (transfer) => {
     
     console.log(`取消转移记录: ${transfer.id}`)
     
-    // 调用API取消转移
-    const response = await billApi.cancelPaymentTransfer(transfer.id)
+    // 模拟API调用
+    console.log('模拟取消转移记录:', transfer.id)
     
-    if (response.data.success) {
-      ElMessage.success('转移记录已取消')
-      showDetailDialog.value = false
-      loadTransfers() // 重新加载列表
-    } else {
-      ElMessage.error(response.data.message || '取消转移失败')
+    // 更新本地数据
+    const index = transfers.value.findIndex(t => t.id === transfer.id)
+    if (index !== -1) {
+      transfers.value[index].status = 'cancelled'
+      transfers.value[index].updatedAt = new Date().toISOString()
     }
+    
+    // 如果是从详情页取消，也要更新selectedTransfer
+    if (selectedTransfer.value && selectedTransfer.value.id === transfer.id) {
+      selectedTransfer.value.status = 'cancelled'
+      selectedTransfer.value.updatedAt = new Date().toISOString()
+    }
+    
+    ElMessage.success('转移记录已取消')
+    showDetailDialog.value = false
   } catch (error) {
     if (error !== 'cancel') {
       console.error('取消转移失败:', error)

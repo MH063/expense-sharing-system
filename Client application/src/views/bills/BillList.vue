@@ -535,79 +535,102 @@ const loadBills = async () => {
   try {
     console.log('开始加载账单数据...')
     
-    // 构建查询参数
-    const params = new URLSearchParams()
-    
-    // 添加筛选参数
-    if (filters.value.status) {
-      params.append('status', filters.value.status)
-    }
-    
-    if (filters.value.creator_id) {
-      params.append('creator_id', filters.value.creator_id)
-    }
-    
-    if (filters.value.dateRange && filters.value.dateRange.length === 2) {
-      params.append('start_date', filters.value.dateRange[0])
-      params.append('end_date', filters.value.dateRange[1])
-    }
-    
-    if (filters.value.amountRange && filters.value.amountRange.length === 2) {
-      params.append('min_amount', filters.value.amountRange[0])
-      params.append('max_amount', filters.value.amountRange[1])
-    }
-    
-    // 添加分页参数
-    params.append('page', currentPage.value)
-    params.append('limit', itemsPerPage.value)
-    
-    // 调用API获取账单数据
-    const response = await fetch(`/api/bills?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${authStore.token}`,
-        'Content-Type': 'application/json'
+    // 模拟账单数据
+    bills.value = [
+      {
+        id: 'bill-1',
+        title: '10月水电费',
+        total_amount: 230.50,
+        amount: 230.50,
+        status: 'pending',
+        creator_id: 'user-1',
+        creator_name: '张三',
+        creatorName: '张三',
+        due_date: '2023-10-25',
+        dueDate: '2023-10-25',
+        created_at: '2023-10-01',
+        createdAt: '2023-10-01',
+        participants: [
+          { id: 'user-1', name: '张三' },
+          { id: 'user-2', name: '李四' },
+          { id: 'user-3', name: '王五' }
+        ]
+      },
+      {
+        id: 'bill-2',
+        title: '网费',
+        total_amount: 99.00,
+        amount: 99.00,
+        status: 'paid',
+        creator_id: 'user-2',
+        creator_name: '李四',
+        creatorName: '李四',
+        due_date: '2023-10-15',
+        dueDate: '2023-10-15',
+        created_at: '2023-09-30',
+        createdAt: '2023-09-30',
+        participants: [
+          { id: 'user-1', name: '张三' },
+          { id: 'user-2', name: '李四' },
+          { id: 'user-3', name: '王五' }
+        ]
+      },
+      {
+        id: 'bill-3',
+        title: '聚餐费用',
+        total_amount: 450.00,
+        amount: 450.00,
+        status: 'overdue',
+        creator_id: 'user-3',
+        creator_name: '王五',
+        creatorName: '王五',
+        due_date: '2023-10-05',
+        dueDate: '2023-10-05',
+        created_at: '2023-09-28',
+        createdAt: '2023-09-28',
+        participants: [
+          { id: 'user-1', name: '张三' },
+          { id: 'user-2', name: '李四' },
+          { id: 'user-3', name: '王五' }
+        ]
+      },
+      {
+        id: 'bill-4',
+        title: '日用品采购',
+        total_amount: 186.80,
+        amount: 186.80,
+        status: 'partial',
+        creator_id: 'user-1',
+        creator_name: '张三',
+        creatorName: '张三',
+        due_date: '2023-10-20',
+        dueDate: '2023-10-20',
+        created_at: '2023-10-02',
+        createdAt: '2023-10-02',
+        participants: [
+          { id: 'user-1', name: '张三' },
+          { id: 'user-2', name: '李四' },
+          { id: 'user-3', name: '王五' }
+        ]
       }
-    })
+    ]
     
-    if (!response.ok) {
-      throw new Error('获取账单数据失败')
+    // 模拟房间成员数据
+    members.value = [
+      { id: 'user-1', name: '张三', user_id: 'user-1' },
+      { id: 'user-2', name: '李四', user_id: 'user-2' },
+      { id: 'user-3', name: '王五', user_id: 'user-3' }
+    ]
+    
+    // 计算统计数据
+    stats.value = {
+      pending: bills.value.filter(bill => bill.status === 'pending').length,
+      paid: bills.value.filter(bill => bill.status === 'paid').length,
+      overdue: bills.value.filter(bill => bill.status === 'overdue').length,
+      totalAmount: bills.value.reduce((sum, bill) => sum + parseFloat(bill.total_amount || bill.amount || 0), 0)
     }
     
-    const result = await response.json()
-    console.log('获取到的账单数据:', result)
-    
-    if (result.success) {
-      bills.value = result.data.bills || []
-      
-      // 计算统计数据
-      stats.value = {
-        pending: bills.value.filter(bill => bill.status === 'pending').length,
-        paid: bills.value.filter(bill => bill.status === 'paid').length,
-        overdue: bills.value.filter(bill => bill.status === 'overdue').length,
-        totalAmount: bills.value.reduce((sum, bill) => sum + parseFloat(bill.total_amount || bill.amount || 0), 0)
-      }
-      console.log('账单数据加载成功，共', bills.value.length, '条记录')
-    } else {
-      console.error('获取账单列表失败:', result.message)
-      throw new Error(result.message || '获取账单数据失败')
-    }
-    
-    // 获取房间成员数据（如果还没有）
-    if (members.value.length === 0) {
-      const membersResponse = await fetch('/api/room/members', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authStore.token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      const membersResult = await membersResponse.json()
-      if (membersResult.success) {
-        members.value = membersResult.data || []
-      }
-    }
+    console.log('账单数据加载成功，共', bills.value.length, '条记录')
     
   } catch (error) {
     console.error('加载账单失败:', error)

@@ -163,12 +163,22 @@ export default {
       errorMessage.value = '';
       
       try {
-        const response = await paymentApi.getBillPaymentStatus(billId);
-        if (response.data.success) {
-          billInfo.value = response.data.data.payment_status;
-        } else {
-          errorMessage.value = response.data.message || '获取账单信息失败';
-        }
+        // 模拟API调用
+        console.log('模拟获取账单支付状态API调用:', { billId });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 模拟账单信息
+        billInfo.value = {
+          bill_title: '10月份电费',
+          room_name: '101房间',
+          creator_name: '张三',
+          total_amount: '150.00',
+          user_amount: '50.00',
+          due_date: '2023-11-30',
+          status: 'pending'
+        };
       } catch (error) {
         console.error('获取账单信息失败:', error);
         errorMessage.value = '获取账单信息失败，请稍后重试';
@@ -195,12 +205,14 @@ export default {
       errorMessage.value = '';
       
       try {
-        const response = await paymentApi.getBillQrCode(billId, method);
-        if (response.data.success) {
-          qrCodeUrl.value = response.data.data.payment_info.qr_image_url;
-        } else {
-          errorMessage.value = response.data.message || '获取收款码失败';
-        }
+        // 模拟API调用
+        console.log('模拟获取账单二维码API调用:', { billId, method });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // 模拟二维码URL
+        qrCodeUrl.value = `https://picsum.photos/seed/${method}-${billId}/200/200.jpg`;
       } catch (error) {
         console.error('获取收款码失败:', error);
         errorMessage.value = '获取收款码失败，请稍后重试';
@@ -230,14 +242,15 @@ export default {
       errorMessage.value = '';
       
       try {
-        const response = await paymentApi.confirmPayment(billId, paymentForm.value);
-        if (response.data.success) {
-          // 支付成功，跳转到账单详情页
-          router.push(`/bills/${billId}`);
-        } else {
-          errorMessage.value = response.data.message || '支付确认失败';
-          showConfirmDialog.value = false;
-        }
+        // 模拟API调用
+        console.log('模拟确认支付API调用:', { billId, paymentData: paymentForm.value });
+        
+        // 模拟API响应延迟
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 模拟支付成功
+        // 支付成功，跳转到账单详情页
+        router.push(`/bills/${billId}`);
       } catch (error) {
         console.error('支付确认失败:', error);
         errorMessage.value = '支付确认失败，请稍后重试';

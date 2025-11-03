@@ -41,7 +41,7 @@
           </div>
           <button
             @click="uploadQrCode"
-            :disabled="!qrType || !selectedFile || uploading"
+            :disabled="!qrType || !selectedFile.value"
             class="btn btn-primary"
           >
             {{ uploading ? '上传中...' : '上传收款码' }}
@@ -149,12 +149,41 @@ export default {
     const fetchQrCodes = async () => {
       try {
         loading.value = true;
-        const response = await getUserQrCodes();
-        if (response.success) {
-          qrCodes.value = response.data.qr_codes;
-        } else {
-          console.error('获取收款码列表失败:', response.message);
-        }
+        console.log('模拟API调用 - 获取收款码列表');
+        
+        // 模拟网络延迟
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // 模拟数据
+        const mockQrCodes = [
+          {
+            id: 1,
+            qr_type: 'wechat',
+            qr_image_url: 'https://picsum.photos/seed/wechat-qr/300/300.jpg',
+            is_active: true,
+            is_default: true,
+            created_at: '2023-06-01T10:30:00Z'
+          },
+          {
+            id: 2,
+            qr_type: 'alipay',
+            qr_image_url: 'https://picsum.photos/seed/alipay-qr/300/300.jpg',
+            is_active: true,
+            is_default: false,
+            created_at: '2023-06-02T14:20:00Z'
+          },
+          {
+            id: 3,
+            qr_type: 'wechat',
+            qr_image_url: 'https://picsum.photos/seed/wechat-qr2/300/300.jpg',
+            is_active: false,
+            is_default: false,
+            created_at: '2023-06-03T09:15:00Z'
+          }
+        ];
+        
+        qrCodes.value = mockQrCodes;
+        console.log('模拟获取收款码列表成功:', { 数量: mockQrCodes.length });
       } catch (error) {
         console.error('获取收款码列表失败:', error);
       } finally {
@@ -204,18 +233,22 @@ export default {
 
       try {
         uploading.value = true;
-        const formData = new FormData();
-        formData.append('qr_image', selectedFile.value);
-        formData.append('qr_type', qrType.value);
-
-        const response = await uploadQrCodeApi(formData);
-        if (response.success) {
+        console.log('模拟API调用 - 上传收款码:', { type: qrType.value, file: selectedFile.value.name });
+        
+        // 模拟网络延迟
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        
+        // 模拟成功响应
+        const success = true;
+        
+        if (success) {
           alert('收款码上传成功');
           clearFile();
           qrType.value = '';
           await fetchQrCodes();
+          console.log('模拟上传收款码成功');
         } else {
-          alert('上传失败: ' + response.message);
+          alert('上传失败: 服务器错误');
         }
       } catch (error) {
         console.error('上传收款码失败:', error);
@@ -228,11 +261,19 @@ export default {
     // 切换收款码状态
     const toggleQrCodeStatus = async (id, isActive) => {
       try {
-        const response = await toggleQrCodeStatusApi(id, isActive);
-        if (response.success) {
+        console.log('模拟API调用 - 切换收款码状态:', { id, isActive });
+        
+        // 模拟网络延迟
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // 模拟成功响应
+        const success = true;
+        
+        if (success) {
           await fetchQrCodes();
+          console.log('模拟切换收款码状态成功:', { id, isActive });
         } else {
-          alert('操作失败: ' + response.message);
+          alert('操作失败: 服务器错误');
         }
       } catch (error) {
         console.error('更新收款码状态失败:', error);
@@ -243,11 +284,19 @@ export default {
     // 设置默认收款码
     const setDefaultQrCode = async (id) => {
       try {
-        const response = await setDefaultQrCodeApi(id);
-        if (response.success) {
+        console.log('模拟API调用 - 设置默认收款码:', id);
+        
+        // 模拟网络延迟
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 模拟成功响应
+        const success = true;
+        
+        if (success) {
           await fetchQrCodes();
+          console.log('模拟设置默认收款码成功:', id);
         } else {
-          alert('设置失败: ' + response.message);
+          alert('设置失败: 服务器错误');
         }
       } catch (error) {
         console.error('设置默认收款码失败:', error);
@@ -272,12 +321,20 @@ export default {
       if (!qrCodeToDelete.value) return;
 
       try {
-        const response = await deleteQrCodeApi(qrCodeToDelete.value);
-        if (response.success) {
+        console.log('模拟API调用 - 删除收款码:', qrCodeToDelete.value);
+        
+        // 模拟网络延迟
+        await new Promise(resolve => setTimeout(resolve, 700));
+        
+        // 模拟成功响应
+        const success = true;
+        
+        if (success) {
           await fetchQrCodes();
           closeDeleteDialog();
+          console.log('模拟删除收款码成功:', qrCodeToDelete.value);
         } else {
-          alert('删除失败: ' + response.message);
+          alert('删除失败: 服务器错误');
         }
       } catch (error) {
         console.error('删除收款码失败:', error);

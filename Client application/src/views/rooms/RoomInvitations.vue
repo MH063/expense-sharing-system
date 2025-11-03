@@ -239,10 +239,39 @@ const loadInvitationsData = async () => {
  */
 const loadReceivedInvitations = async () => {
   try {
-    const response = await roomsApi.getRoomInvitations()
-    if (response.success) {
-      receivedInvitations.value = response.data || []
-    }
+    // 模拟API调用
+    console.log('模拟加载收到的邀请API调用')
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟收到的邀请数据
+    const mockInvitations = [
+      {
+        id: 'inv-1',
+        roomId: 'room-1',
+        roomName: '东区3号楼201室',
+        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
+        inviterId: 'user-1',
+        inviterName: '张三',
+        inviteeId: currentUserId.value,
+        status: 'pending',
+        createdAt: '2023-11-15T10:30:00Z'
+      },
+      {
+        id: 'inv-2',
+        roomId: 'room-3',
+        roomName: '南区2号楼105室',
+        roomDescription: '娱乐学习两不误，欢迎大家！',
+        inviterId: 'user-3',
+        inviterName: '王五',
+        inviteeId: currentUserId.value,
+        status: 'accepted',
+        createdAt: '2023-11-10T14:20:00Z'
+      }
+    ]
+    
+    receivedInvitations.value = mockInvitations
   } catch (error) {
     console.error('加载收到的邀请失败:', error)
   }
@@ -253,10 +282,41 @@ const loadReceivedInvitations = async () => {
  */
 const loadSentInvitations = async () => {
   try {
-    // const response = await roomsApi.getRoomInvitations()
-    if (response.success) {
-      sentInvitations.value = response.data || []
-    }
+    // 模拟API调用
+    console.log('模拟加载发送的邀请API调用')
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟发送的邀请数据
+    const mockInvitations = [
+      {
+        id: 'inv-3',
+        roomId: 'room-1',
+        roomName: '东区3号楼201室',
+        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
+        inviterId: currentUserId.value,
+        inviterName: '我',
+        inviteeId: 'user-4',
+        inviteeName: '赵六',
+        status: 'pending',
+        createdAt: '2023-11-12T09:15:00Z'
+      },
+      {
+        id: 'inv-4',
+        roomId: 'room-1',
+        roomName: '东区3号楼201室',
+        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
+        inviterId: currentUserId.value,
+        inviterName: '我',
+        inviteeId: 'user-5',
+        inviteeName: '钱七',
+        status: 'rejected',
+        createdAt: '2023-11-08T16:30:00Z'
+      }
+    ]
+    
+    sentInvitations.value = mockInvitations
   } catch (error) {
     console.error('加载发送的邀请失败:', error)
   }
@@ -267,10 +327,39 @@ const loadSentInvitations = async () => {
  */
 const loadApplications = async () => {
   try {
-    // const response = await roomsApi.getRoomApplications()
-    if (response.success) {
-      applications.value = response.data || []
-    }
+    // 模拟API调用
+    console.log('模拟加载加入申请API调用')
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 600))
+    
+    // 模拟加入申请数据
+    const mockApplications = [
+      {
+        id: 'app-1',
+        roomId: 'room-1',
+        roomName: '东区3号楼201室',
+        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
+        applicantId: 'user-6',
+        applicantName: '孙八',
+        status: 'pending',
+        canManage: true,
+        createdAt: '2023-11-14T11:45:00Z'
+      },
+      {
+        id: 'app-2',
+        roomId: 'room-2',
+        roomName: '西区5号楼302室',
+        roomDescription: '学习氛围浓厚，共同进步！',
+        applicantId: currentUserId.value,
+        applicantName: '我',
+        status: 'rejected',
+        canManage: false,
+        createdAt: '2023-11-05T13:20:00Z'
+      }
+    ]
+    
+    applications.value = mockApplications
   } catch (error) {
     console.error('加载加入申请失败:', error)
   }
@@ -295,13 +384,19 @@ const handleTabClick = () => {
  */
 const acceptInvitation = async (invitation) => {
   try {
-    const response = await roomsApi.acceptRoomInvitation(invitation.id)
-    if (response.success) {
-      ElMessage.success('已接受邀请')
-      loadReceivedInvitations()
-    } else {
-      ElMessage.error('接受邀请失败')
+    // 模拟API调用
+    console.log('模拟接受邀请API调用:', { invitationId: invitation.id })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 更新本地状态
+    const index = receivedInvitations.value.findIndex(inv => inv.id === invitation.id)
+    if (index !== -1) {
+      receivedInvitations.value[index].status = 'accepted'
     }
+    
+    ElMessage.success('已接受邀请')
   } catch (error) {
     console.error('接受邀请失败:', error)
     ElMessage.error('接受邀请失败')
@@ -313,13 +408,19 @@ const acceptInvitation = async (invitation) => {
  */
 const rejectInvitation = async (invitation) => {
   try {
-    const response = await roomsApi.rejectRoomInvitation(invitation.id)
-    if (response.success) {
-      ElMessage.success('已拒绝邀请')
-      loadReceivedInvitations()
-    } else {
-      ElMessage.error('拒绝邀请失败')
+    // 模拟API调用
+    console.log('模拟拒绝邀请API调用:', { invitationId: invitation.id })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 更新本地状态
+    const index = receivedInvitations.value.findIndex(inv => inv.id === invitation.id)
+    if (index !== -1) {
+      receivedInvitations.value[index].status = 'rejected'
     }
+    
+    ElMessage.success('已拒绝邀请')
   } catch (error) {
     console.error('拒绝邀请失败:', error)
     ElMessage.error('拒绝邀请失败')
@@ -337,13 +438,19 @@ const cancelInvitation = async (invitation) => {
       type: 'warning'
     })
     
-    const response = await roomsApi.cancelRoomInvitation(invitation.id)
-    if (response.success) {
-      ElMessage.success('已取消邀请')
-      loadSentInvitations()
-    } else {
-      ElMessage.error('取消邀请失败')
+    // 模拟API调用
+    console.log('模拟取消邀请API调用:', { invitationId: invitation.id })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 更新本地状态
+    const index = sentInvitations.value.findIndex(inv => inv.id === invitation.id)
+    if (index !== -1) {
+      sentInvitations.value[index].status = 'cancelled'
     }
+    
+    ElMessage.success('已取消邀请')
   } catch (error) {
     if (error !== 'cancel') {
       console.error('取消邀请失败:', error)
@@ -357,13 +464,20 @@ const cancelInvitation = async (invitation) => {
  */
 const resendInvitation = async (invitation) => {
   try {
-    const response = await roomsApi.resendInvitation(invitation.id)
-    if (response.success) {
-      ElMessage.success('邀请已重新发送')
-      loadSentInvitations()
-    } else {
-      ElMessage.error('重新发送邀请失败')
+    // 模拟API调用
+    console.log('模拟重新发送邀请API调用:', { invitationId: invitation.id })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 更新本地状态
+    const index = sentInvitations.value.findIndex(inv => inv.id === invitation.id)
+    if (index !== -1) {
+      sentInvitations.value[index].status = 'pending'
+      sentInvitations.value[index].createdAt = new Date().toISOString()
     }
+    
+    ElMessage.success('邀请已重新发送')
   } catch (error) {
     console.error('重新发送邀请失败:', error)
     ElMessage.error('重新发送邀请失败')
@@ -375,13 +489,19 @@ const resendInvitation = async (invitation) => {
  */
 const approveApplication = async (application) => {
   try {
-    // const response = await roomsApi.acceptRoomInvitation(application.id)
-    if (response.success) {
-      ElMessage.success('申请已批准')
-      loadApplications()
-    } else {
-      ElMessage.error('批准申请失败')
+    // 模拟API调用
+    console.log('模拟批准申请API调用:', { applicationId: application.id })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 更新本地状态
+    const index = applications.value.findIndex(app => app.id === application.id)
+    if (index !== -1) {
+      applications.value[index].status = 'accepted'
     }
+    
+    ElMessage.success('申请已批准')
   } catch (error) {
     console.error('批准申请失败:', error)
     ElMessage.error('批准申请失败')
@@ -393,13 +513,19 @@ const approveApplication = async (application) => {
  */
 const rejectApplication = async (application) => {
   try {
-    // const response = await roomsApi.rejectRoomInvitation(application.id)
-    if (response.success) {
-      ElMessage.success('申请已拒绝')
-      loadApplications()
-    } else {
-      ElMessage.error('拒绝申请失败')
+    // 模拟API调用
+    console.log('模拟拒绝申请API调用:', { applicationId: application.id })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 更新本地状态
+    const index = applications.value.findIndex(app => app.id === application.id)
+    if (index !== -1) {
+      applications.value[index].status = 'rejected'
     }
+    
+    ElMessage.success('申请已拒绝')
   } catch (error) {
     console.error('拒绝申请失败:', error)
     ElMessage.error('拒绝申请失败')
@@ -411,13 +537,20 @@ const rejectApplication = async (application) => {
  */
 const reapply = async (application) => {
   try {
-    // const response = await roomsApi.joinRoom(application.roomId)
-    if (response.success) {
-      ElMessage.success('申请已重新提交')
-      loadApplications()
-    } else {
-      ElMessage.error('重新申请失败')
+    // 模拟API调用
+    console.log('模拟重新申请API调用:', { applicationId: application.id })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 更新本地状态
+    const index = applications.value.findIndex(app => app.id === application.id)
+    if (index !== -1) {
+      applications.value[index].status = 'pending'
+      applications.value[index].createdAt = new Date().toISOString()
     }
+    
+    ElMessage.success('申请已重新提交')
   } catch (error) {
     console.error('重新申请失败:', error)
     ElMessage.error('重新申请失败')
@@ -427,8 +560,20 @@ const reapply = async (application) => {
 /**
  * 进入房间
  */
-const goToRoom = (roomId) => {
-  router.push(`/rooms/${roomId}`)
+const enterRoom = async (roomId) => {
+  try {
+    // 模拟API调用
+    console.log('模拟进入房间API调用:', { roomId })
+    
+    // 模拟API响应延迟
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    ElMessage.success('正在进入房间...')
+    router.push(`/rooms/${roomId}`)
+  } catch (error) {
+    console.error('进入房间失败:', error)
+    ElMessage.error('进入房间失败')
+  }
 }
 
 /**

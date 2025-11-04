@@ -9,7 +9,7 @@
               <div class="stat-label">总寝室数</div>
             </div>
             <div class="stat-icon">
-              <el-icon><component :is="HouseIcon" /></el-icon>
+              <el-icon><House /></el-icon>
             </div>
           </el-card>
         </el-col>
@@ -20,7 +20,7 @@
               <div class="stat-label">活跃寝室</div>
             </div>
             <div class="stat-icon">
-              <el-icon><component :is="HouseFilledIcon" /></el-icon>
+              <el-icon><HomeFilled /></el-icon>
             </div>
           </el-card>
         </el-col>
@@ -31,7 +31,7 @@
               <div class="stat-label">平均人数</div>
             </div>
             <div class="stat-icon">
-              <el-icon><component :is="UserIcon" /></el-icon>
+              <el-icon><User /></el-icon>
             </div>
           </el-card>
         </el-col>
@@ -42,7 +42,7 @@
               <div class="stat-label">寝室均消费</div>
             </div>
             <div class="stat-icon">
-              <el-icon><component :is="MoneyIcon" /></el-icon>
+              <el-icon><Money /></el-icon>
             </div>
           </el-card>
         </el-col>
@@ -70,7 +70,10 @@
       <el-card>
         <div class="card-header">
           <span>寝室列表</span>
-          <el-button type="primary" size="small" @click="fetchRoomList">刷新</el-button>
+          <el-button type="primary" size="small" :loading="loading" @click="refreshRoomData">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
         </div>
         <el-table :data="roomList" v-loading="loading" stripe>
           <el-table-column prop="name" label="寝室" width="120" />
@@ -105,13 +108,9 @@
 import { ref, onMounted, onUnmounted, watch, defineProps } from 'vue'
 import * as echarts from 'echarts'
 import { roomsApi } from '@/api/rooms'
+import { House, HomeFilled, User, Money, Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import RoomActivityChart from '../charts/RoomActivityChart.vue'
-
-// 直接使用Element Plus内置图标
-const HouseIcon = () => import('@element-plus/icons-vue').then(m => m.House)
-const HouseFilledIcon = () => import('@element-plus/icons-vue').then(m => m.HouseFilled)
-const UserIcon = () => import('@element-plus/icons-vue').then(m => m.User)
-const MoneyIcon = () => import('@element-plus/icons-vue').then(m => m.Money)
 
 // Props
 const props = defineProps({
@@ -134,6 +133,28 @@ const expenseChartRef = ref(null)
 let expenseChartInstance = null
 
 // 方法
+/**
+ * 刷新寝室数据（列表、统计数据和图表）
+ */
+const refreshRoomData = async () => {
+  loading.value = true
+  try {
+    // 并行获取所有数据
+    await Promise.all([
+      fetchRoomStats(),
+      fetchRoomList(),
+      updateExpenseChart()
+    ])
+    
+    ElMessage.success('寝室数据刷新成功')
+  } catch (error) {
+    console.error('刷新寝室数据失败:', error)
+    ElMessage.error('刷新寝室数据失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 /**
  * 获取寝室统计数据
  */

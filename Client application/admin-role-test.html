@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员角色测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-case {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-case h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .expected {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .code {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>管理员角色测试说明</h1>
+    
+    <div class="test-case">
+        <h3>测试目的</h3>
+        <p>验证所有登录模拟用户的角色都是管理员级别，无论用户名是什么。</p>
+    </div>
+    
+    <div class="test-case">
+        <h3>修改内容</h3>
+        <p>我们修改了以下两个文件中的登录逻辑：</p>
+        <ol>
+            <li><code>src/views/auth/Login.vue</code> - 登录页面的登录处理函数</li>
+            <li><code>src/stores/auth.js</code> - 认证状态管理中的登录方法</li>
+        </ol>
+    </div>
+    
+    <div class="test-case">
+        <h3>修改详情</h3>
+        <p>在两个文件中，我们都修改了模拟登录响应中的用户对象，确保：</p>
+        <ul>
+            <li>所有用户的 <span class="expected">name</span> 都设置为"管理员"</li>
+            <li>所有用户的 <span class="expected">roles</span> 都设置为 <span class="code">['admin']</span></li>
+            <li>所有用户的 <span class="expected">permissions</span> 都设置为 <span class="code">['all']</span></li>
+        </ul>
+    </div>
+    
+    <div class="test-case">
+        <h3>测试步骤</h3>
+        <ol>
+            <li>打开登录页面：<a href="http://localhost:8000/auth/login" target="_blank">http://localhost:8000/auth/login</a></li>
+            <li>使用任意用户名和密码登录（例如：user/password）</li>
+            <li>登录成功后，检查用户信息显示</li>
+            <li>验证用户角色显示为"管理员"</li>
+            <li>验证用户拥有管理员权限（可以访问所有页面）</li>
+        </ol>
+    </div>
+    
+    <div class="test-case">
+        <h3>预期结果</h3>
+        <p>无论使用什么用户名登录，都应该：</p>
+        <ul>
+            <li>用户名显示为输入的用户名</li>
+            <li>用户角色显示为"管理员"</li>
+            <li>用户拥有所有权限</li>
+            <li>可以访问所有需要管理员权限的页面</li>
+        </ul>
+    </div>
+    
+    <div class="test-case">
+        <h3>注意事项</h3>
+        <p>这些修改只影响模拟登录，不会影响真实API登录时的用户角色设置。</p>
+    </div>
+</body>
+</html>

@@ -40,6 +40,9 @@ export const useAuthStore = defineStore('auth', () => {
       // 初始化Token管理器
       tokenManager.init()
       
+      // 获取当前用户名
+      const currentUsername = tokenManager.getCurrentUser()
+      
       // 从Token管理器获取Token
       const token = tokenManager.getToken()
       const refreshTkn = tokenManager.getRefreshToken()
@@ -64,7 +67,7 @@ export const useAuthStore = defineStore('auth', () => {
           if (token.startsWith('mock-jwt-token-')) {
             currentUser.value = {
               id: 1,
-              username: 'user',
+              username: currentUsername || 'user',
               name: '虚拟用户',
               email: 'user@example.com',
               avatar: 'https://picsum.photos/seed/user1/200/200.jpg',
@@ -139,12 +142,14 @@ export const useAuthStore = defineStore('auth', () => {
       if (response.success) {
         const { token: newAccessToken, refreshToken: newRefreshToken } = response.data
         
-        // 更新Token管理器
-        tokenManager.setToken(newAccessToken)
+        // 获取当前用户名，确保Token刷新时使用正确的用户上下文
+        const currentUsername = tokenManager.getCurrentUser()
         
-        if (newRefreshToken) {
-          tokenManager.setRefreshToken(newRefreshToken)
-        }
+        // 更新Token管理器，支持多用户
+        tokenManager.setTokens({
+          token: newAccessToken,
+          refreshToken: newRefreshToken
+        }, currentUsername)
         
         // 更新状态
         accessToken.value = newAccessToken
@@ -208,9 +213,10 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * 用户登录
    * @param {Object} credentials - 登录凭据
+   * @param {string} username - 用户名，用于多用户Token管理
    * @returns {Promise} 登录结果
    */
-  const login = async (credentials) => {
+  const login = async (credentials, username) => {
     try {
       // 模拟登录API调用
       console.log('模拟登录API调用:', credentials)
@@ -227,12 +233,12 @@ export const useAuthStore = defineStore('auth', () => {
           user: {
             id: 1,
             username: credentials.username,
-            name: credentials.username === 'admin' ? '管理员' : '虚拟用户',
+            name: '管理员', // 所有模拟登录用户都是管理员
             email: credentials.username + '@example.com',
             avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
-            role: 'admin', // 虚拟登录默认为管理员角色，拥有所有权限
+            role: 'admin', // 所有模拟登录用户都是管理员
             roles: ['admin'],
-            permissions: ['all'], // 设置为拥有所有权限
+            permissions: ['all'], // 所有模拟登录用户拥有所有权限
             roomId: 1,
             rooms: [
               {
@@ -251,9 +257,11 @@ export const useAuthStore = defineStore('auth', () => {
       if (mockResponse.success) {
         const { token, refreshToken: refreshTkn, user: userData } = mockResponse.data
         
-        // 存储Token到Token管理器
-        tokenManager.setToken(token)
-        tokenManager.setRefreshToken(refreshTkn)
+        // 存储Token到Token管理器，支持多用户
+        tokenManager.setTokens({
+          token,
+          refreshToken: refreshTkn
+        }, username)
         
         // 更新状态
         accessToken.value = token
@@ -292,13 +300,29 @@ export const useAuthStore = defineStore('auth', () => {
       console.error('服务器登出失败:', error)
     } finally {
       // 无论服务器登出是否成功，都清除本地状态
-      clearSession()
+      // 清除Token管理器（只清除当前用户的Token，不影响其他已记住的用户）
+      tokenManager.clearTokens()
+      
+      // 清除状态
+      currentUser.value = null
+      accessToken.value = null
+      refreshToken.value = null
+      tokenExpiry.value = null
+      roles.value = []
+      permissions.value = []
+      isRefreshing.value = false
+      refreshPromise.value = null
+      
+      // 断开WebSocket连接
+      disconnectWebSocket()
+      
+      console.log('用户已登出，已清除当前用户的Token和状态')
     }
     
     return { success: true }
   }
   
-  const setSession = ({ user, tokens, permissions: newPermissions }) => {
+  const setSession = ({ user, tokens, permissions: newPermissions, username }) => {
     currentUser.value = user
     
     if (tokens) {
@@ -306,12 +330,12 @@ export const useAuthStore = defineStore('auth', () => {
       refreshToken.value = tokens.refreshToken || null
       tokenExpiry.value = tokens.accessTokenExpiresAt || null
       
-      // 存储Token到Token管理器
+      // 存储Token到Token管理器，支持多用户
       if (tokens.token) {
-        tokenManager.setToken(tokens.token)
-      }
-      if (tokens.refreshToken) {
-        tokenManager.setRefreshToken(tokens.refreshToken)
+        tokenManager.setTokens({
+          token: tokens.token,
+          refreshToken: tokens.refreshToken
+        }, username || user?.username)
       }
     }
     

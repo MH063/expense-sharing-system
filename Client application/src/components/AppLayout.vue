@@ -1,10 +1,10 @@
 <template>
   <div class="app-layout">
-    <!-- 顶部导航栏 -->
-    <header class="app-header">
+    <!-- 顶部导航栏 - 只在已登录时显示 -->
+    <header v-if="isAuthenticated" class="app-header">
       <div class="header-container">
         <div class="logo">
-          <router-link to="/" class="logo-link">
+          <router-link to="/dashboard" class="logo-link">
             <h1>寝室记账系统</h1>
           </router-link>
         </div>
@@ -12,7 +12,7 @@
         <nav class="main-nav">
           <ul class="nav-list">
             <li class="nav-item">
-              <router-link to="/" class="nav-link">首页</router-link>
+              <router-link to="/dashboard" class="nav-link">仪表盘</router-link>
             </li>
             <li class="nav-item" v-if="isAuthenticated">
               <router-link to="/expenses" class="nav-link">费用管理</router-link>
@@ -102,8 +102,8 @@
             </div>
           </div>
           
-          <!-- 登录/注册按钮 -->
-          <div class="auth-buttons" v-else>
+          <!-- 登录/注册按钮 - 只在未登录时显示 -->
+          <div class="auth-buttons" v-if="!isAuthenticated">
             <router-link to="/auth/login" class="btn btn-outline">登录</router-link>
             <router-link to="/auth/register" class="btn btn-primary">注册</router-link>
           </div>

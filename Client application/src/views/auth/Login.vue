@@ -10,15 +10,56 @@
         <div class="form-group">
           <label for="username" class="form-label">用户名</label>
           <div class="input-wrapper">
-            <input
-              id="username"
-              v-model="loginForm.username"
-              type="text"
-              class="form-input"
-              :class="{ 'error': errors.username }"
-              placeholder="请输入用户名"
-              required
-            />
+            <div class="input-with-dropdown">
+              <!-- 记住用户下拉选择器 -->
+              <div v-if="rememberedUsers.length > 0" class="remembered-users-dropdown">
+                <button 
+                  type="button"
+                  class="dropdown-toggle"
+                  @click="toggleDropdown"
+                >
+                  <span v-if="selectedRememberedUser">{{ selectedRememberedUser.username }}</span>
+                  <span v-else>选择已记住的用户</span>
+                  <svg class="dropdown-arrow" :class="{ 'open': isDropdownOpen }" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div v-if="isDropdownOpen" class="dropdown-menu">
+                  <div 
+                    v-for="user in rememberedUsers" 
+                    :key="user.username"
+                    class="dropdown-item"
+                    @click="selectRememberedUser(user.username)"
+                  >
+                    <div class="dropdown-user-info">
+                      <span class="dropdown-user-name">{{ user.username }}</span>
+                      <span class="dropdown-last-login">上次登录: {{ formatDate(user.lastLogin) }}</span>
+                    </div>
+                    <button 
+                      type="button"
+                      class="dropdown-remove-btn"
+                      @click.stop="removeFromRememberedUsers(user.username)"
+                      title="移除此用户"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <input
+                id="username"
+                v-model="loginForm.username"
+                type="text"
+                class="form-input"
+                :class="{ 'error': errors.username, 'with-dropdown': rememberedUsers.length > 0 }"
+                placeholder="请输入用户名"
+                required
+              />
+            </div>
             <span v-if="errors.username" class="error-message">{{ errors.username }}</span>
           </div>
         </div>
@@ -60,7 +101,7 @@
             <input type="checkbox" v-model="loginForm.remember" />
             <span class="checkbox-text">记住我</span>
           </label>
-          <a href="#" class="forgot-password">忘记密码？</a>
+          <router-link to="/auth/forgot-password" class="forgot-password">忘记密码？</router-link>
         </div>
         
         <button
@@ -85,9 +126,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import tokenManager from '@/utils/jwt-token-manager'
 
 // 路由和状态管理
 const router = useRouter()
@@ -97,6 +139,9 @@ const authStore = useAuthStore()
 const isLoading = ref(false)
 const showPassword = ref(false)
 const errorMessage = ref('')
+const rememberedUsers = ref([])
+const isDropdownOpen = ref(false)
+const selectedRememberedUser = ref(null)
 
 // 表单数据
 const loginForm = reactive({
@@ -110,6 +155,157 @@ const errors = reactive({
   username: '',
   password: ''
 })
+
+// 页面初始化时检查是否有记住的用户名
+onMounted(() => {
+  loadRememberedUsers()
+  
+  // 添加全局点击事件监听器
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  // 移除全局点击事件监听器
+  document.removeEventListener('click', handleClickOutside)
+})
+
+// 加载记住的用户列表
+const loadRememberedUsers = () => {
+  try {
+    const savedUsers = localStorage.getItem('remembered_users')
+    if (savedUsers) {
+      rememberedUsers.value = JSON.parse(savedUsers)
+      
+      // 如果只有一个用户，直接填充
+      if (rememberedUsers.value.length === 1) {
+        loginForm.username = rememberedUsers.value[0].username
+        loginForm.remember = true
+      }
+    }
+  } catch (error) {
+    console.error('加载记住的用户列表失败:', error)
+  }
+}
+
+// 选择记住的用户
+const selectRememberedUser = (username) => {
+  loginForm.username = username
+  loginForm.remember = true
+  selectedRememberedUser.value = rememberedUsers.value.find(user => user.username === username)
+  isDropdownOpen.value = false
+  
+  // 添加用户选择反馈
+  console.log(`已选择记住的用户: ${username}`)
+  
+  // 清除之前的错误信息
+  errorMessage.value = ''
+  errors.username = ''
+  errors.password = ''
+  
+  // 聚焦到密码输入框
+  setTimeout(() => {
+    const passwordInput = document.querySelector('input[type="password"]')
+    if (passwordInput) {
+      passwordInput.focus()
+    }
+  }, 100)
+}
+
+// 切换下拉菜单
+const toggleDropdown = () => {
+  isDropdownOpen.value = !isDropdownOpen.value
+}
+
+// 点击外部关闭下拉菜单
+const handleClickOutside = (event) => {
+  if (!event.target.closest('.remembered-users-dropdown')) {
+    isDropdownOpen.value = false
+  }
+}
+
+// 添加用户到记住列表
+const addToRememberedUsers = (username) => {
+  try {
+    // 检查用户是否已在列表中
+    const existingIndex = rememberedUsers.value.findIndex(user => user.username === username)
+    
+    if (existingIndex !== -1) {
+      // 如果用户已存在，更新最后登录时间
+      rememberedUsers.value[existingIndex].lastLogin = new Date().toISOString()
+      console.log(`已更新用户 ${username} 的最后登录时间`)
+    } else {
+      // 如果用户不存在，添加到列表
+      rememberedUsers.value.push({
+        username: username,
+        lastLogin: new Date().toISOString()
+      })
+      console.log(`已将用户 ${username} 添加到记住列表`)
+    }
+    
+    // 保存到本地存储
+    localStorage.setItem('remembered_users', JSON.stringify(rememberedUsers.value))
+    console.log('已更新记住的用户列表:', rememberedUsers.value)
+  } catch (error) {
+    console.error('更新记住的用户列表失败:', error)
+  }
+}
+
+// 从记住列表中移除用户
+const removeFromRememberedUsers = (username) => {
+  try {
+    rememberedUsers.value = rememberedUsers.value.filter(user => user.username !== username)
+    
+    // 保存到本地存储
+    localStorage.setItem('remembered_users', JSON.stringify(rememberedUsers.value))
+    console.log('已从记住列表中移除用户:', username)
+    
+    // 添加UI反馈
+    // 如果移除的是当前选中的用户，清空用户名
+    if (loginForm.username === username) {
+      loginForm.username = ''
+      loginForm.remember = false
+    }
+    
+    // 如果列表为空，隐藏选择器
+    if (rememberedUsers.value.length === 0) {
+      // 选择器会根据 rememberedUsers.length 自动隐藏
+    }
+    
+    // 显示移除成功反馈
+    console.log(`用户 ${username} 已从记住列表中移除`)
+  } catch (error) {
+    console.error('从记住列表中移除用户失败:', error)
+  }
+}
+
+// 格式化日期
+const formatDate = (dateString) => {
+  if (!dateString) return '未知'
+  
+  try {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now - date
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) {
+      return '今天'
+    } else if (diffDays === 1) {
+      return '昨天'
+    } else if (diffDays < 7) {
+      return `${diffDays}天前`
+    } else if (diffDays < 30) {
+      return `${Math.floor(diffDays / 7)}周前`
+    } else if (diffDays < 365) {
+      return `${Math.floor(diffDays / 30)}个月前`
+    } else {
+      return `${Math.floor(diffDays / 365)}年前`
+    }
+  } catch (error) {
+    console.error('格式化日期失败:', error)
+    return '未知'
+  }
+}
 
 // 表单验证
 const validateForm = () => {
@@ -169,24 +365,55 @@ const handleLogin = async () => {
         user: {
           id: 1,
           username: loginForm.username,
-          name: loginForm.username === 'admin' ? '管理员' : '普通用户',
+          name: loginForm.username === 'admin' ? '管理员' : '管理员',
           email: loginForm.username + '@example.com',
           avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
-          roles: loginForm.username === 'admin' ? ['admin'] : ['user'],
-          permissions: loginForm.username === 'admin' ? ['all'] : ['read', 'write'],
+          roles: ['admin'], // 所有模拟登录用户都是管理员
+          permissions: ['all'], // 所有模拟登录用户拥有所有权限
           roomId: 1
         }
       }
     }
     
-    // 使用authStore的login方法处理登录
-    await authStore.login({
-      username: loginForm.username,
-      password: loginForm.password
-    })
+    // 处理记住我功能：如果用户勾选了记住我，保存用户名到本地存储
+    if (loginForm.remember) {
+      // 添加用户到记住列表
+      addToRememberedUsers(loginForm.username)
+      localStorage.setItem('remember_me', 'true') // 设置记住我标志，供Token管理器使用
+      console.log('已记住用户名:', loginForm.username)
+    } else {
+      // 如果用户没有勾选记住我，从记住列表中移除该用户
+      removeFromRememberedUsers(loginForm.username)
+      localStorage.setItem('remember_me', 'false') // 设置记住我标志，供Token管理器使用
+      console.log('已从记住列表中移除用户名:', loginForm.username)
+    }
     
-    // 登录成功，跳转到首页或之前访问的页面
-    const redirectPath = router.currentRoute.value.query.redirect || '/'
+    // 设置当前用户（用于Token管理）
+    tokenManager.setCurrentUser(loginForm.username)
+    
+    // 保存Token到本地存储
+    tokenManager.setTokens(
+      mockResponse.data.token,
+      mockResponse.data.refreshToken,
+      null, // 没有过期时间
+      loginForm.username
+    )
+    
+    // 更新认证状态
+    authStore.accessToken = mockResponse.data.token
+    authStore.refreshToken = mockResponse.data.refreshToken
+    authStore.currentUser = mockResponse.data.user
+    authStore.roles = mockResponse.data.user.roles || []
+    authStore.permissions = mockResponse.data.user.permissions || []
+    
+    // 设置Token管理器的刷新回调
+    tokenManager.setRefreshCallback(authStore.refreshTokens)
+    
+    // 添加登录成功反馈
+    console.log(`用户 ${loginForm.username} 登录成功`)
+    
+    // 登录成功，跳转到仪表盘或之前访问的页面
+    const redirectPath = router.currentRoute.value.query.redirect || '/dashboard'
     router.push(redirectPath)
   } catch (error) {
     console.error('登录失败:', error)
@@ -237,6 +464,122 @@ const handleLogin = async () => {
 
 .login-form {
   padding: 30px;
+}
+
+/* 用户选择器样式 */
+.input-with-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.remembered-users-dropdown {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.dropdown-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background-color: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: none;
+}
+
+.dropdown-toggle:hover {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+}
+
+.dropdown-arrow {
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background-color: white;
+  border: 1px solid #e9ecef;
+  border-top: none;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.dropdown-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-user-name {
+  font-weight: 500;
+  color: #212529;
+}
+
+.dropdown-last-login {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.dropdown-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #6c757d;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dropdown-remove-btn:hover {
+  background-color: #f8d7da;
+  color: #dc3545;
+}
+
+.form-input.with-dropdown {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+  margin-top: -1px; /* 覆盖下拉菜单的底部边框 */
 }
 
 .form-group {

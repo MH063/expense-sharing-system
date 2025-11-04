@@ -1,12 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '@/views/Home.vue'
+import UserGuide from '@/views/UserGuide.vue'
+import Dashboard from '@/views/Dashboard.vue'
 import NotFound from '@/views/NotFound.vue'
 import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
+import ForgotPassword from '@/views/auth/ForgotPassword.vue'
 import Profile from '@/views/auth/Profile.vue'
 import Notifications from '@/views/NotificationsPage.vue'
 import RoomDashboard from '@/views/rooms/RoomDashboard.vue'
 import RoomDetail from '@/views/rooms/RoomDetail.vue'
+import RoomCreate from '@/views/rooms/RoomCreate.vue'
 import RoomInvitations from '@/views/rooms/RoomInvitations.vue'
 import ExpenseDashboard from '@/views/expenses/ExpenseDashboard.vue'
 import ExpenseDetail from '@/views/expenses/ExpenseDetail.vue'
@@ -31,6 +35,7 @@ import DisputeDetail from '@/views/disputes/DisputeDetail.vue'
 import AnalyticsDashboard from '@/views/analytics/AnalyticsDashboard.vue'
 import NotificationCenter from '@/views/notifications/NotificationCenter.vue'
 import Settings from '@/views/Settings.vue'
+import ActivitiesList from '@/views/activities/ActivitiesList.vue'
 import Forbidden from '@/views/Forbidden.vue'
 import PermissionTest from '@/views/admin/PermissionTest.vue'
 import { createAuthGuard } from './guards'
@@ -42,6 +47,24 @@ const routes = [
     path: '/',
     name: 'Home',
     component: Home
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: Dashboard,
+    meta: {
+      title: '仪表盘',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/user-guide',
+    name: 'UserGuide',
+    component: UserGuide,
+    meta: {
+      title: '使用指南',
+      requiresAuth: false
+    }
   },
   {
     path: '/auth/login',
@@ -56,6 +79,15 @@ const routes = [
     path: '/auth/register',
     name: 'Register',
     component: Register,
+    meta: { 
+      layout: 'auth',
+      requiresGuest: true // 只有未登录用户可以访问
+    }
+  },
+  {
+    path: '/auth/forgot-password',
+    name: 'ForgotPassword',
+    component: ForgotPassword,
     meta: { 
       layout: 'auth',
       requiresGuest: true // 只有未登录用户可以访问
@@ -93,6 +125,24 @@ const routes = [
     meta: { 
       requiresAuth: true,
       requiresPermission: PERMISSIONS.ROOM_VIEW
+    }
+  },
+  {
+    path: '/rooms/create',
+    name: 'RoomCreate',
+    component: RoomCreate,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.ROOM_CREATE
+    }
+  },
+  {
+    path: '/rooms/create/payment-rules',
+    name: 'CreateRoomPaymentRules',
+    component: SpecialPaymentRules,
+    meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.ROOM_CREATE
     }
   },
   {
@@ -307,6 +357,16 @@ const routes = [
     name: 'AnalyticsDashboard',
     component: AnalyticsDashboard,
     meta: { 
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.EXPENSE_VIEW
+    }
+  },
+  {
+    path: '/activities',
+    name: 'ActivitiesList',
+    component: ActivitiesList,
+    meta: { 
+      title: '活动列表',
       requiresAuth: true,
       requiresPermission: PERMISSIONS.EXPENSE_VIEW
     }

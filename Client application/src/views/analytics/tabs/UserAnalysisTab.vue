@@ -70,7 +70,10 @@
       <el-card>
         <div class="card-header">
           <span>用户列表</span>
-          <el-button type="primary" size="small" @click="fetchUserList">刷新</el-button>
+          <el-button type="primary" size="small" @click="refreshUserData" :loading="loading">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
         </div>
         <el-table :data="userList" v-loading="loading" stripe>
           <el-table-column prop="name" label="姓名" width="120" />
@@ -98,7 +101,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, defineProps } from 'vue'
-import { User, UserFilled, Plus, Money } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { User, UserFilled, Plus, Money, Refresh } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { userApi } from '@/api/user'
 import UserGrowthChart from '../charts/UserGrowthChart.vue'
@@ -124,6 +128,28 @@ const activityChartRef = ref(null)
 let activityChartInstance = null
 
 // 方法
+/**
+ * 刷新用户数据（包括用户列表、统计数据和图表）
+ */
+const refreshUserData = async () => {
+  loading.value = true
+  try {
+    // 并行获取所有数据
+    await Promise.all([
+      fetchUserStats(),
+      fetchUserList(),
+      updateActivityChart()
+    ])
+    
+    ElMessage.success('用户数据刷新成功')
+  } catch (error) {
+    console.error('刷新用户数据失败:', error)
+    ElMessage.error('刷新用户数据失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
 /**
  * 获取用户统计数据
  */

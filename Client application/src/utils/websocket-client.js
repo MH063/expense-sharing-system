@@ -357,6 +357,36 @@ class WebSocketClient {
       subscribedEvents: [...this.subscribedEvents]
     };
   }
+
+  // 更新WebSocket配置
+  updateConfig(config = {}) {
+    const { url, reconnectInterval, maxReconnectAttempts } = config;
+    
+    // 更新URL
+    if (url && typeof url === 'string') {
+      this.url = url;
+      console.log('WebSocket服务器地址已更新为:', this.url);
+    }
+    
+    // 更新重连间隔
+    if (reconnectInterval && typeof reconnectInterval === 'number' && reconnectInterval > 0) {
+      this.reconnectInterval = reconnectInterval;
+      console.log('WebSocket重连间隔已更新为:', this.reconnectInterval, 'ms');
+    }
+    
+    // 更新最大重连次数
+    if (maxReconnectAttempts && typeof maxReconnectAttempts === 'number' && maxReconnectAttempts > 0) {
+      this.maxReconnectAttempts = maxReconnectAttempts;
+      console.log('WebSocket最大重连次数已更新为:', this.maxReconnectAttempts);
+    }
+    
+    // 如果当前已连接，需要断开后重新连接以应用新配置
+    if (this.isConnected) {
+      console.log('应用新配置需要重新连接WebSocket');
+      this.disconnect();
+      // 不在这里自动重连，让调用方决定何时重连
+    }
+  }
 }
 
 // 创建单例实例

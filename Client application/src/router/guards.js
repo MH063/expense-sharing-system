@@ -10,9 +10,14 @@ export const createAuthGuard = (router) => {
     const requiresAuth = to.matched.some(record => record.meta?.[requiresAuthMetaKey])
     const requiresGuest = to.matched.some(record => record.meta?.[requiresGuestMetaKey])
 
-    // 如果页面要求只有未登录用户才能访问，且用户已登录，则重定向到首页
+    // 如果页面要求只有未登录用户才能访问，且用户已登录，则重定向到仪表盘
     if (requiresGuest && authStore.isAuthenticated) {
-      return next({ path: '/' })
+      return next({ path: '/dashboard' })
+    }
+
+    // 如果已登录用户访问首页，重定向到仪表盘
+    if (to.path === '/' && authStore.isAuthenticated) {
+      return next({ path: '/dashboard' })
     }
 
     // 如果页面不需要认证，直接通过

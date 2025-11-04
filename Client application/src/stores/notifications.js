@@ -12,6 +12,7 @@ export const useNotificationStore = defineStore('notifications', () => {
   const connectionAttempts = ref(0)
   const lastError = ref(null)
   const isReconnecting = ref(false)
+  const isConnecting = ref(false)
 
   const orderedNotifications = computed(() => notifications.value)
   const unreadCount = computed(() => orderedNotifications.value.filter(item => !item.read).length)
@@ -49,17 +50,23 @@ export const useNotificationStore = defineStore('notifications', () => {
     notifications.value = []
   }
 
+  const removeNotification = (notificationId) => {
+    notifications.value = notifications.value.filter(item => item.id !== notificationId)
+  }
+
   const connect = () => {
-    if (isConnected.value) {
+    if (isConnected.value || isConnecting.value) {
       return
     }
 
+    isConnecting.value = true
     const authStore = useAuthStore()
 
     try {
       // WebSocket连接事件处理
       websocketClient.on('connected', () => {
         isConnected.value = true
+        isConnecting.value = false
         connectionAttempts.value = 0
         lastError.value = null
         isReconnecting.value = false
@@ -72,19 +79,23 @@ export const useNotificationStore = defineStore('notifications', () => {
 
       websocketClient.on('disconnected', () => {
         isConnected.value = false
+        isConnecting.value = false
       })
 
       websocketClient.on('reconnecting', () => {
         isReconnecting.value = true
+        isConnecting.value = false
       })
 
       websocketClient.on('reconnect_failed', () => {
         isReconnecting.value = false
+        isConnecting.value = false
         lastError.value = new Error('WebSocket重连失败，已达到最大重试次数')
       })
 
       websocketClient.on('error', (error) => {
         lastError.value = error
+        isConnecting.value = false
       })
 
       const handlePayload = (payload) => {
@@ -123,10 +134,12 @@ export const useNotificationStore = defineStore('notifications', () => {
         console.error('WebSocket连接失败:', error)
         lastError.value = error
         connectionAttempts.value += 1
+        isConnecting.value = false
       })
     } catch (error) {
       lastError.value = error
       connectionAttempts.value += 1
+      isConnecting.value = false
     }
   }
 
@@ -156,15 +169,22 @@ export const useNotificationStore = defineStore('notifications', () => {
     const authStore = useAuthStore()
     connectionAttempts.value = 0
     lastError.value = null
+    isConnecting.value = true
     websocketClient.connect(authStore.accessToken).catch(error => {
       console.error('WebSocket重连失败:', error)
       lastError.value = error
       connectionAttempts.value += 1
+      isConnecting.value = false
     })
+  }
+
+  const updateWebSocketConfig = (config = {}) => {
+    websocketClient.updateConfig(config)
   }
 
   return {
     isConnected,
+    isConnecting,
     notifications,
     orderedNotifications,
     unreadCount,
@@ -176,8 +196,10 @@ export const useNotificationStore = defineStore('notifications', () => {
     markAsRead,
     markAllAsRead,
     clearAll,
+    removeNotification,
     subscribeChannels,
     unsubscribeChannels,
-    retryConnection
+    retryConnection,
+    updateWebSocketConfig
   }
 })

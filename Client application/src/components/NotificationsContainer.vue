@@ -22,6 +22,10 @@
             全部标记为已读
           </button>
           <button @click="clearAll" class="clear-all-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
             清空
           </button>
         </div>
@@ -105,7 +109,9 @@ const markAllAsRead = () => {
 }
 
 const clearAll = () => {
-  notificationStore.clearNotifications()
+  if (confirm('确定要清空所有通知吗？')) {
+    notificationStore.clearAll()
+  }
 }
 
 const markAsRead = (id) => {
@@ -233,11 +239,22 @@ onUnmounted(() => {
   padding: 4px 8px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
 }
 
 .mark-all-read-btn:hover, .clear-all-btn:hover {
   background-color: #f5f5f5;
   color: #333;
+}
+
+.clear-all-btn {
+  color: #ff4757;
+}
+
+.clear-all-btn:hover {
+  background-color: #ffe0e3;
+  color: #ff3838;
 }
 
 .notification-content {

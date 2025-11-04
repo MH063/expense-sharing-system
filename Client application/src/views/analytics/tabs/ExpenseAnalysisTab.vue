@@ -109,7 +109,17 @@
                   :value="category.id"
                 />
               </el-select>
-              <el-button type="primary" @click="exportData">导出数据</el-button>
+              <el-dropdown @command="handleExportCommand">
+                <el-button type="primary">
+                  导出数据<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="excel">导出为Excel</el-dropdown-item>
+                    <el-dropdown-item command="csv">导出为CSV</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </div>
         </template>
@@ -165,8 +175,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, defineProps } from 'vue'
 import { useRouter } from 'vue-router'
-import { Money, TrendCharts, List, Top } from '@element-plus/icons-vue'
+import { Money, TrendCharts, List, Top, ArrowDown } from '@element-plus/icons-vue'
 import { expenseApi } from '@/api/expenses'
+import { exportExpenseData } from '@/utils/export'
 import ExpenseTrendChart from '../charts/ExpenseTrendChart.vue'
 import ExpenseCategoryChart from '../charts/ExpenseCategoryChart.vue'
 import MemberComparisonChart from '../charts/MemberComparisonChart.vue'
@@ -376,11 +387,44 @@ const viewExpenseDetail = (expense) => {
 }
 
 /**
+ * 处理导出命令
+ */
+const handleExportCommand = (command) => {
+  try {
+    // 获取当前筛选后的费用数据
+    const dataToExport = filteredExpenses.value;
+    
+    if (dataToExport.length === 0) {
+      console.warn('没有可导出的数据');
+      return;
+    }
+    
+    // 导出选项
+    const exportOptions = {
+      filename: '费用明细',
+      title: '费用明细表',
+      dateRange: props.dateRange
+    };
+    
+    // 根据命令选择导出格式
+    const success = exportExpenseData(dataToExport, command, exportOptions);
+    
+    if (success) {
+      console.log(`费用明细数据导出成功，格式: ${command}`);
+    } else {
+      console.error(`费用明细数据导出失败，格式: ${command}`);
+    }
+  } catch (error) {
+    console.error('导出费用数据时发生错误:', error);
+  }
+}
+
+/**
  * 导出数据
  */
 const exportData = () => {
-  // 实现数据导出功能
-  console.log('导出费用数据')
+  // 默认导出为Excel格式
+  handleExportCommand('excel');
 }
 
 /**

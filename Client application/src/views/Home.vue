@@ -37,16 +37,35 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
+/**
+ * 开始使用按钮点击处理
+ * 根据用户登录状态跳转到不同页面
+ */
 const navigateToExpenses = () => {
-  // 这里可以跳转到费用管理页面
-  console.log('跳转到费用管理')
+  // 检查用户是否已登录
+  if (authStore.isAuthenticated) {
+    // 已登录用户跳转到仪表盘页面
+    router.push('/dashboard')
+  } else {
+    // 未登录用户跳转到登录页面
+    router.push({
+      name: 'Login',
+      query: { redirect: '/dashboard' }
+    })
+  }
 }
 
+/**
+ * 显示使用指南
+ */
 const showGuide = () => {
-  alert('使用指南功能开发中...')
+  // 跳转到使用指南页面
+  router.push('/user-guide')
 }
 </script>
 

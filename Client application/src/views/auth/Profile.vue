@@ -461,15 +461,38 @@ const loadProfile = async () => {
     ]
     loginActivities.value = mockLoginActivities
     
-    // 模拟加载通知设置
+    // 加载通知设置
     console.log('加载通知设置')
-    const mockNotificationSettings = {
-      browserNotifications: false,
-      emailNotifications: true,
-      expenseNotifications: true,
-      invitationNotifications: true
+    try {
+      const response = await fetch('/api/notification-settings', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authStore.token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          Object.assign(notificationSettings, data.data)
+        } else {
+          console.error('加载通知设置失败:', data.message)
+        }
+      } else {
+        console.error('加载通知设置失败:', response.statusText)
+      }
+    } catch (error) {
+      console.error('加载通知设置失败:', error)
+      // 使用默认设置
+      const defaultNotificationSettings = {
+        browserNotifications: false,
+        emailNotifications: true,
+        expenseNotifications: true,
+        invitationNotifications: true
+      }
+      Object.assign(notificationSettings, defaultNotificationSettings)
     }
-    Object.assign(notificationSettings, mockNotificationSettings)
     
   } catch (error) {
     console.error('加载用户资料失败:', error)
@@ -580,29 +603,40 @@ const changePassword = async () => {
   successMessage.value = ''
   
   try {
-    // 模拟API调用
     console.log('修改密码')
     
-    // 模拟API响应
-    const mockResponse = {
-      success: true,
-      message: '密码修改成功'
-    }
+    const response = await fetch('/api/users/password', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authStore.token}`
+      },
+      body: JSON.stringify({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      })
+    })
     
-    if (mockResponse.success) {
-      // 重置表单
-      passwordForm.currentPassword = ''
-      passwordForm.newPassword = ''
-      passwordForm.confirmPassword = ''
-      
-      successMessage.value = '密码修改成功'
-      
-      // 3秒后隐藏成功消息
-      setTimeout(() => {
-        successMessage.value = ''
-      }, 3000)
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success) {
+        // 重置表单
+        passwordForm.currentPassword = ''
+        passwordForm.newPassword = ''
+        passwordForm.confirmPassword = ''
+        
+        successMessage.value = '密码修改成功'
+        
+        // 3秒后隐藏成功消息
+        setTimeout(() => {
+          successMessage.value = ''
+        }, 3000)
+      } else {
+        errorMessage.value = data.message || '密码修改失败'
+      }
     } else {
-      errorMessage.value = mockResponse.message || '密码修改失败'
+      const errorData = await response.json()
+      errorMessage.value = errorData.message || `密码修改失败: ${response.statusText}`
     }
   } catch (error) {
     console.error('修改密码失败:', error)
@@ -615,24 +649,31 @@ const changePassword = async () => {
 // 更新通知设置
 const updateNotificationSettings = async () => {
   try {
-    // 模拟API调用
     console.log('更新通知设置:', notificationSettings)
     
-    // 模拟API响应
-    const mockResponse = {
-      success: true,
-      message: '通知设置已更新'
-    }
+    const response = await fetch('/api/notification-settings', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authStore.token}`
+      },
+      body: JSON.stringify(notificationSettings)
+    })
     
-    if (mockResponse.success) {
-      successMessage.value = '通知设置已更新'
-      
-      // 3秒后隐藏成功消息
-      setTimeout(() => {
-        successMessage.value = ''
-      }, 3000)
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success) {
+        successMessage.value = '通知设置已更新'
+        
+        // 3秒后隐藏成功消息
+        setTimeout(() => {
+          successMessage.value = ''
+        }, 3000)
+      } else {
+        errorMessage.value = data.message || '更新通知设置失败'
+      }
     } else {
-      errorMessage.value = mockResponse.message || '更新通知设置失败'
+      errorMessage.value = `更新通知设置失败: ${response.statusText}`
     }
   } catch (error) {
     console.error('更新通知设置失败:', error)

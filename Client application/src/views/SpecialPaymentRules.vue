@@ -2,9 +2,13 @@
   <div class="special-payment-rules-container">
     <div class="page-header">
       <h1>特殊支付规则管理</h1>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <i class="el-icon-plus"></i> 创建规则
-      </el-button>
+      <div class="header-actions">
+        <el-button @click="goBack" v-if="isCreateRoomFlow">返回房间创建</el-button>
+        <el-button @click="goBack" v-else-if="roomId">返回房间详情</el-button>
+        <el-button type="primary" @click="showCreateDialog = true">
+          <i class="el-icon-plus"></i> 创建规则
+        </el-button>
+      </div>
     </div>
 
     <div class="rules-list">
@@ -163,6 +167,10 @@ export default {
     ...mapGetters(['isAuthenticated', 'hasPermission']),
     roomId() {
       return this.$route.params.roomId;
+    },
+    // 判断是否是创建房间流程中的支付规则页面
+    isCreateRoomFlow() {
+      return this.$route.name === 'CreateRoomPaymentRules';
     }
   },
   created() {
@@ -370,6 +378,36 @@ export default {
       if (this.$refs.ruleForm) {
         this.$refs.ruleForm.resetFields();
       }
+    },
+    /**
+     * 返回上一页或房间创建页面或房间详情页面
+     */
+    goBack() {
+      // 添加加载状态，防止重复点击
+      if (this.loading) return;
+      
+      this.loading = true;
+      
+      try {
+        if (this.isCreateRoomFlow) {
+          // 如果是创建房间流程，返回到房间创建页面
+          this.$router.replace('/rooms/create');
+        } else if (this.roomId) {
+          // 如果有房间ID，返回到房间详情页面
+          this.$router.replace(`/rooms/${this.roomId}`);
+        } else {
+          // 否则返回上一页
+          this.$router.back();
+        }
+      } catch (error) {
+        console.error('导航失败:', error);
+        this.$message.error('返回失败，请重试');
+      } finally {
+        // 延迟重置加载状态，确保导航完成
+        setTimeout(() => {
+          this.loading = false;
+        }, 300);
+      }
     }
   }
 };
@@ -385,6 +423,11 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .rules-list {

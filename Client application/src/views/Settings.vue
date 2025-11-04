@@ -200,6 +200,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import axios from 'axios'
 
 // 获取认证状态
 const authStore = useAuthStore()
@@ -239,37 +240,129 @@ const systemSettings = reactive({
   dateFormat: 'YYYY-MM-DD'
 })
 
+// 加载用户偏好设置
+const loadUserPreferences = async () => {
+  try {
+    console.log('正在加载用户偏好设置...')
+    const response = await axios.get('/api/user-preferences')
+    
+    if (response.data && response.data.success) {
+      console.log('获取用户偏好设置成功:', response.data.data)
+      
+      // 处理个人设置
+      if (response.data.data.personal) {
+        Object.assign(personalSettings, response.data.data.personal)
+      }
+      
+      // 处理通知设置
+      if (response.data.data.notification) {
+        Object.assign(notificationSettings, response.data.data.notification)
+      }
+      
+      // 处理隐私设置
+      if (response.data.data.privacy) {
+        Object.assign(privacySettings, response.data.data.privacy)
+      }
+      
+      // 处理系统设置
+      if (response.data.data.system) {
+        Object.assign(systemSettings, response.data.data.system)
+      }
+    } else {
+      console.error('获取用户偏好设置失败:', response.data?.message || '未知错误')
+    }
+  } catch (error) {
+    console.error('加载用户偏好设置出错:', error)
+    ElMessage.error('加载用户偏好设置失败')
+  }
+}
+
 // 保存个人设置
-const savePersonalSettings = () => {
-  console.log('保存个人设置:', personalSettings)
-  ElMessage.success('个人信息保存成功')
+const savePersonalSettings = async () => {
+  try {
+    console.log('保存个人设置:', personalSettings)
+    const response = await axios.put('/api/user-preferences/personal', personalSettings)
+    
+    if (response.data && response.data.success) {
+      console.log('个人设置保存成功')
+      ElMessage.success('个人信息保存成功')
+    } else {
+      console.error('保存个人设置失败:', response.data?.message || '未知错误')
+      ElMessage.error('保存个人信息失败')
+    }
+  } catch (error) {
+    console.error('保存个人设置出错:', error)
+    ElMessage.error('保存个人信息失败')
+  }
 }
 
 // 保存通知设置
-const saveNotificationSettings = () => {
-  console.log('保存通知设置:', notificationSettings)
-  ElMessage.success('通知设置保存成功')
+const saveNotificationSettings = async () => {
+  try {
+    console.log('保存通知设置:', notificationSettings)
+    const response = await axios.put('/api/user-preferences/notification', notificationSettings)
+    
+    if (response.data && response.data.success) {
+      console.log('通知设置保存成功')
+      ElMessage.success('通知设置保存成功')
+    } else {
+      console.error('保存通知设置失败:', response.data?.message || '未知错误')
+      ElMessage.error('保存通知设置失败')
+    }
+  } catch (error) {
+    console.error('保存通知设置出错:', error)
+    ElMessage.error('保存通知设置失败')
+  }
 }
 
 // 保存隐私设置
-const savePrivacySettings = () => {
-  console.log('保存隐私设置:', privacySettings)
-  ElMessage.success('隐私设置保存成功')
+const savePrivacySettings = async () => {
+  try {
+    console.log('保存隐私设置:', privacySettings)
+    const response = await axios.put('/api/user-preferences/privacy', privacySettings)
+    
+    if (response.data && response.data.success) {
+      console.log('隐私设置保存成功')
+      ElMessage.success('隐私设置保存成功')
+    } else {
+      console.error('保存隐私设置失败:', response.data?.message || '未知错误')
+      ElMessage.error('保存隐私设置失败')
+    }
+  } catch (error) {
+    console.error('保存隐私设置出错:', error)
+    ElMessage.error('保存隐私设置失败')
+  }
 }
 
 // 保存系统设置
-const saveSystemSettings = () => {
-  console.log('保存系统设置:', systemSettings)
-  ElMessage.success('系统设置保存成功')
+const saveSystemSettings = async () => {
+  try {
+    console.log('保存系统设置:', systemSettings)
+    const response = await axios.put('/api/user-preferences/system', systemSettings)
+    
+    if (response.data && response.data.success) {
+      console.log('系统设置保存成功')
+      ElMessage.success('系统设置保存成功')
+    } else {
+      console.error('保存系统设置失败:', response.data?.message || '未知错误')
+      ElMessage.error('保存系统设置失败')
+    }
+  } catch (error) {
+    console.error('保存系统设置出错:', error)
+    ElMessage.error('保存系统设置失败')
+  }
 }
 
 // 初始化设置数据
-onMounted(() => {
+onMounted(async () => {
   // 从认证状态获取用户信息
   if (authStore.user) {
     personalSettings.username = authStore.user.name || ''
     personalSettings.email = authStore.user.email || ''
   }
+  
+  // 加载用户偏好设置
+  await loadUserPreferences()
 })
 </script>
 

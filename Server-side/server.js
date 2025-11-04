@@ -93,7 +93,9 @@ const specialPaymentRoutes = require('./routes/special-payment-routes');
 const paymentTransferRoutes = require('./routes/payment-transfer-routes');
 const paymentOptimizationRoutes = require('./routes/payment-optimization-routes');
 const notificationRoutes = require('./routes/notification-routes');
+const notificationSettingsRoutes = require('./routes/notification-settings-routes');
 const mfaRoutes = require('./routes/mfa-routes');
+const userPreferencesRoutes = require('./routes/user-preferences-routes');
 
 // 导入错误处理中间件
 const { errorHandler, notFoundHandler } = require('./middleware/error-handler');
@@ -1825,7 +1827,9 @@ app.use('/api/special-payments', specialPaymentRoutes);
 app.use('/api/payment-transfers', paymentTransferRoutes);
 app.use('/api/payment-optimization', paymentOptimizationRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/notification-settings', notificationSettingsRoutes);
 app.use('/api/mfa', mfaRoutes);
+app.use('/api/user-preferences', userPreferencesRoutes);
 
 // 404处理中间件
 app.use(notFoundHandler);

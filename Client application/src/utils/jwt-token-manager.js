@@ -9,6 +9,7 @@ import { Base64 } from 'js-base64'
 const TOKEN_KEY = 'auth_token'
 const REFRESH_TOKEN_KEY = 'refresh_token'
 const TOKEN_EXPIRY_KEY = 'token_expiry'
+const CURRENT_USER_KEY = 'current_user'
 
 // Token状态枚举
 export const TOKEN_STATUS = {
@@ -62,11 +63,17 @@ class JwtTokenManager {
    * @param {string} token - JWT访问令牌
    * @param {string} refreshToken - 刷新令牌
    * @param {Date|string} tokenExpiry - Token过期时间
+   * @param {string} username - 用户名，用于多用户Token管理
    */
-  setTokens(token, refreshToken, tokenExpiry) {
+  setTokens(token, refreshToken, tokenExpiry, username) {
     this.token = token
     this.refreshToken = refreshToken
     this.tokenExpiry = tokenExpiry ? new Date(tokenExpiry) : null
+    
+    // 如果提供了用户名，设置为当前用户
+    if (username) {
+      this.setCurrentUser(username)
+    }
     
     // 重置重试计数
     this.retryCount = 0
@@ -330,6 +337,47 @@ class JwtTokenManager {
   }
 
   /**
+   * 设置当前用户
+   * @param {string} username - 用户名
+   */
+  setCurrentUser(username) {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(CURRENT_USER_KEY, username)
+        console.log('已设置当前用户:', username)
+      } catch (error) {
+        console.error('设置当前用户失败:', error)
+      }
+    }
+  }
+
+  /**
+   * 获取当前用户
+   * @returns {string|null} 当前用户名
+   */
+  getCurrentUser() {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        return localStorage.getItem(CURRENT_USER_KEY)
+      } catch (error) {
+        console.error('获取当前用户失败:', error)
+        return null
+      }
+    }
+    return null
+  }
+
+  /**
+   * 获取用户特定的Token键名
+   * @param {string} key - 基础键名
+   * @param {string} username - 用户名
+   * @returns {string} 用户特定的键名
+   */
+  getUserSpecificKey(key, username) {
+    return username ? `${key}_${username}` : key
+  }
+
+  /**
    * 清除Token
    */
   clearTokens() {
@@ -351,14 +399,39 @@ class JwtTokenManager {
   saveToStorage() {
     if (typeof localStorage !== 'undefined') {
       try {
-        if (this.token) localStorage.setItem(TOKEN_KEY, this.token)
-        else localStorage.removeItem(TOKEN_KEY)
+        // 获取当前用户
+        const currentUser = this.getCurrentUser()
         
-        if (this.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, this.refreshToken)
-        else localStorage.removeItem(REFRESH_TOKEN_KEY)
+        // 检查是否勾选了记住我
+        const rememberMe = localStorage.getItem('remember_me') === 'true'
         
-        if (this.tokenExpiry) localStorage.setItem(TOKEN_EXPIRY_KEY, this.tokenExpiry.toISOString())
-        else localStorage.removeItem(TOKEN_EXPIRY_KEY)
+        // 根据记住我状态选择存储方式
+        const storage = rememberMe ? localStorage : sessionStorage
+        
+        // 为当前用户生成特定的键名
+        const userTokenKey = this.getUserSpecificKey(TOKEN_KEY, currentUser)
+        const userRefreshTokenKey = this.getUserSpecificKey(REFRESH_TOKEN_KEY, currentUser)
+        const userTokenExpiryKey = this.getUserSpecificKey(TOKEN_EXPIRY_KEY, currentUser)
+        
+        if (this.token) storage.setItem(userTokenKey, this.token)
+        else {
+          localStorage.removeItem(userTokenKey)
+          sessionStorage.removeItem(userTokenKey)
+        }
+        
+        if (this.refreshToken) storage.setItem(userRefreshTokenKey, this.refreshToken)
+        else {
+          localStorage.removeItem(userRefreshTokenKey)
+          sessionStorage.removeItem(userRefreshTokenKey)
+        }
+        
+        if (this.tokenExpiry) storage.setItem(userTokenExpiryKey, this.tokenExpiry.toISOString())
+        else {
+          localStorage.removeItem(userTokenExpiryKey)
+          sessionStorage.removeItem(userTokenExpiryKey)
+        }
+        
+        console.log(`Token已保存到${rememberMe ? 'localStorage' : 'sessionStorage'}，用户: ${currentUser}`)
       } catch (error) {
         console.error('保存Token到本地存储失败:', error)
       }
@@ -371,16 +444,32 @@ class JwtTokenManager {
   loadFromStorage() {
     if (typeof localStorage !== 'undefined') {
       try {
-        this.token = localStorage.getItem(TOKEN_KEY)
-        this.refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
+        // 获取当前用户
+        const currentUser = this.getCurrentUser()
         
-        const expiryStr = localStorage.getItem(TOKEN_EXPIRY_KEY)
+        // 检查是否勾选了记住我
+        const rememberMe = localStorage.getItem('remember_me') === 'true'
+        
+        // 为当前用户生成特定的键名
+        const userTokenKey = this.getUserSpecificKey(TOKEN_KEY, currentUser)
+        const userRefreshTokenKey = this.getUserSpecificKey(REFRESH_TOKEN_KEY, currentUser)
+        const userTokenExpiryKey = this.getUserSpecificKey(TOKEN_EXPIRY_KEY, currentUser)
+        
+        // 根据记住我状态选择存储方式，但也要尝试从两种存储中读取
+        let token = localStorage.getItem(userTokenKey) || sessionStorage.getItem(userTokenKey)
+        let refreshToken = localStorage.getItem(userRefreshTokenKey) || sessionStorage.getItem(userRefreshTokenKey)
+        let expiryStr = localStorage.getItem(userTokenExpiryKey) || sessionStorage.getItem(userTokenExpiryKey)
+        
+        this.token = token
+        this.refreshToken = refreshToken
         this.tokenExpiry = expiryStr ? new Date(expiryStr) : null
         
         console.log('从本地存储加载Token:', {
           hasToken: !!this.token,
           hasRefreshToken: !!this.refreshToken,
-          tokenExpiry: this.tokenExpiry
+          tokenExpiry: this.tokenExpiry,
+          currentUser,
+          rememberMe
         })
         
         // 检查加载的Token是否有效
@@ -404,9 +493,24 @@ class JwtTokenManager {
   removeFromStorage() {
     if (typeof localStorage !== 'undefined') {
       try {
-        localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem(REFRESH_TOKEN_KEY)
-        localStorage.removeItem(TOKEN_EXPIRY_KEY)
+        // 获取当前用户
+        const currentUser = this.getCurrentUser()
+        
+        // 为当前用户生成特定的键名
+        const userTokenKey = this.getUserSpecificKey(TOKEN_KEY, currentUser)
+        const userRefreshTokenKey = this.getUserSpecificKey(REFRESH_TOKEN_KEY, currentUser)
+        const userTokenExpiryKey = this.getUserSpecificKey(TOKEN_EXPIRY_KEY, currentUser)
+        
+        // 从localStorage和sessionStorage中清除Token
+        localStorage.removeItem(userTokenKey)
+        localStorage.removeItem(userRefreshTokenKey)
+        localStorage.removeItem(userTokenExpiryKey)
+        
+        sessionStorage.removeItem(userTokenKey)
+        sessionStorage.removeItem(userRefreshTokenKey)
+        sessionStorage.removeItem(userTokenExpiryKey)
+        
+        console.log(`已从本地存储清除Token，用户: ${currentUser}`)
       } catch (error) {
         console.error('从本地存储移除Token失败:', error)
       }

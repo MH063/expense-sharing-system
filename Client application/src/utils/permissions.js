@@ -122,6 +122,11 @@ export function hasPermission(user, permission, resource = null) {
     return false;
   }
   
+  // 如果用户拥有'all'权限，则具有所有权限
+  if (user.permissions && user.permissions.includes('all')) {
+    return true;
+  }
+  
   // 获取用户角色
   const userRole = user.role || ROLES.GUEST;
   

@@ -1,4 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { checkAuth, initAuth } from '../utils/auth'
+
+// 初始化权限验证
+initAuth()
 
 const routes = [
   {
@@ -46,6 +50,7 @@ const routes = [
   {
     path: '/system',
     name: 'System',
+    redirect: '/system/users',
     component: () => import('../views/AdminHome.vue'),
     children: [
       {
@@ -79,26 +84,20 @@ const routes = [
     path: '/review',
     name: 'Review',
     component: () => import('../views/AdminHome.vue'),
-    redirect: '/review/monitor',
+    redirect: '/review/process',
     meta: { title: '审核与争议管理', icon: 'Document' },
     children: [
       {
-        path: 'monitor',
-        name: 'ReviewMonitor',
+        path: 'process',
+        name: 'ReviewProcess',
         component: () => import('../views/review/ReviewMonitor.vue'),
-        meta: { title: '审核流程监控' }
+        meta: { title: '审核流程' }
       },
       {
-        path: 'records',
-        name: 'ReviewRecords',
-        component: () => import('../views/review/ReviewRecords.vue'),
-        meta: { title: '审核记录查询' }
-      },
-      {
-        path: 'dispute',
-        name: 'DisputeManagement',
+        path: 'disputes',
+        name: 'DisputeCases',
         component: () => import('../views/review/DisputeManagement.vue'),
-        meta: { title: '争议案件管理' }
+        meta: { title: '争议管理' }
       },
       {
         path: 'progress',
@@ -151,6 +150,29 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 全局前置守卫 - 处理权限验证
+router.beforeEach((to, from, next) => {
+  console.log('路由导航:', to.path)
+  
+  // 在模拟环境下，允许所有路由访问
+  // 在生产环境中，可以取消下面的注释来启用权限验证
+  
+  /*
+  // 检查用户是否已登录
+  if (!checkAuth()) {
+    console.log('用户未登录，重定向到登录页')
+    // 这里可以重定向到登录页面
+    // next('/login')
+    next() // 临时允许访问
+    return
+  }
+  */
+  
+  // 模拟环境下，允许所有路由访问
+  console.log('权限验证通过，允许访问')
+  next()
 })
 
 export default router

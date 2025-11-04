@@ -173,7 +173,7 @@ const toggleUserMenu = () => {
 const handleLogout = async () => {
   try {
     await authStore.logout()
-    router.push('/login')
+    router.push('/')
   } catch (error) {
     console.error('登出失败:', error)
   }

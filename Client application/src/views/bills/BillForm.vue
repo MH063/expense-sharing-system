@@ -242,7 +242,7 @@
                   <div class="participant-info">
                     <div class="participant-name">{{ participant.name }}</div>
                     <div v-if="form.splitType === 'equal'" class="participant-share">
-                      ¥{{ getParticipantShare(participant).toFixed(2) }}
+                      ¥{{ participantShareAmount(participant) }}
                     </div>
                     <div v-else class="participant-share-input">
                       <input 
@@ -476,7 +476,7 @@ const goBack = async () => {
           type: 'warning'
         }
       )
-    } catch {
+    } catch (error) {
       return
     }
   }
@@ -753,8 +753,13 @@ const removeParticipant = (participantId) => {
 const getParticipantShare = (participant) => {
   if (!form.value.amount || selectedParticipants.value.length === 0) return 0
   
-  const amount = parseFloat(form.value.amount)
-  return amount / selectedParticipants.value.length
+  const amount = parseFloat(form.value.amount) || 0
+  const shareAmount = amount / selectedParticipants.value.length
+  return isNaN(shareAmount) ? 0 : shareAmount
+}
+
+const participantShareAmount = (participant) => {
+  return (getParticipantShare(participant) || 0).toFixed(2)
 }
 
 const validateCustomShares = () => {
@@ -810,32 +815,32 @@ const handleSubmit = async () => {
     }
     
     // 检查响应是否成功
-    if (response.success) {
+    if (response && response.success) {
       // 清除草稿
-      clearDraft()
-      formChanged.value = false
+      clearDraft();
+      formChanged.value = false;
       
-      ElMessage.success(isEditing.value ? '账单更新成功' : '账单创建成功')
+      ElMessage.success(isEditing.value ? '账单更新成功' : '账单创建成功');
       
       // 跳转到账单详情页
       if (isEditing.value) {
-        router.push(`/bills/${route.params.id}`)
+        router.push(`/bills/${route.params.id}`);
       } else {
         // 使用返回的账单ID
-        const newBillId = response.data.id || `bill-${Date.now()}`
-        router.push(`/bills/${newBillId}`)
+        const newBillId = response.data.id || `bill-${Date.now()}`;
+        router.push(`/bills/${newBillId}`);
       }
     } else {
-      ElMessage.error(response.message || '操作失败')
+      ElMessage.error(response?.message || '操作失败');
     }
     
   } catch (error) {
-    console.error('保存账单失败:', error)
-    ElMessage.error('保存账单失败，请稍后再试')
+    console.error('保存账单失败:', error);
+    ElMessage.error('保存账单失败，请稍后再试');
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
   }
-}
+};
 
 const loadBillDetail = async () => {
   if (!isEditing.value) return
@@ -868,11 +873,10 @@ const loadBillDetail = async () => {
       
       // 初始化临时选中的参与者
       tempSelectedParticipants.value = [...selectedParticipants.value]
-      
-    } catch (error) {
-      console.error('加载账单详情失败:', error)
-      ElMessage.error('加载账单详情失败，请稍后再试')
     }
+  } catch (error) {
+    console.error('加载账单详情失败:', error)
+    ElMessage.error('加载账单详情失败，请稍后再试')
   }
 }
 
@@ -913,77 +917,6 @@ const uploadReceipt = async (event) => {
     uploading.value = false;
   }
 };
-
-// 加载账单详情
-const loadBillDetail = async () => {
-  if (!isEditing.value) return
-  
-  try {
-    // 模拟API调用
-    console.log('加载账单详情:', route.params.id)
-    
-    // 模拟账单数据
-    const bill = {
-      id: route.params.id,
-      title: '11月水电费',
-      amount: 156.50,
-      category: 'utilities',
-      due_date: '2023-11-30',
-      description: '11月份的水电费账单，包含水费和电费',
-      receipt_url: 'https://picsum.photos/seed/bill123/400/600.jpg',
-      split_type: 'equal',
-      participants: [
-        {
-          user_id: 'user-1',
-          user_name: '张三',
-          share: 52.17
-        },
-        {
-          user_id: 'user-2',
-          user_name: '李四',
-          share: 52.17
-        },
-        {
-          user_id: 'user-3',
-          user_name: '王五',
-          share: 52.16
-        }
-      ]
-    }
-    
-    // 填充表单
-    form.value = {
-      title: bill.title,
-      amount: bill.amount.toString(),
-      category: bill.category,
-      dueDate: bill.due_date,
-      description: bill.description || '',
-      receipt: bill.receipt_url || '',
-      receipt_url: bill.receipt_url || '',
-      splitType: bill.split_type || 'equal',
-      participants: []
-    }
-    
-    // 设置参与者
-    selectedParticipants.value = bill.participants.map(p => ({
-      id: p.user_id,
-      name: p.user_name,
-      customShare: p.share.toString()
-    }))
-    
-    // 初始化临时选中的参与者
-    tempSelectedParticipants.value = [...selectedParticipants.value]
-    
-  } catch (error) {
-    console.error('加载账单详情失败:', error)
-    ElMessage.error('加载账单详情失败，请稍后再试')
-  }
-}
-
-// 替换handleSubmit函数
-const handleSubmit = async () => {
-  await saveBill()
-}
 
 // 监听器
 watch(() => form.value.splitType, (newType) => {

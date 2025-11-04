@@ -259,16 +259,17 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Download, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
+import { expenseApi } from '@/api'
 
 // 统计数据
-const pendingCount = ref(28)
-const pendingTrend = ref(5)
-const todayReviewedCount = ref(15)
-const completionRate = ref(65)
-const avgReviewTime = ref(4.2)
-const timeTrend = ref(-0.5)
-const overdueCount = ref(3)
-const overdueTrend = ref(-1)
+const pendingCount = ref(0)
+const pendingTrend = ref(0)
+const todayReviewedCount = ref(0)
+const completionRate = ref(0)
+const avgReviewTime = ref(0)
+const timeTrend = ref(0)
+const overdueCount = ref(0)
+const overdueTrend = ref(0)
 
 // 流程图相关
 const flowView = ref('pending')
@@ -279,100 +280,15 @@ const filterStatus = ref('')
 const filterPriority = ref('')
 
 // 审核任务列表
-const reviewList = ref([
-  {
-    id: 1,
-    type: 'expense',
-    title: '高额电费审核',
-    applicant: '张三',
-    submitTime: '2023-11-20 09:30:00',
-    priority: 'high',
-    status: 'pending',
-    reviewer: null,
-    deadline: '2023-11-22 18:00:00',
-    content: '本月电费350元，超过平均值50%，需要审核确认',
-    attachments: [
-      { id: 1, name: '电费账单.pdf', url: '/files/electricity_bill.pdf' }
-    ],
-    comment: ''
-  },
-  {
-    id: 2,
-    type: 'user',
-    title: '新用户注册审核',
-    applicant: '李四',
-    submitTime: '2023-11-20 10:15:00',
-    priority: 'medium',
-    status: 'processing',
-    reviewer: '王五',
-    deadline: '2023-11-21 18:00:00',
-    content: '新用户李四申请注册，需要审核身份信息',
-    attachments: [
-      { id: 2, name: '身份证照片.jpg', url: '/files/id_card.jpg' }
-    ],
-    comment: '正在核实身份信息'
-  },
-  {
-    id: 3,
-    type: 'dispute',
-    title: '费用分摊争议',
-    applicant: '赵六',
-    submitTime: '2023-11-19 14:20:00',
-    priority: 'high',
-    status: 'approved',
-    reviewer: '钱七',
-    deadline: '2023-11-20 18:00:00',
-    content: '赵六对本月水费分摊有异议，认为计算有误',
-    attachments: [
-      { id: 3, name: '水费账单.pdf', url: '/files/water_bill.pdf' },
-      { id: 4, name: '分摊说明.docx', url: '/files/sharing_explanation.docx' }
-    ],
-    comment: '已核实，分摊计算正确，驳回争议'
-  },
-  {
-    id: 4,
-    type: 'expense',
-    title: '异常网费审核',
-    applicant: '孙八',
-    submitTime: '2023-11-19 16:45:00',
-    priority: 'low',
-    status: 'rejected',
-    reviewer: '周九',
-    deadline: '2023-11-21 18:00:00',
-    content: '本月网费100元，为正常费用的两倍',
-    attachments: [],
-    comment: '用户已解释，是半年费用合并支付'
-  },
-  {
-    id: 5,
-    type: 'user',
-    title: '寝室变更申请',
-    applicant: '吴十',
-    submitTime: '2023-11-18 09:10:00',
-    priority: 'medium',
-    status: 'pending',
-    reviewer: null,
-    deadline: '2023-11-22 18:00:00',
-    content: '吴十申请从A101寝室调换到B201寝室',
-    attachments: [
-      { id: 5, name: '申请表.pdf', url: '/files/transfer_application.pdf' }
-    ],
-    comment: ''
-  }
-])
+const reviewList = ref([])
 
 // 可分配的审核人列表
-const availableReviewers = ref([
-  { id: 1, name: '王审核员', currentTasks: 2 },
-  { id: 2, name: '李审核员', currentTasks: 1 },
-  { id: 3, name: '张审核员', currentTasks: 3 },
-  { id: 4, name: '赵审核员', currentTasks: 0 }
-])
+const availableReviewers = ref([])
 
 // 分页相关
 const currentPage = ref(1)
 const pageSize = ref(10)
-const totalReviews = ref(100)
+const totalReviews = ref(0)
 
 // 加载状态
 const loading = ref(false)
@@ -395,6 +311,73 @@ const assignFormRules = {
   reviewerId: [
     { required: true, message: '请选择审核人', trigger: 'change' }
   ]
+}
+
+// 获取统计数据
+const fetchStatistics = async () => {
+  try {
+    loading.value = true
+    const response = await expenseApi.getReviewStatistics()
+    if (response.data.success) {
+      const data = response.data.data
+      pendingCount.value = data.pendingCount || 0
+      pendingTrend.value = data.pendingTrend || 0
+      todayReviewedCount.value = data.todayReviewedCount || 0
+      completionRate.value = data.completionRate || 0
+      avgReviewTime.value = data.avgReviewTime || 0
+      timeTrend.value = data.timeTrend || 0
+      overdueCount.value = data.overdueCount || 0
+      overdueTrend.value = data.overdueTrend || 0
+    } else {
+      ElMessage.error('获取统计数据失败')
+    }
+  } catch (error) {
+    console.error('获取统计数据错误:', error)
+    ElMessage.error('获取统计数据错误')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取审核任务列表
+const fetchReviewList = async () => {
+  try {
+    loading.value = true
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      type: filterType.value,
+      status: filterStatus.value,
+      priority: filterPriority.value
+    }
+    const response = await expenseApi.getReviewList(params)
+    if (response.data.success) {
+      reviewList.value = response.data.data.list || []
+      totalReviews.value = response.data.data.total || 0
+    } else {
+      ElMessage.error('获取审核列表失败')
+    }
+  } catch (error) {
+    console.error('获取审核列表错误:', error)
+    ElMessage.error('获取审核列表错误')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取可用审核人列表
+const fetchAvailableReviewers = async () => {
+  try {
+    const response = await expenseApi.getAvailableReviewers()
+    if (response.data.success) {
+      availableReviewers.value = response.data.data || []
+    } else {
+      ElMessage.error('获取审核人列表失败')
+    }
+  } catch (error) {
+    console.error('获取审核人列表错误:', error)
+    ElMessage.error('获取审核人列表错误')
+  }
 }
 
 // 获取审核类型名称
@@ -461,17 +444,38 @@ const getStatusTagType = (status) => {
 
 // 刷新数据
 const refreshData = () => {
-  loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('数据刷新成功')
-  }, 1000)
+  fetchStatistics()
+  fetchReviewList()
+  fetchAvailableReviewers()
 }
 
 // 导出报告
-const exportReport = () => {
-  ElMessage.success('报告导出成功')
+const exportReport = async () => {
+  try {
+    const params = {
+      type: filterType.value,
+      status: filterStatus.value,
+      priority: filterPriority.value
+    }
+    const response = await expenseApi.exportReviewReport(params)
+    if (response.data.success) {
+      // 创建下载链接
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', '审核报告.xlsx')
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      ElMessage.success('报告导出成功')
+    } else {
+      ElMessage.error('报告导出失败')
+    }
+  } catch (error) {
+    console.error('导出报告错误:', error)
+    ElMessage.error('导出报告错误')
+  }
 }
 
 // 更新流程图
@@ -481,18 +485,24 @@ const updateFlowChart = () => {
 
 // 筛选审核任务
 const filterReviews = () => {
-  loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('筛选完成')
-  }, 500)
+  currentPage.value = 1
+  fetchReviewList()
 }
 
 // 查看审核详情
-const viewReview = (review) => {
-  currentReview.value = { ...review }
-  showReviewDetailDialog.value = true
+const viewReview = async (review) => {
+  try {
+    const response = await expenseApi.getReviewDetail(review.id)
+    if (response.data.success) {
+      currentReview.value = response.data.data
+      showReviewDetailDialog.value = true
+    } else {
+      ElMessage.error('获取审核详情失败')
+    }
+  } catch (error) {
+    console.error('获取审核详情错误:', error)
+    ElMessage.error('获取审核详情错误')
+  }
 }
 
 // 分配审核人
@@ -510,22 +520,27 @@ const handleReview = (review) => {
 }
 
 // 提交分配
-const submitAssign = () => {
-  assignFormRef.value.validate((valid) => {
+const submitAssign = async () => {
+  assignFormRef.value.validate(async (valid) => {
     if (valid) {
-      // 模拟API调用
-      const index = reviewList.value.findIndex(r => r.id === assignForm.reviewId)
-      if (index !== -1) {
-        const reviewer = availableReviewers.value.find(r => r.id === assignForm.reviewerId)
-        if (reviewer) {
-          reviewList.value[index].reviewer = reviewer.name
-          reviewList.value[index].status = 'processing'
-          reviewer.currentTasks += 1
+      try {
+        const data = {
+          reviewId: assignForm.reviewId,
+          reviewerId: assignForm.reviewerId,
+          comment: assignForm.comment
         }
+        const response = await expenseApi.assignReviewer(data)
+        if (response.data.success) {
+          ElMessage.success('分配成功')
+          showAssignDialog.value = false
+          fetchReviewList()
+        } else {
+          ElMessage.error('分配失败')
+        }
+      } catch (error) {
+        console.error('分配审核人错误:', error)
+        ElMessage.error('分配审核人错误')
       }
-      
-      ElMessage.success('分配成功')
-      showAssignDialog.value = false
     }
   })
 }
@@ -538,16 +553,26 @@ const approveReview = () => {
     inputType: 'textarea',
     inputPlaceholder: '请输入审核意见'
   })
-    .then(({ value }) => {
-      // 模拟API调用
-      const index = reviewList.value.findIndex(r => r.id === currentReview.value.id)
-      if (index !== -1) {
-        reviewList.value[index].status = 'approved'
-        reviewList.value[index].comment = value || '审核通过'
+    .then(async ({ value }) => {
+      try {
+        const data = {
+          reviewId: currentReview.value.id,
+          action: 'approve',
+          comment: value || '审核通过'
+        }
+        const response = await expenseApi.processReview(data)
+        if (response.data.success) {
+          ElMessage.success('审核已通过')
+          showReviewDetailDialog.value = false
+          fetchReviewList()
+          fetchStatistics()
+        } else {
+          ElMessage.error('审核操作失败')
+        }
+      } catch (error) {
+        console.error('审核操作错误:', error)
+        ElMessage.error('审核操作错误')
       }
-      
-      ElMessage.success('审核已通过')
-      showReviewDetailDialog.value = false
     })
     .catch(() => {
       ElMessage.info('已取消操作')
@@ -562,16 +587,26 @@ const rejectReview = () => {
     inputType: 'textarea',
     inputPlaceholder: '请输入拒绝原因'
   })
-    .then(({ value }) => {
-      // 模拟API调用
-      const index = reviewList.value.findIndex(r => r.id === currentReview.value.id)
-      if (index !== -1) {
-        reviewList.value[index].status = 'rejected'
-        reviewList.value[index].comment = value || '审核拒绝'
+    .then(async ({ value }) => {
+      try {
+        const data = {
+          reviewId: currentReview.value.id,
+          action: 'reject',
+          comment: value || '审核拒绝'
+        }
+        const response = await expenseApi.processReview(data)
+        if (response.data.success) {
+          ElMessage.success('审核已拒绝')
+          showReviewDetailDialog.value = false
+          fetchReviewList()
+          fetchStatistics()
+        } else {
+          ElMessage.error('审核操作失败')
+        }
+      } catch (error) {
+        console.error('审核操作错误:', error)
+        ElMessage.error('审核操作错误')
       }
-      
-      ElMessage.success('审核已拒绝')
-      showReviewDetailDialog.value = false
     })
     .catch(() => {
       ElMessage.info('已取消操作')
@@ -579,23 +614,36 @@ const rejectReview = () => {
 }
 
 // 下载文件
-const downloadFile = (file) => {
-  ElMessage.success(`正在下载文件: ${file.name}`)
+const downloadFile = async (file) => {
+  try {
+    const response = await expenseApi.downloadFile(file.id)
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', file.name)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success(`正在下载文件: ${file.name}`)
+  } catch (error) {
+    console.error('下载文件错误:', error)
+    ElMessage.error('下载文件错误')
+  }
 }
 
 // 处理分页大小变化
 const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
-  // 重新加载数据
-  filterReviews()
+  fetchReviewList()
 }
 
 // 处理当前页变化
 const handleCurrentChange = (page) => {
   currentPage.value = page
-  // 重新加载数据
-  filterReviews()
+  fetchReviewList()
 }
 
 // 组件挂载时加载数据

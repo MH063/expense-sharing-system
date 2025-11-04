@@ -409,33 +409,36 @@ const loadRooms = async () => {
     rooms.value = paginatedRooms
     total.value = filteredRooms.length
     
-    /**
-     * 加载统计数据
-     */
-    const loadStats = async () => {
-      try {
-        // 模拟API调用
-        console.log('模拟加载房间统计数据API调用')
-        
-        // 模拟统计数据
-        const mockStats = {
-          total: 4,
-          myRooms: 2,
-          activeRooms: 2,
-          pendingInvitations: 1
-        }
-        
-        // 更新统计数据
-        Object.assign(stats, mockStats)
-      } catch (error) {
-        console.error('加载统计数据失败:', error)
-      }
-    }
+    // 加载统计数据
+    loadStats()
   } catch (error) {
     console.error('加载房间列表失败:', error)
     ElMessage.error('加载房间列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 加载统计数据
+ */
+const loadStats = async () => {
+  try {
+    // 模拟API调用
+    console.log('模拟加载房间统计数据API调用')
+    
+    // 模拟统计数据
+    const mockStats = {
+      total: 4,
+      myRooms: 2,
+      activeRooms: 2,
+      pendingInvitations: 1
+    }
+    
+    // 更新统计数据
+    Object.assign(stats, mockStats)
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
   }
 }
 

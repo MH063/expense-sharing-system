@@ -26,53 +26,50 @@
               <template #header>
                 <div class="card-header">
                   <h3>基础系统设置</h3>
+                  <div class="card-actions">
+                    <el-button size="small" @click="saveConfig('basic')" :loading="formLoading">
+                      <el-icon><Check /></el-icon>
+                      保存
+                    </el-button>
+                    <el-button size="small" @click="resetToDefault('basic')" :loading="formLoading">
+                      <el-icon><RefreshLeft /></el-icon>
+                      恢复默认
+                    </el-button>
+                  </div>
                 </div>
               </template>
               
-              <el-form :model="basicConfig" label-width="150px">
+              <el-form :model="basicForm" label-width="150px">
                 <el-form-item label="系统名称">
-                  <el-input v-model="basicConfig.systemName" placeholder="请输入系统名称" />
+                  <el-input v-model="basicForm.systemName" placeholder="请输入系统名称" />
                 </el-form-item>
                 
-                <el-form-item label="系统版本">
-                  <el-input v-model="basicConfig.systemVersion" placeholder="请输入系统版本" />
+                <el-form-item label="系统Logo">
+                  <el-input v-model="basicForm.systemLogo" placeholder="请输入系统Logo URL" />
                 </el-form-item>
                 
                 <el-form-item label="系统描述">
                   <el-input
-                    v-model="basicConfig.systemDescription"
+                    v-model="basicForm.systemDescription"
                     type="textarea"
                     rows="3"
                     placeholder="请输入系统描述"
                   />
                 </el-form-item>
                 
-                <el-form-item label="系统Logo">
-                  <el-upload
-                    class="logo-uploader"
-                    action="#"
-                    :show-file-list="false"
-                    :before-upload="beforeLogoUpload"
-                    :on-success="handleLogoSuccess"
-                  >
-                    <img v-if="basicConfig.logoUrl" :src="basicConfig.logoUrl" class="logo" />
-                    <el-icon v-else class="logo-uploader-icon"><Plus /></el-icon>
-                  </el-upload>
-                </el-form-item>
-                
-                <el-form-item label="系统主题色">
-                  <el-color-picker v-model="basicConfig.primaryColor" />
+                <el-form-item label="主题色">
+                  <el-color-picker v-model="basicForm.themeColor" />
                 </el-form-item>
                 
                 <el-form-item label="系统语言">
-                  <el-select v-model="basicConfig.language" placeholder="请选择系统语言">
+                  <el-select v-model="basicForm.language" placeholder="请选择系统语言">
                     <el-option label="简体中文" value="zh-CN" />
                     <el-option label="English" value="en-US" />
                   </el-select>
                 </el-form-item>
                 
                 <el-form-item label="时区设置">
-                  <el-select v-model="basicConfig.timezone" placeholder="请选择时区">
+                  <el-select v-model="basicForm.timezone" placeholder="请选择时区">
                     <el-option label="北京时间 (UTC+8)" value="Asia/Shanghai" />
                     <el-option label="东京时间 (UTC+9)" value="Asia/Tokyo" />
                     <el-option label="纽约时间 (UTC-5)" value="America/New_York" />
@@ -80,21 +77,19 @@
                   </el-select>
                 </el-form-item>
                 
-                <el-form-item label="系统维护模式">
-                  <el-switch
-                    v-model="basicConfig.maintenanceMode"
-                    active-text="开启"
-                    inactive-text="关闭"
-                  />
+                <el-form-item label="日期格式">
+                  <el-select v-model="basicForm.dateFormat" placeholder="请选择日期格式">
+                    <el-option label="YYYY-MM-DD" value="YYYY-MM-DD" />
+                    <el-option label="DD/MM/YYYY" value="DD/MM/YYYY" />
+                    <el-option label="MM/DD/YYYY" value="MM/DD/YYYY" />
+                  </el-select>
                 </el-form-item>
                 
-                <el-form-item label="维护提示信息">
-                  <el-input
-                    v-model="basicConfig.maintenanceMessage"
-                    type="textarea"
-                    rows="3"
-                    placeholder="请输入维护提示信息"
-                  />
+                <el-form-item label="时间格式">
+                  <el-select v-model="basicForm.timeFormat" placeholder="请选择时间格式">
+                    <el-option label="24小时制 (HH:mm:ss)" value="HH:mm:ss" />
+                    <el-option label="12小时制 (hh:mm:ss A)" value="hh:mm:ss A" />
+                  </el-select>
                 </el-form-item>
               </el-form>
             </el-card>
@@ -106,69 +101,64 @@
               <template #header>
                 <div class="card-header">
                   <h3>系统安全设置</h3>
+                  <div class="card-actions">
+                    <el-button size="small" @click="saveConfig('security')" :loading="formLoading">
+                      <el-icon><Check /></el-icon>
+                      保存
+                    </el-button>
+                    <el-button size="small" @click="resetToDefault('security')" :loading="formLoading">
+                      <el-icon><RefreshLeft /></el-icon>
+                      恢复默认
+                    </el-button>
+                  </div>
                 </div>
               </template>
               
-              <el-form :model="securityConfig" label-width="150px">
+              <el-form :model="securityForm" label-width="150px">
                 <el-form-item label="密码最小长度">
-                  <el-input-number v-model="securityConfig.passwordMinLength" :min="6" :max="20" />
+                  <el-input-number v-model="securityForm.passwordMinLength" :min="6" :max="20" />
                 </el-form-item>
                 
                 <el-form-item label="密码复杂度要求">
-                  <el-checkbox-group v-model="securityConfig.passwordComplexity">
-                    <el-checkbox label="uppercase">必须包含大写字母</el-checkbox>
-                    <el-checkbox label="lowercase">必须包含小写字母</el-checkbox>
-                    <el-checkbox label="number">必须包含数字</el-checkbox>
-                    <el-checkbox label="special">必须包含特殊字符</el-checkbox>
-                  </el-checkbox-group>
+                  <el-checkbox v-model="securityForm.passwordRequireUppercase">必须包含大写字母</el-checkbox>
+                  <el-checkbox v-model="securityForm.passwordRequireLowercase">必须包含小写字母</el-checkbox>
+                  <el-checkbox v-model="securityForm.passwordRequireNumbers">必须包含数字</el-checkbox>
+                  <el-checkbox v-model="securityForm.passwordRequireSpecialChars">必须包含特殊字符</el-checkbox>
                 </el-form-item>
                 
                 <el-form-item label="密码有效期">
-                  <el-input-number v-model="securityConfig.passwordExpiry" :min="30" :max="365" />
+                  <el-input-number v-model="securityForm.passwordExpiryDays" :min="30" :max="365" />
                   <span style="margin-left: 10px;">天</span>
                 </el-form-item>
                 
-                <el-form-item label="登录失败锁定">
-                  <el-switch
-                    v-model="securityConfig.loginLockEnabled"
-                    active-text="开启"
-                    inactive-text="关闭"
-                  />
-                </el-form-item>
-                
-                <el-form-item label="最大失败次数" v-if="securityConfig.loginLockEnabled">
-                  <el-input-number v-model="securityConfig.maxFailedAttempts" :min="3" :max="10" />
-                </el-form-item>
-                
-                <el-form-item label="锁定时间" v-if="securityConfig.loginLockEnabled">
-                  <el-input-number v-model="securityConfig.lockDuration" :min="5" :max="60" />
+                <el-form-item label="会话超时时间">
+                  <el-input-number v-model="securityForm.sessionTimeout" :min="10" :max="480" />
                   <span style="margin-left: 10px;">分钟</span>
                 </el-form-item>
                 
-                <el-form-item label="会话超时时间">
-                  <el-input-number v-model="securityConfig.sessionTimeout" :min="10" :max="480" />
+                <el-form-item label="最大登录尝试次数">
+                  <el-input-number v-model="securityForm.maxLoginAttempts" :min="3" :max="10" />
+                </el-form-item>
+                
+                <el-form-item label="账户锁定时间">
+                  <el-input-number v-model="securityForm.lockoutDuration" :min="5" :max="60" />
                   <span style="margin-left: 10px;">分钟</span>
                 </el-form-item>
                 
                 <el-form-item label="双因素认证">
                   <el-switch
-                    v-model="securityConfig.twoFactorAuth"
+                    v-model="securityForm.enableTwoFactorAuth"
                     active-text="开启"
                     inactive-text="关闭"
                   />
                 </el-form-item>
                 
-                <el-form-item label="操作日志记录">
+                <el-form-item label="强制密码更改">
                   <el-switch
-                    v-model="securityConfig.operationLogging"
+                    v-model="securityForm.forcePasswordChange"
                     active-text="开启"
                     inactive-text="关闭"
                   />
-                </el-form-item>
-                
-                <el-form-item label="日志保留时间">
-                  <el-input-number v-model="securityConfig.logRetentionDays" :min="30" :max="365" />
-                  <span style="margin-left: 10px;">天</span>
                 </el-form-item>
               </el-form>
             </el-card>
@@ -180,81 +170,100 @@
               <template #header>
                 <div class="card-header">
                   <h3>系统通知设置</h3>
+                  <div class="card-actions">
+                    <el-button size="small" @click="saveConfig('notification')" :loading="formLoading">
+                      <el-icon><Check /></el-icon>
+                      保存
+                    </el-button>
+                    <el-button size="small" @click="resetToDefault('notification')" :loading="formLoading">
+                      <el-icon><RefreshLeft /></el-icon>
+                      恢复默认
+                    </el-button>
+                  </div>
                 </div>
               </template>
               
-              <el-form :model="notificationConfig" label-width="150px">
+              <el-form :model="notificationForm" label-width="150px">
                 <el-form-item label="邮件通知">
                   <el-switch
-                    v-model="notificationConfig.emailEnabled"
+                    v-model="notificationForm.emailNotifications"
                     active-text="开启"
                     inactive-text="关闭"
                   />
                 </el-form-item>
                 
-                <template v-if="notificationConfig.emailEnabled">
+                <template v-if="notificationForm.emailNotifications">
                   <el-form-item label="SMTP服务器">
-                    <el-input v-model="notificationConfig.smtpHost" placeholder="请输入SMTP服务器地址" />
+                    <el-input v-model="notificationForm.emailSmtpServer" placeholder="请输入SMTP服务器地址" />
                   </el-form-item>
                   
                   <el-form-item label="SMTP端口">
-                    <el-input-number v-model="notificationConfig.smtpPort" :min="1" :max="65535" />
+                    <el-input-number v-model="notificationForm.emailSmtpPort" :min="1" :max="65535" />
                   </el-form-item>
                   
                   <el-form-item label="发件人邮箱">
-                    <el-input v-model="notificationConfig.senderEmail" placeholder="请输入发件人邮箱" />
+                    <el-input v-model="notificationForm.emailUsername" placeholder="请输入发件人邮箱" />
                   </el-form-item>
                   
                   <el-form-item label="邮箱密码">
-                    <el-input v-model="notificationConfig.senderPassword" type="password" placeholder="请输入邮箱密码" />
+                    <el-input v-model="notificationForm.emailPassword" type="password" placeholder="请输入邮箱密码" />
                   </el-form-item>
                   
-                  <el-form-item label="使用SSL">
+                  <el-form-item label="使用TLS">
                     <el-switch
-                      v-model="notificationConfig.smtpSsl"
+                      v-model="notificationForm.emailUseTls"
                       active-text="是"
                       inactive-text="否"
                     />
+                  </el-form-item>
+                  
+                  <el-form-item>
+                    <el-button type="primary" size="small" @click="testEmailConfig" :loading="formLoading">
+                      <el-icon><Bell /></el-icon>
+                      测试邮件配置
+                    </el-button>
                   </el-form-item>
                 </template>
                 
                 <el-form-item label="短信通知">
                   <el-switch
-                    v-model="notificationConfig.smsEnabled"
+                    v-model="notificationForm.smsNotifications"
                     active-text="开启"
                     inactive-text="关闭"
                   />
                 </el-form-item>
                 
-                <template v-if="notificationConfig.smsEnabled">
+                <template v-if="notificationForm.smsNotifications">
                   <el-form-item label="短信服务商">
-                    <el-select v-model="notificationConfig.smsProvider" placeholder="请选择短信服务商">
+                    <el-select v-model="notificationForm.smsProvider" placeholder="请选择短信服务商">
                       <el-option label="阿里云短信" value="aliyun" />
                       <el-option label="腾讯云短信" value="tencent" />
                       <el-option label="华为云短信" value="huawei" />
                     </el-select>
                   </el-form-item>
                   
-                  <el-form-item label="AccessKey ID">
-                    <el-input v-model="notificationConfig.smsAccessKey" placeholder="请输入AccessKey ID" />
+                  <el-form-item label="API Key">
+                    <el-input v-model="notificationForm.smsApiKey" placeholder="请输入API Key" />
                   </el-form-item>
                   
-                  <el-form-item label="AccessKey Secret">
-                    <el-input v-model="notificationConfig.smsSecretKey" type="password" placeholder="请输入AccessKey Secret" />
+                  <el-form-item label="API Secret">
+                    <el-input v-model="notificationForm.smsApiSecret" type="password" placeholder="请输入API Secret" />
+                  </el-form-item>
+                  
+                  <el-form-item>
+                    <el-button type="primary" size="small" @click="testSmsConfig" :loading="formLoading">
+                      <el-icon><Bell /></el-icon>
+                      测试短信配置
+                    </el-button>
                   </el-form-item>
                 </template>
                 
-                <el-form-item label="系统通知">
-                  <el-checkbox-group v-model="notificationConfig.systemNotifications">
-                    <el-checkbox label="userRegister">用户注册</el-checkbox>
-                    <el-checkbox label="userLogin">用户登录</el-checkbox>
-                    <el-checkbox label="expenseSubmit">费用提交</el-checkbox>
-                    <el-checkbox label="expenseApproved">费用审核通过</el-checkbox>
-                    <el-checkbox label="expenseRejected">费用审核拒绝</el-checkbox>
-                    <el-checkbox label="disputeCreated">争议创建</el-checkbox>
-                    <el-checkbox label="disputeResolved">争议解决</el-checkbox>
-                    <el-checkbox label="systemError">系统错误</el-checkbox>
-                  </el-checkbox-group>
+                <el-form-item label="推送通知">
+                  <el-switch
+                    v-model="notificationForm.pushNotifications"
+                    active-text="开启"
+                    inactive-text="关闭"
+                  />
                 </el-form-item>
               </el-form>
             </el-card>
@@ -266,98 +275,110 @@
               <template #header>
                 <div class="card-header">
                   <h3>数据备份设置</h3>
+                  <div class="card-actions">
+                    <el-button size="small" @click="saveConfig('backup')" :loading="formLoading">
+                      <el-icon><Check /></el-icon>
+                      保存
+                    </el-button>
+                    <el-button size="small" @click="resetToDefault('backup')" :loading="formLoading">
+                      <el-icon><RefreshLeft /></el-icon>
+                      恢复默认
+                    </el-button>
+                  </div>
                 </div>
               </template>
               
-              <el-form :model="backupConfig" label-width="150px">
+              <el-form :model="backupForm" label-width="150px">
                 <el-form-item label="自动备份">
                   <el-switch
-                    v-model="backupConfig.autoBackup"
+                    v-model="backupForm.autoBackup"
                     active-text="开启"
                     inactive-text="关闭"
                   />
                 </el-form-item>
                 
-                <template v-if="backupConfig.autoBackup">
+                <template v-if="backupForm.autoBackup">
                   <el-form-item label="备份频率">
-                    <el-select v-model="backupConfig.backupFrequency" placeholder="请选择备份频率">
+                    <el-select v-model="backupForm.backupFrequency" placeholder="请选择备份频率">
                       <el-option label="每天" value="daily" />
                       <el-option label="每周" value="weekly" />
                       <el-option label="每月" value="monthly" />
                     </el-select>
                   </el-form-item>
                   
-                  <el-form-item label="备份时间" v-if="backupConfig.backupFrequency === 'daily'">
+                  <el-form-item label="备份时间">
                     <el-time-picker
-                      v-model="backupConfig.backupTime"
+                      v-model="backupForm.backupTime"
                       format="HH:mm"
                       placeholder="选择时间"
-                    />
-                  </el-form-item>
-                  
-                  <el-form-item label="备份时间" v-if="backupConfig.backupFrequency === 'weekly'">
-                    <el-select v-model="backupConfig.backupDay" placeholder="请选择星期">
-                      <el-option label="星期一" value="1" />
-                      <el-option label="星期二" value="2" />
-                      <el-option label="星期三" value="3" />
-                      <el-option label="星期四" value="4" />
-                      <el-option label="星期五" value="5" />
-                      <el-option label="星期六" value="6" />
-                      <el-option label="星期日" value="7" />
-                    </el-select>
-                    <el-time-picker
-                      v-model="backupConfig.backupTime"
-                      format="HH:mm"
-                      placeholder="选择时间"
-                      style="margin-left: 10px;"
-                    />
-                  </el-form-item>
-                  
-                  <el-form-item label="备份时间" v-if="backupConfig.backupFrequency === 'monthly'">
-                    <el-select v-model="backupConfig.backupDay" placeholder="请选择日期">
-                      <el-option
-                        v-for="day in 31"
-                        :key="day"
-                        :label="`${day}日`"
-                        :value="day"
-                      />
-                    </el-select>
-                    <el-time-picker
-                      v-model="backupConfig.backupTime"
-                      format="HH:mm"
-                      placeholder="选择时间"
-                      style="margin-left: 10px;"
                     />
                   </el-form-item>
                 </template>
                 
                 <el-form-item label="备份保留天数">
-                  <el-input-number v-model="backupConfig.retentionDays" :min="7" :max="365" />
+                  <el-input-number v-model="backupForm.backupRetentionDays" :min="7" :max="365" />
                   <span style="margin-left: 10px;">天</span>
                 </el-form-item>
                 
-                <el-form-item label="备份存储位置">
-                  <el-input v-model="backupConfig.storagePath" placeholder="请输入备份存储路径" />
+                <el-form-item label="备份位置">
+                  <el-select v-model="backupForm.backupLocation" placeholder="请选择备份位置">
+                    <el-option label="本地存储" value="local" />
+                    <el-option label="云存储" value="cloud" />
+                  </el-select>
                 </el-form-item>
                 
-                <el-form-item label="备份压缩">
-                  <el-switch
-                    v-model="backupConfig.compression"
-                    active-text="开启"
-                    inactive-text="关闭"
-                  />
-                </el-form-item>
+                <template v-if="backupForm.backupLocation === 'cloud'">
+                  <el-form-item label="云存储服务">
+                    <el-switch
+                      v-model="backupForm.cloudBackup"
+                      active-text="开启"
+                      inactive-text="关闭"
+                    />
+                  </el-form-item>
+                  
+                  <template v-if="backupForm.cloudBackup">
+                    <el-form-item label="云服务商">
+                      <el-select v-model="backupForm.cloudProvider" placeholder="请选择云服务商">
+                        <el-option label="阿里云OSS" value="aliyun" />
+                        <el-option label="腾讯云COS" value="tencent" />
+                        <el-option label="华为云OBS" value="huawei" />
+                      </el-select>
+                    </el-form-item>
+                    
+                    <el-form-item label="存储桶名称">
+                      <el-input v-model="backupForm.cloudBucket" placeholder="请输入存储桶名称" />
+                    </el-form-item>
+                    
+                    <el-form-item label="AccessKey">
+                      <el-input v-model="backupForm.cloudAccessKey" placeholder="请输入AccessKey" />
+                    </el-form-item>
+                    
+                    <el-form-item label="SecretKey">
+                      <el-input v-model="backupForm.cloudSecretKey" type="password" placeholder="请输入SecretKey" />
+                    </el-form-item>
+                    
+                    <el-form-item>
+                      <el-button type="primary" size="small" @click="testCloudBackupConfig" :loading="formLoading">
+                        <el-icon><Setting /></el-icon>
+                        测试云备份配置
+                      </el-button>
+                    </el-form-item>
+                  </template>
+                </template>
                 
                 <el-form-item label="备份加密">
                   <el-switch
-                    v-model="backupConfig.encryption"
+                    v-model="backupForm.backupEncryption"
                     active-text="开启"
                     inactive-text="关闭"
                   />
                 </el-form-item>
                 
-                <el-form-item label="备份密码" v-if="backupConfig.encryption">
-                  <el-input v-model="backupConfig.backupPassword" type="password" placeholder="请输入备份密码" />
+                <el-form-item>
+                  <el-button type="primary" @click="manualBackup" :loading="formLoading">
+                    <el-icon><Download /></el-icon>
+                    立即备份
+                  </el-button>
                 </el-form-item>
               </el-form>
             </el-card>
@@ -369,30 +390,56 @@
               <template #header>
                 <div class="card-header">
                   <h3>系统性能设置</h3>
+                  <div class="card-actions">
+                    <el-button size="small" @click="saveConfig('performance')" :loading="formLoading">
+                      <el-icon><Check /></el-icon>
+                      保存
+                    </el-button>
+                    <el-button size="small" @click="resetToDefault('performance')" :loading="formLoading">
+                      <el-icon><RefreshLeft /></el-icon>
+                      恢复默认
+                    </el-button>
+                  </div>
                 </div>
               </template>
               
-              <el-form :model="performanceConfig" label-width="150px">
-                <el-form-item label="缓存过期时间">
-                  <el-input-number v-model="performanceConfig.cacheExpiry" :min="60" :max="86400" />
+              <el-form :model="performanceForm" label-width="150px">
+                <el-form-item label="启用缓存">
+                  <el-switch
+                    v-model="performanceForm.enableCache"
+                    active-text="开启"
+                    inactive-text="关闭"
+                  />
+                </el-form-item>
+                
+                <el-form-item label="缓存过期时间" v-if="performanceForm.enableCache">
+                  <el-input-number v-model="performanceForm.cacheExpireTime" :min="60" :max="86400" />
                   <span style="margin-left: 10px;">秒</span>
                 </el-form-item>
                 
-                <el-form-item label="最大并发连接数">
-                  <el-input-number v-model="performanceConfig.maxConnections" :min="10" :max="1000" />
+                <el-form-item label="最大上传大小">
+                  <el-input-number v-model="performanceForm.maxUploadSize" :min="1" :max="100" />
+                  <span style="margin-left: 10px;">MB</span>
                 </el-form-item>
                 
-                <el-form-item label="请求超时时间">
-                  <el-input-number v-model="performanceConfig.requestTimeout" :min="5" :max="300" />
-                  <span style="margin-left: 10px;">秒</span>
+                <el-form-item label="启用压缩">
+                  <el-switch
+                    v-model="performanceForm.enableCompression"
+                    active-text="开启"
+                    inactive-text="关闭"
+                  />
                 </el-form-item>
                 
-                <el-form-item label="分页大小">
-                  <el-input-number v-model="performanceConfig.pageSize" :min="10" :max="100" />
+                <el-form-item label="启用懒加载">
+                  <el-switch
+                    v-model="performanceForm.enableLazyLoading"
+                    active-text="开启"
+                    inactive-text="关闭"
+                  />
                 </el-form-item>
                 
                 <el-form-item label="日志级别">
-                  <el-select v-model="performanceConfig.logLevel" placeholder="请选择日志级别">
+                  <el-select v-model="performanceForm.logLevel" placeholder="请选择日志级别">
                     <el-option label="ERROR" value="error" />
                     <el-option label="WARN" value="warn" />
                     <el-option label="INFO" value="info" />
@@ -400,30 +447,76 @@
                   </el-select>
                 </el-form-item>
                 
-                <el-form-item label="启用性能监控">
+                <el-form-item label="性能监控">
                   <el-switch
-                    v-model="performanceConfig.performanceMonitoring"
+                    v-model="performanceForm.enablePerformanceMonitoring"
                     active-text="开启"
                     inactive-text="关闭"
                   />
                 </el-form-item>
                 
-                <el-form-item label="启用慢查询日志">
+                <el-form-item label="最大并发用户数">
+                  <el-input-number v-model="performanceForm.maxConcurrentUsers" :min="10" :max="10000" />
+                </el-form-item>
+                
+                <el-form-item label="启用限流">
                   <el-switch
-                    v-model="performanceConfig.slowQueryLog"
+                    v-model="performanceForm.enableRateLimiting"
                     active-text="开启"
                     inactive-text="关闭"
                   />
                 </el-form-item>
                 
-                <el-form-item label="慢查询阈值" v-if="performanceConfig.slowQueryLog">
-                  <el-input-number v-model="performanceConfig.slowQueryThreshold" :min="100" :max="10000" />
-                  <span style="margin-left: 10px;">毫秒</span>
+                <template v-if="performanceForm.enableRateLimiting">
+                  <el-form-item label="限流请求数">
+                    <el-input-number v-model="performanceForm.rateLimitRequests" :min="10" :max="1000" />
+                  </el-form-item>
+                  
+                  <el-form-item label="限流时间窗口">
+                    <el-input-number v-model="performanceForm.rateLimitWindow" :min="10" :max="3600" />
+                    <span style="margin-left: 10px;">秒</span>
+                  </el-form-item>
+                </template>
+                
+                <el-form-item>
+                  <el-button type="warning" @click="clearCache" :loading="formLoading">
+                    <el-icon><Refresh /></el-icon>
+                    清除缓存
+                  </el-button>
                 </el-form-item>
               </el-form>
             </el-card>
           </el-tab-pane>
         </el-tabs>
+        
+        <!-- 配置导入导出 -->
+        <el-card class="config-card">
+          <template #header>
+            <div class="card-header">
+              <h3>配置管理</h3>
+            </div>
+          </template>
+          
+          <div class="config-management">
+            <el-button type="primary" @click="exportConfig" :loading="formLoading">
+              <el-icon><Download /></el-icon>
+              导出配置
+            </el-button>
+            
+            <el-upload
+              action="#"
+              :auto-upload="false"
+              :show-file-list="false"
+              :on-change="importConfig"
+              accept=".json"
+            >
+              <el-button type="success" :loading="formLoading">
+                <el-icon><Upload /></el-icon>
+                导入配置
+              </el-button>
+            </el-upload>
+          </div>
+        </el-card>
       </el-main>
     </el-container>
   </div>
@@ -432,139 +525,404 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, RefreshLeft, Plus } from '@element-plus/icons-vue'
+import { Setting, Lock, Bell, Download, Refresh } from '@element-plus/icons-vue'
 
-// 当前激活的标签页
+// 当前选中的标签页
 const activeTab = ref('basic')
 
-// 基础设置配置
-const basicConfig = reactive({
-  systemName: '寝室记账系统',
-  systemVersion: 'v1.0.0',
-  systemDescription: '一个用于寝室费用分摊和管理的系统',
-  logoUrl: 'https://picsum.photos/seed/system-logo/200/200.jpg',
-  primaryColor: '#409EFF',
+// 基础设置表单
+const basicForm = reactive({
+  systemName: '记账系统',
+  systemLogo: '',
+  systemDescription: '多人记账管理系统',
+  themeColor: '#409EFF',
   language: 'zh-CN',
   timezone: 'Asia/Shanghai',
-  maintenanceMode: false,
-  maintenanceMessage: '系统正在维护中，请稍后再试'
+  dateFormat: 'YYYY-MM-DD',
+  timeFormat: 'HH:mm:ss'
 })
 
-// 安全设置配置
-const securityConfig = reactive({
+// 安全设置表单
+const securityForm = reactive({
   passwordMinLength: 8,
-  passwordComplexity: ['lowercase', 'number'],
-  passwordExpiry: 90,
-  loginLockEnabled: true,
-  maxFailedAttempts: 5,
-  lockDuration: 15,
-  sessionTimeout: 120,
-  twoFactorAuth: false,
-  operationLogging: true,
-  logRetentionDays: 90
+  passwordRequireUppercase: true,
+  passwordRequireLowercase: true,
+  passwordRequireNumbers: true,
+  passwordRequireSpecialChars: true,
+  sessionTimeout: 30,
+  maxLoginAttempts: 5,
+  lockoutDuration: 15,
+  enableTwoFactorAuth: false,
+  forcePasswordChange: false,
+  passwordExpiryDays: 90
 })
 
-// 通知设置配置
-const notificationConfig = reactive({
-  emailEnabled: true,
-  smtpHost: 'smtp.example.com',
-  smtpPort: 587,
-  senderEmail: 'system@example.com',
-  senderPassword: '',
-  smtpSsl: true,
-  smsEnabled: false,
+// 通知设置表单
+const notificationForm = reactive({
+  emailNotifications: true,
+  smsNotifications: false,
+  pushNotifications: true,
+  emailSmtpServer: 'smtp.example.com',
+  emailSmtpPort: 587,
+  emailUsername: 'noreply@example.com',
+  emailPassword: '',
+  emailUseTls: true,
   smsProvider: 'aliyun',
-  smsAccessKey: '',
-  smsSecretKey: '',
-  systemNotifications: ['userRegister', 'expenseSubmit', 'expenseApproved', 'disputeCreated', 'disputeResolved']
+  smsApiKey: '',
+  smsApiSecret: ''
 })
 
-// 备份设置配置
-const backupConfig = reactive({
+// 备份设置表单
+const backupForm = reactive({
   autoBackup: true,
   backupFrequency: 'daily',
-  backupDay: 1,
-  backupTime: new Date(2000, 1, 1, 2, 0),
-  retentionDays: 30,
-  storagePath: '/var/backups/accounting-system',
-  compression: true,
-  encryption: false,
-  backupPassword: ''
+  backupTime: '02:00',
+  backupRetentionDays: 30,
+  backupLocation: 'local',
+  cloudBackup: false,
+  cloudProvider: 'aliyun',
+  cloudBucket: '',
+  cloudAccessKey: '',
+  cloudSecretKey: '',
+  backupEncryption: true
 })
 
-// 性能设置配置
-const performanceConfig = reactive({
-  cacheExpiry: 3600,
-  maxConnections: 100,
-  requestTimeout: 30,
-  pageSize: 20,
+// 性能设置表单
+const performanceForm = reactive({
+  enableCache: true,
+  cacheExpireTime: 3600,
+  maxUploadSize: 10,
+  enableCompression: true,
+  enableLazyLoading: true,
   logLevel: 'info',
-  performanceMonitoring: true,
-  slowQueryLog: true,
-  slowQueryThreshold: 1000
+  enablePerformanceMonitoring: true,
+  maxConcurrentUsers: 1000,
+  enableRateLimiting: true,
+  rateLimitRequests: 100,
+  rateLimitWindow: 60
 })
 
-// 处理标签页切换
+// 表单加载状态
+const formLoading = ref(false)
+
+// 保存配置
+const saveConfig = async (formType) => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    let formName = ''
+    switch (formType) {
+      case 'basic':
+        formName = '基础设置'
+        break
+      case 'security':
+        formName = '安全设置'
+        break
+      case 'notification':
+        formName = '通知设置'
+        break
+      case 'backup':
+        formName = '备份设置'
+        break
+      case 'performance':
+        formName = '性能设置'
+        break
+    }
+    
+    ElMessage.success(`${formName}保存成功`)
+  } catch (error) {
+    console.error('保存配置失败:', error)
+    ElMessage.error('保存配置失败，请重试')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 恢复默认设置
+const resetToDefault = async (formType) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要恢复默认设置吗？此操作不可撤销。',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 重置表单数据
+    switch (formType) {
+      case 'basic':
+        basicForm.systemName = '记账系统'
+        basicForm.systemLogo = ''
+        basicForm.systemDescription = '多人记账管理系统'
+        basicForm.themeColor = '#409EFF'
+        basicForm.language = 'zh-CN'
+        basicForm.timezone = 'Asia/Shanghai'
+        basicForm.dateFormat = 'YYYY-MM-DD'
+        basicForm.timeFormat = 'HH:mm:ss'
+        break
+      case 'security':
+        securityForm.passwordMinLength = 8
+        securityForm.passwordRequireUppercase = true
+        securityForm.passwordRequireLowercase = true
+        securityForm.passwordRequireNumbers = true
+        securityForm.passwordRequireSpecialChars = true
+        securityForm.sessionTimeout = 30
+        securityForm.maxLoginAttempts = 5
+        securityForm.lockoutDuration = 15
+        securityForm.enableTwoFactorAuth = false
+        securityForm.forcePasswordChange = false
+        securityForm.passwordExpiryDays = 90
+        break
+      case 'notification':
+        notificationForm.emailNotifications = true
+        notificationForm.smsNotifications = false
+        notificationForm.pushNotifications = true
+        notificationForm.emailSmtpServer = 'smtp.example.com'
+        notificationForm.emailSmtpPort = 587
+        notificationForm.emailUsername = 'noreply@example.com'
+        notificationForm.emailPassword = ''
+        notificationForm.emailUseTls = true
+        notificationForm.smsProvider = 'aliyun'
+        notificationForm.smsApiKey = ''
+        notificationForm.smsApiSecret = ''
+        break
+      case 'backup':
+        backupForm.autoBackup = true
+        backupForm.backupFrequency = 'daily'
+        backupForm.backupTime = '02:00'
+        backupForm.backupRetentionDays = 30
+        backupForm.backupLocation = 'local'
+        backupForm.cloudBackup = false
+        backupForm.cloudProvider = 'aliyun'
+        backupForm.cloudBucket = ''
+        backupForm.cloudAccessKey = ''
+        backupForm.cloudSecretKey = ''
+        backupForm.backupEncryption = true
+        break
+      case 'performance':
+        performanceForm.enableCache = true
+        performanceForm.cacheExpireTime = 3600
+        performanceForm.maxUploadSize = 10
+        performanceForm.enableCompression = true
+        performanceForm.enableLazyLoading = true
+        performanceForm.logLevel = 'info'
+        performanceForm.enablePerformanceMonitoring = true
+        performanceForm.maxConcurrentUsers = 1000
+        performanceForm.enableRateLimiting = true
+        performanceForm.rateLimitRequests = 100
+        performanceForm.rateLimitWindow = 60
+        break
+    }
+    
+    ElMessage.success('已恢复默认设置')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('恢复默认设置失败:', error)
+      ElMessage.error('恢复默认设置失败，请重试')
+    }
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 测试邮件配置
+const testEmailConfig = async () => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    ElMessage.success('邮件配置测试成功，测试邮件已发送')
+  } catch (error) {
+    console.error('邮件配置测试失败:', error)
+    ElMessage.error('邮件配置测试失败，请检查配置信息')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 测试短信配置
+const testSmsConfig = async () => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    ElMessage.success('短信配置测试成功，测试短信已发送')
+  } catch (error) {
+    console.error('短信配置测试失败:', error)
+    ElMessage.error('短信配置测试失败，请检查配置信息')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 测试云备份配置
+const testCloudBackupConfig = async () => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    ElMessage.success('云备份配置测试成功')
+  } catch (error) {
+    console.error('云备份配置测试失败:', error)
+    ElMessage.error('云备份配置测试失败，请检查配置信息')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 手动备份
+const manualBackup = async () => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    ElMessage.success('系统备份成功')
+  } catch (error) {
+    console.error('系统备份失败:', error)
+    ElMessage.error('系统备份失败，请重试')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 清除缓存
+const clearCache = async () => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    ElMessage.success('缓存清除成功')
+  } catch (error) {
+    console.error('清除缓存失败:', error)
+    ElMessage.error('清除缓存失败，请重试')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 导出配置
+const exportConfig = async () => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    // 模拟下载配置文件
+    const configData = {
+      basic: basicForm,
+      security: securityForm,
+      notification: notificationForm,
+      backup: backupForm,
+      performance: performanceForm
+    }
+    
+    const dataStr = JSON.stringify(configData, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `system-config-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success('配置导出成功')
+  } catch (error) {
+    console.error('导出配置失败:', error)
+    ElMessage.error('导出配置失败，请重试')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 导入配置
+const importConfig = async (event) => {
+  try {
+    const file = event.target.files[0]
+    if (!file) return
+    
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const configData = JSON.parse(e.target.result)
+        
+        // 更新表单数据
+        if (configData.basic) Object.assign(basicForm, configData.basic)
+        if (configData.security) Object.assign(securityForm, configData.security)
+        if (configData.notification) Object.assign(notificationForm, configData.notification)
+        if (configData.backup) Object.assign(backupForm, configData.backup)
+        if (configData.performance) Object.assign(performanceForm, configData.performance)
+        
+        ElMessage.success('配置导入成功')
+      } catch (parseError) {
+        console.error('解析配置文件失败:', parseError)
+        ElMessage.error('配置文件格式错误，请检查文件内容')
+      }
+    }
+    
+    reader.readAsText(file)
+  } catch (error) {
+    console.error('导入配置失败:', error)
+    ElMessage.error('导入配置失败，请重试')
+  } finally {
+    formLoading.value = false
+    // 清空文件输入，以便可以重复选择同一文件
+    event.target.value = ''
+  }
+}
+
+// 保存所有配置
+const saveAllConfigs = async () => {
+  try {
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    ElMessage.success('所有配置保存成功')
+  } catch (error) {
+    console.error('保存所有配置失败:', error)
+    ElMessage.error('保存所有配置失败，请重试')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+// 标签页点击事件
 const handleTabClick = (tab) => {
   console.log('切换到标签页:', tab.props.name)
 }
 
-// 保存所有配置
-const saveAllConfigs = () => {
-  ElMessageBox.confirm('确定要保存所有配置吗？此操作将立即生效。', '确认保存', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // 模拟API调用
-    setTimeout(() => {
-      ElMessage.success('所有配置保存成功')
-    }, 1000)
-  }).catch(() => {
-    // 用户取消操作
-  })
-}
-
-// 恢复默认设置
-const resetToDefault = () => {
-  ElMessageBox.confirm('确定要恢复默认设置吗？这将覆盖当前所有配置。', '确认重置', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // 模拟API调用
-    setTimeout(() => {
-      ElMessage.success('已恢复默认设置')
-      // 这里应该重新加载默认配置
-    }, 1000)
-  }).catch(() => {
-    // 用户取消操作
-  })
-}
-
-// Logo上传前的处理
-const beforeLogoUpload = (file) => {
-  const isJPG = file.type === 'image/jpeg' || file.type === 'image/png'
-  const isLt2M = file.size / 1024 / 1024 < 2
-
-  if (!isJPG) {
-    ElMessage.error('上传Logo只能是 JPG/PNG 格式!')
-  }
-  if (!isLt2M) {
-    ElMessage.error('上传Logo大小不能超过 2MB!')
-  }
-  return isJPG && isLt2M
-}
-
-// Logo上传成功处理
-const handleLogoSuccess = (response, file) => {
-  basicConfig.logoUrl = URL.createObjectURL(file.raw)
-  ElMessage.success('Logo上传成功')
-}
-
-// 组件挂载时加载配置
+// 组件挂载时加载数据
 onMounted(() => {
   // 这里应该从API加载当前配置
+  console.log('SystemConfig组件已挂载')
 })
 </script>
 

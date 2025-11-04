@@ -28,6 +28,11 @@ export const createAuthGuard = (router) => {
     // 检查角色权限
     const allowedRoles = to.meta?.[allowedRolesMetaKey]
     if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
+      // 如果用户拥有'all'权限，则具有所有角色权限
+      if (authStore.permissions && authStore.permissions.includes('all')) {
+        return next()
+      }
+      
       const hasRequiredRole = allowedRoles.some(role => authStore.hasRole(role))
       if (!hasRequiredRole) {
         return next({ name: 'Forbidden' })

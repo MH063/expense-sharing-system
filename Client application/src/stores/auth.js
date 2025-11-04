@@ -59,6 +59,30 @@ export const useAuthStore = defineStore('auth', () => {
           }
           roles.value = Array.isArray(payload.roles) ? payload.roles : []
           permissions.value = Array.isArray(payload.permissions) ? payload.permissions : []
+        } else {
+          // 如果是模拟Token，创建默认用户信息
+          if (token.startsWith('mock-jwt-token-')) {
+            currentUser.value = {
+              id: 1,
+              username: 'user',
+              name: '虚拟用户',
+              email: 'user@example.com',
+              avatar: 'https://picsum.photos/seed/user1/200/200.jpg',
+              role: 'admin', // 设置为管理员角色，拥有所有权限
+              roles: ['admin'],
+              permissions: ['all'], // 设置为拥有所有权限
+              roomId: 1,
+              rooms: [
+                {
+                  id: 1,
+                  name: '默认寝室',
+                  role: 'owner'
+                }
+              ]
+            }
+            roles.value = ['admin']
+            permissions.value = ['all']
+          }
         }
         
         // 连接WebSocket
@@ -188,10 +212,44 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const login = async (credentials) => {
     try {
-      const response = await http.post('/api/users/login', credentials)
+      // 模拟登录API调用
+      console.log('模拟登录API调用:', credentials)
       
-      if (response.success) {
-        const { token, refreshToken: refreshTkn, user: userData } = response.data
+      // 模拟API响应延迟
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // 模拟登录成功响应
+      const mockResponse = {
+        success: true,
+        data: {
+          token: 'mock-jwt-token-' + Date.now(),
+          refreshToken: 'mock-refresh-token-' + Date.now(),
+          user: {
+            id: 1,
+            username: credentials.username,
+            name: credentials.username === 'admin' ? '管理员' : '虚拟用户',
+            email: credentials.username + '@example.com',
+            avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
+            role: 'admin', // 虚拟登录默认为管理员角色，拥有所有权限
+            roles: ['admin'],
+            permissions: ['all'], // 设置为拥有所有权限
+            roomId: 1,
+            rooms: [
+              {
+                id: 1,
+                name: '默认寝室',
+                role: 'owner'
+              }
+            ]
+          }
+        }
+      }
+      
+      // 如果是真实API，使用下面的代码
+      // const response = await http.post('/api/users/login', credentials)
+      
+      if (mockResponse.success) {
+        const { token, refreshToken: refreshTkn, user: userData } = mockResponse.data
         
         // 存储Token到Token管理器
         tokenManager.setToken(token)
@@ -212,7 +270,7 @@ export const useAuthStore = defineStore('auth', () => {
         
         return { success: true, user: userData }
       } else {
-        throw new Error(response.data.message || '登录失败')
+        throw new Error(mockResponse.data.message || '登录失败')
       }
     } catch (error) {
       console.error('登录失败:', error)

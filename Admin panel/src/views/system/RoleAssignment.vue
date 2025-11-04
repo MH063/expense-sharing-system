@@ -218,91 +218,119 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Download, User } from '@element-plus/icons-vue'
 
-// 角色列表
+// 模拟角色数据
 const roleList = ref([
   {
     id: 1,
     name: 'admin',
     description: '系统管理员，拥有所有权限',
-    userCount: 2,
-    permissions: ['user_manage', 'role_manage', 'expense_manage', 'bill_manage', 'system_config'],
-    createTime: '2023-10-01 10:00:00',
-    users: [
-      { id: 1, username: 'admin', realName: '管理员', dormRoom: 'A101', assignTime: '2023-10-01 10:00:00' },
-      { id: 2, username: 'superadmin', realName: '超级管理员', dormRoom: 'A102', assignTime: '2023-10-02 11:00:00' }
-    ]
+    permissions: ['user_manage', 'role_manage', 'expense_review', 'expense_monitor', 'system_config', 'data_export', 'system_logs'],
+    userCount: 1,
+    createTime: '2023-01-01 10:00:00',
+    status: 'active'
   },
   {
     id: 2,
     name: 'dorm_leader',
-    description: '寝室长，可以管理本寝室的费用和账单',
+    description: '寝室负责人，可以管理寝室成员和费用',
+    permissions: ['user_manage', 'expense_review', 'expense_monitor'],
     userCount: 5,
-    permissions: ['expense_manage', 'bill_manage'],
-    createTime: '2023-10-01 10:30:00',
-    users: [
-      { id: 3, username: 'zhangsan', realName: '张三', dormRoom: 'B201', assignTime: '2023-10-05 14:00:00' },
-      { id: 4, username: 'lisi', realName: '李四', dormRoom: 'B202', assignTime: '2023-10-06 15:00:00' }
-    ]
+    createTime: '2023-01-02 10:00:00',
+    status: 'active'
   },
   {
     id: 3,
     name: 'user',
     description: '普通用户，只能查看和管理自己的费用',
+    permissions: ['expense_monitor'],
     userCount: 20,
-    permissions: ['expense_view', 'bill_view'],
-    createTime: '2023-10-01 11:00:00',
-    users: [
-      { id: 5, username: 'wangwu', realName: '王五', dormRoom: 'C301', assignTime: '2023-10-08 16:00:00' },
-      { id: 6, username: 'zhaoliu', realName: '赵六', dormRoom: 'C302', assignTime: '2023-10-09 17:00:00' }
-    ]
+    createTime: '2023-01-03 10:00:00',
+    status: 'active'
   }
 ])
 
-// 用户角色列表
+// 模拟用户角色数据
 const userRoleList = ref([
   {
     id: 1,
+    userId: '1001',
     username: 'admin',
-    realName: '管理员',
-    dormRoom: 'A101',
+    realName: '系统管理员',
+    avatar: 'https://picsum.photos/seed/admin/40/40.jpg',
     role: 'admin',
-    assignTime: '2023-10-01 10:00:00',
-    assignBy: 'system'
+    roleName: '系统管理员',
+    assignTime: '2023-01-01 10:00:00',
+    assignBy: '系统',
+    status: 'active'
   },
   {
     id: 2,
-    username: 'zhangsan',
-    realName: '张三',
-    dormRoom: 'B201',
+    userId: '1002',
+    username: 'dorm_leader1',
+    realName: '寝室长一',
+    avatar: 'https://picsum.photos/seed/dorm1/40/40.jpg',
     role: 'dorm_leader',
-    assignTime: '2023-10-05 14:00:00',
-    assignBy: 'admin'
+    roleName: '寝室负责人',
+    assignTime: '2023-01-02 10:00:00',
+    assignBy: 'admin',
+    status: 'active'
   },
   {
     id: 3,
-    username: 'lisi',
-    realName: '李四',
-    dormRoom: 'B201',
-    role: 'user',
-    assignTime: '2023-10-08 16:00:00',
-    assignBy: 'admin'
+    userId: '1003',
+    username: 'dorm_leader2',
+    realName: '寝室长二',
+    avatar: 'https://picsum.photos/seed/dorm2/40/40.jpg',
+    role: 'dorm_leader',
+    roleName: '寝室负责人',
+    assignTime: '2023-01-03 10:00:00',
+    assignBy: 'admin',
+    status: 'active'
   },
   {
     id: 4,
-    username: 'wangwu',
-    realName: '王五',
-    dormRoom: 'C301',
+    userId: '1004',
+    username: 'user1',
+    realName: '用户一',
+    avatar: 'https://picsum.photos/seed/user1/40/40.jpg',
     role: 'user',
-    assignTime: '2023-10-10 09:00:00',
-    assignBy: 'admin'
+    roleName: '普通用户',
+    assignTime: '2023-01-04 10:00:00',
+    assignBy: 'admin',
+    status: 'active'
+  },
+  {
+    id: 5,
+    userId: '1005',
+    username: 'user2',
+    realName: '用户二',
+    avatar: 'https://picsum.photos/seed/user2/40/40.jpg',
+    role: 'user',
+    roleName: '普通用户',
+    assignTime: '2023-01-05 10:00:00',
+    assignBy: 'admin',
+    status: 'active'
   }
 ])
 
-// 可分配用户列表
+// 模拟可分配用户列表
 const availableUsers = ref([
-  { id: 7, username: 'qianqi', realName: '钱七' },
-  { id: 8, username: 'sunba', realName: '孙八' },
-  { id: 9, username: 'zhoujiu', realName: '周九' }
+  {
+    id: '1006',
+    username: 'new_user1',
+    realName: '新用户一',
+    avatar: 'https://picsum.photos/seed/new1/40/40.jpg',
+    currentRole: null,
+    status: 'active'
+  },
+  {
+    id: '1007',
+    username: 'new_user2',
+    realName: '新用户二',
+    avatar: 'https://picsum.photos/seed/new2/40/40.jpg',
+    currentRole: null,
+    status: 'active'
+  }
 ])
 
 // 所有权限列表
@@ -412,7 +440,6 @@ const deleteRole = (role) => {
     }
   )
     .then(() => {
-      // 模拟API调用
       const index = roleList.value.findIndex(r => r.id === role.id)
       if (index !== -1) {
         roleList.value.splice(index, 1)
@@ -460,7 +487,6 @@ const assignRole = () => {
     return
   }
   
-  // 模拟API调用
   const user = availableUsers.value.find(u => u.id === assignRoleForm.userId)
   const role = roleList.value.find(r => r.id === assignRoleForm.roleId)
   
@@ -505,7 +531,6 @@ const changeUserRole = (user) => {
     inputValue: user.role
   })
     .then(({ value }) => {
-      // 模拟API调用
       user.role = value
       user.assignTime = new Date().toLocaleString()
       ElMessage.success('角色更改成功')
@@ -527,7 +552,6 @@ const removeUserRole = (user) => {
     }
   )
     .then(() => {
-      // 模拟API调用
       const index = userRoleList.value.findIndex(u => u.id === user.id)
       if (index !== -1) {
         userRoleList.value.splice(index, 1)
@@ -577,14 +601,12 @@ const resetAssignRoleForm = () => {
 const handleUserSizeChange = (size) => {
   userPageSize.value = size
   userCurrentPage.value = 1
-  // 重新加载数据
   loadUserRoleList()
 }
 
 // 处理当前页变化
 const handleUserCurrentChange = (page) => {
   userCurrentPage.value = page
-  // 重新加载数据
   loadUserRoleList()
 }
 
@@ -599,7 +621,7 @@ const loadUserRoleList = () => {
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadUserRoleList()
+  // 模拟数据已在上面定义，无需额外加载
 })
 </script>
 

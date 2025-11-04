@@ -115,7 +115,11 @@
         </el-header>
 
         <el-main class="admin-main">
-          <div class="welcome-section">
+          <!-- 路由视图，用于显示子路由内容 -->
+          <router-view />
+          
+          <!-- 首页内容，只在根路径显示 -->
+          <div v-if="$route.path === '/'" class="welcome-section">
             <el-card class="welcome-card">
               <template #header>
                 <div class="card-header">
@@ -137,10 +141,10 @@
                 <div class="quick-actions">
                   <h3>快捷操作</h3>
                   <el-space wrap>
-                    <el-button type="primary">用户管理</el-button>
-                    <el-button type="success">费用审核</el-button>
-                    <el-button type="warning">数据统计</el-button>
-                    <el-button type="info">系统设置</el-button>
+                    <el-button type="primary" @click="navigateToUserManagement">用户管理</el-button>
+                    <el-button type="success" @click="navigateToExpenseReview">费用审核</el-button>
+                    <el-button type="warning" @click="navigateToDataStatistics">数据统计</el-button>
+                    <el-button type="info" @click="navigateToSystemSettings">系统设置</el-button>
                   </el-space>
                 </div>
               </div>
@@ -186,6 +190,26 @@ const logout = () => {
   }).catch(() => {
     // 取消操作
   })
+}
+
+// 导航到用户管理页面
+const navigateToUserManagement = () => {
+  router.push('/system/users')
+}
+
+// 导航到费用审核页面
+const navigateToExpenseReview = () => {
+  router.push('/review/process')
+}
+
+// 导航到数据统计页面
+const navigateToDataStatistics = () => {
+  router.push('/config/statistics')
+}
+
+// 导航到系统设置页面
+const navigateToSystemSettings = () => {
+  router.push('/config/system')
 }
 </script>
 

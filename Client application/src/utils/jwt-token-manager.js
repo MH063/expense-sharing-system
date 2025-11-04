@@ -158,6 +158,11 @@ class JwtTokenManager {
   checkTokenStatus(token = this.token) {
     if (!token) return TOKEN_STATUS.INVALID
     
+    // 如果是模拟Token，总是返回有效
+    if (token.startsWith('mock-jwt-token-')) {
+      return TOKEN_STATUS.VALID
+    }
+    
     const payload = this.parseToken(token)
     if (!payload || !payload.exp) return TOKEN_STATUS.INVALID
     
@@ -276,6 +281,11 @@ class JwtTokenManager {
   getTokenTimeToLive() {
     if (!this.token) return 0
     
+    // 如果是模拟Token，返回一个较大的值（24小时）
+    if (this.token.startsWith('mock-jwt-token-')) {
+      return 24 * 60 * 60 * 1000 // 24小时
+    }
+    
     const payload = this.parseToken(this.token)
     if (!payload || !payload.exp) return 0
     
@@ -375,8 +385,11 @@ class JwtTokenManager {
         
         // 检查加载的Token是否有效
         if (this.token && this.isTokenExpired()) {
-          console.warn('从本地存储加载的Token已过期，将清除')
-          this.clearTokens()
+          // 如果是模拟Token，不检查过期
+          if (!this.token.startsWith('mock-jwt-token-')) {
+            console.warn('从本地存储加载的Token已过期，将清除')
+            this.clearTokens()
+          }
         }
       } catch (error) {
         console.error('从本地存储加载Token失败:', error)

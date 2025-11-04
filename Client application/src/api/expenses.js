@@ -146,6 +146,19 @@ export function getExpenseStatistics(params) {
 }
 
 /**
+ * 获取费用分类统计
+ * @param {Object} params - 查询参数
+ * @returns {Promise} 分类统计数据
+ */
+export function getExpenseCategoryStats(params) {
+  return request({
+    url: '/api/expenses/category-stats',
+    method: 'get',
+    params
+  })
+}
+
+/**
  * 获取费用趋势数据
  * @param {Object} params - 查询参数
  * @returns {Promise} 趋势数据
@@ -268,6 +281,7 @@ export const expenseApi = {
   updateExpenseCategory,
   deleteExpenseCategory,
   getExpenseStatistics,
+  getExpenseCategoryStats,
   getExpenseTrends,
   getMemberExpenseComparison,
   getExpenseSplitDetail,

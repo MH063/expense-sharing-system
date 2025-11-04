@@ -30,6 +30,7 @@ import DisputeDashboard from '@/views/disputes/DisputeDashboard.vue'
 import DisputeDetail from '@/views/disputes/DisputeDetail.vue'
 import AnalyticsDashboard from '@/views/analytics/AnalyticsDashboard.vue'
 import NotificationCenter from '@/views/notifications/NotificationCenter.vue'
+import Settings from '@/views/Settings.vue'
 import Forbidden from '@/views/Forbidden.vue'
 import PermissionTest from '@/views/admin/PermissionTest.vue'
 import { createAuthGuard } from './guards'
@@ -308,6 +309,14 @@ const routes = [
     meta: { 
       requiresAuth: true,
       requiresPermission: PERMISSIONS.EXPENSE_VIEW
+    }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
+    meta: { 
+      requiresAuth: true
     }
   },
   {

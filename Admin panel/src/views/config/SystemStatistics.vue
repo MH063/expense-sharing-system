@@ -490,12 +490,148 @@ const exportReport = () => {
 const updateStatisticsData = () => {
   // 根据时间范围更新统计数据
   // 这里只是模拟，实际应该调用API
+  
+  // 模拟根据不同时间范围返回不同数据
+  const timeRange = filterForm.timeRange
+  
+  if (timeRange === 'today') {
+    statisticsData.totalUsers = 23
+    statisticsData.userChange = 5.2
+    statisticsData.totalExpenses = 45
+    statisticsData.expenseChange = 3.1
+    statisticsData.totalAmount = 12340
+    statisticsData.amountChange = 8.7
+    statisticsData.totalDisputes = 2
+    statisticsData.disputeChange = -10.5
+  } else if (timeRange === 'week') {
+    statisticsData.totalUsers = 89
+    statisticsData.userChange = 8.7
+    statisticsData.totalExpenses = 234
+    statisticsData.expenseChange = 6.5
+    statisticsData.totalAmount = 89760
+    statisticsData.amountChange = 12.3
+    statisticsData.totalDisputes = 8
+    statisticsData.disputeChange = -7.2
+  } else if (timeRange === 'month') {
+    statisticsData.totalUsers = 156
+    statisticsData.userChange = 12.5
+    statisticsData.totalExpenses = 892
+    statisticsData.expenseChange = 8.3
+    statisticsData.totalAmount = 456780
+    statisticsData.amountChange = 15.2
+    statisticsData.totalDisputes = 23
+    statisticsData.disputeChange = -5.6
+  } else if (timeRange === 'quarter') {
+    statisticsData.totalUsers = 423
+    statisticsData.userChange = 18.9
+    statisticsData.totalExpenses = 2456
+    statisticsData.expenseChange = 14.7
+    statisticsData.totalAmount = 1234560
+    statisticsData.amountChange = 22.1
+    statisticsData.totalDisputes = 67
+    statisticsData.disputeChange = -3.4
+  } else if (timeRange === 'year') {
+    statisticsData.totalUsers = 1234
+    statisticsData.userChange = 25.3
+    statisticsData.totalExpenses = 7890
+    statisticsData.expenseChange = 19.8
+    statisticsData.totalAmount = 5678900
+    statisticsData.amountChange = 28.5
+    statisticsData.totalDisputes = 234
+    statisticsData.disputeChange = -2.1
+  }
 }
 
 // 更新图表数据
 const updateChartData = () => {
   // 根据时间范围更新图表数据
   // 这里只是模拟，实际应该调用API
+  
+  const timeRange = filterForm.timeRange
+  
+  if (timeRange === 'today') {
+    // 今日数据 - 小时级别
+    userActivityData.value = [
+      { label: '00:00', value: 12, color: '#409EFF' },
+      { label: '04:00', value: 8, color: '#409EFF' },
+      { label: '08:00', value: 45, color: '#409EFF' },
+      { label: '12:00', value: 78, color: '#409EFF' },
+      { label: '16:00', value: 65, color: '#409EFF' },
+      { label: '20:00', value: 34, color: '#409EFF' },
+      { label: '23:00', value: 15, color: '#409EFF' }
+    ]
+    
+    expenseTrendData.value = [
+      { label: '00:00', value: 5, color: '#67C23A' },
+      { label: '04:00', value: 2, color: '#67C23A' },
+      { label: '08:00', value: 15, color: '#67C23A' },
+      { label: '12:00', value: 28, color: '#67C23A' },
+      { label: '16:00', value: 22, color: '#67C23A' },
+      { label: '20:00', value: 12, color: '#67C23A' },
+      { label: '23:00', value: 3, color: '#67C23A' }
+    ]
+  } else if (timeRange === 'week' || timeRange === 'month') {
+    // 本周/本月数据 - 日级别
+    userActivityData.value = [
+      { label: '周一', value: 65, color: '#409EFF' },
+      { label: '周二', value: 78, color: '#409EFF' },
+      { label: '周三', value: 90, color: '#409EFF' },
+      { label: '周四', value: 81, color: '#409EFF' },
+      { label: '周五', value: 56, color: '#409EFF' },
+      { label: '周六', value: 55, color: '#409EFF' },
+      { label: '周日', value: 40, color: '#409EFF' }
+    ]
+    
+    expenseTrendData.value = [
+      { label: '周一', value: 45, color: '#67C23A' },
+      { label: '周二', value: 52, color: '#67C23A' },
+      { label: '周三', value: 38, color: '#67C23A' },
+      { label: '周四', value: 65, color: '#67C23A' },
+      { label: '周五', value: 48, color: '#67C23A' },
+      { label: '周六', value: 30, color: '#67C23A' },
+      { label: '周日', value: 25, color: '#67C23A' }
+    ]
+  } else if (timeRange === 'quarter' || timeRange === 'year') {
+    // 本季度/本年数据 - 月级别
+    userActivityData.value = [
+      { label: '1月', value: 120, color: '#409EFF' },
+      { label: '2月', value: 98, color: '#409EFF' },
+      { label: '3月', value: 145, color: '#409EFF' },
+      { label: '4月', value: 167, color: '#409EFF' },
+      { label: '5月', value: 189, color: '#409EFF' },
+      { label: '6月', value: 178, color: '#409EFF' },
+      { label: '7月', value: 156, color: '#409EFF' }
+    ]
+    
+    expenseTrendData.value = [
+      { label: '1月', value: 89, color: '#67C23A' },
+      { label: '2月', value: 76, color: '#67C23A' },
+      { label: '3月', value: 98, color: '#67C23A' },
+      { label: '4月', value: 123, color: '#67C23A' },
+      { label: '5月', value: 145, color: '#67C23A' },
+      { label: '6月', value: 134, color: '#67C23A' },
+      { label: '7月', value: 112, color: '#67C23A' }
+    ]
+  }
+  
+  // 更新费用类型数据
+  const totalExpense = statisticsData.totalExpenses
+  expenseTypeData.value = [
+    { name: '餐饮', value: Math.floor(totalExpense * 0.387), percentage: 38.7, color: '#409EFF' },
+    { name: '日用品', value: Math.floor(totalExpense * 0.25), percentage: 25.0, color: '#67C23A' },
+    { name: '水电费', value: Math.floor(totalExpense * 0.175), percentage: 17.5, color: '#E6A23C' },
+    { name: '娱乐', value: Math.floor(totalExpense * 0.11), percentage: 11.0, color: '#F56C6C' },
+    { name: '其他', value: Math.floor(totalExpense * 0.078), percentage: 7.8, color: '#909399' }
+  ]
+  
+  // 更新争议处理效率数据
+  disputeEfficiencyData.value = [
+    { label: '1月', value: 72 },
+    { label: '2月', value: 68 },
+    { label: '3月', value: 54 },
+    { label: '4月', value: 48 },
+    { label: '5月', value: 36 }
+  ]
 }
 
 // 更新表格数据

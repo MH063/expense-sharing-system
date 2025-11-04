@@ -3,6 +3,18 @@
     <div class="expenses-header">
       <h1 class="page-title">费用记录</h1>
       <div class="header-actions">
+        <div class="search-box">
+          <input 
+            type="text" 
+            placeholder="搜索费用记录..." 
+            v-model="searchQuery"
+            @input="handleSearch"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+        </div>
         <button class="filter-button" @click="showFilterModal = true">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
@@ -82,48 +94,72 @@
       
       <div class="expenses-list">
         <div class="list-header">
-          <div class="sort-controls">
-            <select v-model="sortBy" @change="sortExpenses">
-              <option value="date-desc">日期 (最新)</option>
-              <option value="date-asc">日期 (最早)</option>
-              <option value="amount-desc">金额 (最高)</option>
-              <option value="amount-asc">金额 (最低)</option>
-            </select>
+          <div class="batch-actions" v-if="selectedExpenses.length > 0">
+            <span class="selected-count">已选择 {{ selectedExpenses.length }} 项</span>
+            <div class="batch-buttons">
+              <button class="batch-button settle" @click="batchSettle">
+                批量结算
+              </button>
+              <button class="batch-button delete" @click="batchDelete">
+                批量删除
+              </button>
+              <button class="batch-button cancel" @click="clearSelection">
+                取消选择
+              </button>
+            </div>
           </div>
-          
-          <div class="view-controls">
-            <button 
-              class="view-button" 
-              :class="{ active: viewMode === 'list' }"
-              @click="viewMode = 'list'"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6"></line>
-                <line x1="8" y1="12" x2="21" y2="12"></line>
-                <line x1="8" y1="18" x2="21" y2="18"></line>
-                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                <line x1="3" y1="18" x2="3.01" y2="18"></line>
-              </svg>
-            </button>
-            <button 
-              class="view-button" 
-              :class="{ active: viewMode === 'grid' }"
-              @click="viewMode = 'grid'"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="7"></rect>
-                <rect x="14" y="3" width="7" height="7"></rect>
-                <rect x="14" y="14" width="7" height="7"></rect>
-                <rect x="3" y="14" width="7" height="7"></rect>
-              </svg>
-            </button>
+          <div class="controls-container" v-else>
+            <div class="sort-controls">
+              <select v-model="sortBy" @change="sortExpenses">
+                <option value="date-desc">日期 (最新)</option>
+                <option value="date-asc">日期 (最早)</option>
+                <option value="amount-desc">金额 (最高)</option>
+                <option value="amount-asc">金额 (最低)</option>
+              </select>
+            </div>
+            
+            <div class="view-controls">
+              <button 
+                class="view-button" 
+                :class="{ active: viewMode === 'list' }"
+                @click="viewMode = 'list'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+              </button>
+              <button 
+                class="view-button" 
+                :class="{ active: viewMode === 'grid' }"
+                @click="viewMode = 'grid'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
         
         <!-- 列表视图 -->
         <div v-if="viewMode === 'list'" class="list-view">
-          <div v-for="expense in sortedExpenses" :key="expense.id" class="expense-item" @click="viewExpenseDetail(expense.id)">
+          <div v-for="expense in paginatedExpenses" :key="expense.id" class="expense-item" @click="viewExpenseDetail(expense.id)">
+            <div class="expense-checkbox" @click.stop>
+              <input 
+                type="checkbox" 
+                :id="`expense-${expense.id}`"
+                v-model="selectedExpenses"
+                :value="expense.id"
+              />
+            </div>
             <div class="expense-icon">
               <component :is="getCategoryIcon(expense.category)" />
             </div>
@@ -152,7 +188,15 @@
         
         <!-- 网格视图 -->
         <div v-else class="grid-view">
-          <div v-for="expense in sortedExpenses" :key="expense.id" class="expense-card" @click="viewExpenseDetail(expense.id)">
+          <div v-for="expense in paginatedExpenses" :key="expense.id" class="expense-card" @click="viewExpenseDetail(expense.id)">
+            <div class="expense-card-checkbox" @click.stop>
+              <input 
+                type="checkbox" 
+                :id="`expense-card-${expense.id}`"
+                v-model="selectedExpenses"
+                :value="expense.id"
+              />
+            </div>
             <div class="card-header">
               <div class="expense-icon">
                 <component :is="getCategoryIcon(expense.category)" />
@@ -307,6 +351,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { expenseApi } from '@/api/expenses'
+import { roomsApi } from '@/api/rooms'
 
 // 路由和状态管理
 const router = useRouter()
@@ -319,6 +365,8 @@ const viewMode = ref('list')
 const sortBy = ref('date-desc')
 const currentPage = ref(1)
 const itemsPerPage = 10
+const searchQuery = ref('')
+const selectedExpenses = ref([])
 
 // 筛选条件
 const filterCategories = ref([])
@@ -359,6 +407,16 @@ const myShareAmount = computed(() => {
 
 const filteredExpenses = computed(() => {
   let result = [...expenses.value]
+  
+  // 按搜索关键词筛选
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(expense => 
+      expense.title.toLowerCase().includes(query) ||
+      getCategoryName(expense.category).toLowerCase().includes(query) ||
+      expense.payerName.toLowerCase().includes(query)
+    )
+  }
   
   // 按类别筛选
   if (filterCategories.value.length > 0) {
@@ -464,6 +522,73 @@ const sortExpenses = () => {
   currentPage.value = 1
 }
 
+// 处理搜索
+const handleSearch = () => {
+  currentPage.value = 1
+}
+
+// 清除选择
+const clearSelection = () => {
+  selectedExpenses.value = []
+}
+
+// 批量结算
+const batchSettle = async () => {
+  if (selectedExpenses.value.length === 0) return
+  
+  try {
+    console.log('批量结算费用:', selectedExpenses.value)
+    // 这里应该调用批量结算API
+    // await expenseApi.batchSettleExpenses(selectedExpenses.value)
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 更新本地数据状态
+    expenses.value = expenses.value.map(expense => {
+      if (selectedExpenses.value.includes(expense.id)) {
+        return { ...expense, status: 'settled' }
+      }
+      return expense
+    })
+    
+    // 清除选择
+    clearSelection()
+    
+    console.log('批量结算成功')
+  } catch (error) {
+    console.error('批量结算失败:', error)
+  }
+}
+
+// 批量删除
+const batchDelete = async () => {
+  if (selectedExpenses.value.length === 0) return
+  
+  if (!confirm(`确定要删除选中的 ${selectedExpenses.value.length} 条费用记录吗？`)) {
+    return
+  }
+  
+  try {
+    console.log('批量删除费用:', selectedExpenses.value)
+    // 这里应该调用批量删除API
+    // await expenseApi.batchDeleteExpenses(selectedExpenses.value)
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 从本地数据中移除
+    expenses.value = expenses.value.filter(expense => !selectedExpenses.value.includes(expense.id))
+    
+    // 清除选择
+    clearSelection()
+    
+    console.log('批量删除成功')
+  } catch (error) {
+    console.error('批量删除失败:', error)
+  }
+}
+
 // 创建费用
 const createExpense = () => {
   router.push('/expenses/create')
@@ -493,83 +618,60 @@ const resetFilters = () => {
 }
 
 // 加载费用数据
-const loadExpensesData = async () => {
+const loadExpensesData = async (loadAllData = false) => {
   loading.value = true
   
   try {
     // 获取费用列表
-    // expenses.value = await api.getExpenses()
+    console.log('加载费用列表')
+    const expensesResponse = await expenseApi.getExpenses({
+      page: currentPage.value,
+      limit: itemsPerPage
+    })
     
-    // 模拟费用数据
-    expenses.value = [
-      {
-        id: 'expense-1',
-        title: '超市购物',
-        amount: 156.50,
-        category: 'groceries',
-        date: new Date('2023-10-15').toISOString(),
-        payerId: 'user-1',
-        payerName: '张三',
-        status: 'pending',
-        myShare: 52.17
-      },
-      {
-        id: 'expense-2',
-        title: '水电费',
-        amount: 230.00,
-        category: 'utilities',
-        date: new Date('2023-10-10').toISOString(),
-        payerId: 'user-2',
-        payerName: '李四',
-        status: 'settled',
-        myShare: 76.67
-      },
-      {
-        id: 'expense-3',
-        title: '聚餐',
-        amount: 450.00,
-        category: 'dining',
-        date: new Date('2023-10-05').toISOString(),
-        payerId: 'user-1',
-        payerName: '张三',
-        status: 'pending',
-        myShare: 150.00
-      },
-      {
-        id: 'expense-4',
-        title: '网费',
-        amount: 99.00,
-        category: 'utilities',
-        date: new Date('2023-10-01').toISOString(),
-        payerId: 'user-3',
-        payerName: '王五',
-        status: 'settled',
-        myShare: 33.00
+    if (expensesResponse.data && expensesResponse.data.success) {
+      expenses.value = expensesResponse.data.data.data || []
+      console.log('费用列表加载成功:', expenses.value)
+    } else {
+      console.error('费用列表加载失败:', expensesResponse.data?.message || '未知错误')
+    }
+    
+    // 只在首次加载或需要时加载类别列表和成员列表
+    if (loadAllData || categories.value.length === 0) {
+      // 获取类别列表
+      console.log('加载费用类别列表')
+      const categoriesResponse = await expenseApi.getExpenseCategories()
+      
+      if (categoriesResponse.data && categoriesResponse.data.success) {
+        categories.value = categoriesResponse.data.data || []
+        console.log('费用类别列表加载成功:', categories.value)
+      } else {
+        console.error('费用类别列表加载失败:', categoriesResponse.data?.message || '未知错误')
       }
-    ]
+    }
     
-    // 获取类别列表
-    // categories.value = await api.getCategories()
-    
-    // 模拟类别数据
-    categories.value = [
-      { id: 'groceries', name: '食品杂货', icon: 'GroceriesIcon' },
-      { id: 'utilities', name: '水电费', icon: 'UtilitiesIcon' },
-      { id: 'dining', name: '餐饮', icon: 'DiningIcon' },
-      { id: 'entertainment', name: '娱乐', icon: 'EntertainmentIcon' },
-      { id: 'transport', name: '交通', icon: 'TransportIcon' },
-      { id: 'other', name: '其他', icon: 'OtherIcon' }
-    ]
-    
-    // 获取寝室成员
-    // roomMembers.value = await api.getRoomMembers()
-    
-    // 模拟寝室成员数据
-    roomMembers.value = [
-      { id: 'user-1', name: '张三' },
-      { id: 'user-2', name: '李四' },
-      { id: 'user-3', name: '王五' }
-    ]
+    // 只在首次加载或需要时加载寝室成员
+    if (loadAllData || roomMembers.value.length === 0) {
+      // 获取寝室成员
+      console.log('加载寝室成员列表')
+      const roomsResponse = await roomsApi.getRooms()
+      
+      if (roomsResponse.data && roomsResponse.data.success) {
+        // 获取第一个房间的成员列表
+        const rooms = roomsResponse.data.data || []
+        if (rooms.length > 0) {
+          const membersResponse = await roomsApi.getRoomMembers(rooms[0].id)
+          if (membersResponse.data && membersResponse.data.success) {
+            roomMembers.value = membersResponse.data.data || []
+            console.log('寝室成员列表加载成功:', roomMembers.value)
+          } else {
+            console.error('寝室成员列表加载失败:', membersResponse.data?.message || '未知错误')
+          }
+        }
+      } else {
+        console.error('房间列表加载失败:', roomsResponse.data?.message || '未知错误')
+      }
+    }
     
   } catch (error) {
     console.error('加载费用数据失败:', error)
@@ -580,7 +682,7 @@ const loadExpensesData = async () => {
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadExpensesData()
+  loadExpensesData(true)
 })
 </script>
 
@@ -608,6 +710,29 @@ onMounted(() => {
 .header-actions {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box input {
+  padding: 8px 12px 8px 36px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 200px;
+  background-color: white;
+}
+
+.search-box svg {
+  position: absolute;
+  left: 12px;
+  color: #999;
+  pointer-events: none;
 }
 
 .filter-button, .add-button {
@@ -786,6 +911,68 @@ onMounted(() => {
   border-bottom: 1px solid #eee;
 }
 
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.selected-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: #409eff;
+}
+
+.batch-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.batch-button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: none;
+}
+
+.batch-button.settle {
+  background-color: #e1f3d8;
+  color: #67c23a;
+}
+
+.batch-button.settle:hover {
+  background-color: #c2e7b0;
+}
+
+.batch-button.delete {
+  background-color: #fef0f0;
+  color: #f56c6c;
+}
+
+.batch-button.delete:hover {
+  background-color: #fde2e2;
+}
+
+.batch-button.cancel {
+  background-color: #f4f4f5;
+  color: #909399;
+}
+
+.batch-button.cancel:hover {
+  background-color: #e9e9eb;
+}
+
+.controls-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
 .sort-controls select {
   padding: 8px 12px;
   border: 1px solid #ddd;
@@ -840,6 +1027,16 @@ onMounted(() => {
 
 .expense-item:hover {
   background-color: #f9f9f9;
+}
+
+.expense-checkbox {
+  margin-right: 12px;
+}
+
+.expense-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .expense-item:last-child {
@@ -931,10 +1128,24 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s;
+  position: relative;
 }
 
 .expense-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.expense-card-checkbox {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+}
+
+.expense-card-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .card-header {
@@ -942,6 +1153,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  padding-left: 28px; /* 为选择框留出空间 */
 }
 
 .expense-card .expense-icon {

@@ -685,22 +685,6 @@ const loadBillDetail = async () => {
   }
 }
 
-// 删除账单
-const deleteBill = async () => {
-  try {
-    // 模拟API调用
-    console.log('删除账单:', route.params.id)
-    
-    // 模拟成功响应
-    ElMessage.success('账单删除成功')
-    router.push('/bills')
-    
-  } catch (error) {
-    console.error('删除账单失败:', error)
-    ElMessage.error('删除账单失败，请稍后再试')
-  }
-}
-
 // 标记为已支付
 const markAsPaid = async () => {
   try {

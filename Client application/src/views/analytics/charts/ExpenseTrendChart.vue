@@ -10,7 +10,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, defineProps } from 'vue'
 import * as echarts from 'echarts'
-import { expenseApi } from '@/api/expenses'
+import { analyticsApi } from '@/api/analytics'
 
 // Props
 const props = defineProps({
@@ -55,7 +55,7 @@ const updateChart = async () => {
       groupBy: 'day'
     }
     
-    const response = await expenseApi.getExpenseTrends(params)
+    const response = await analyticsApi.getExpenseTrendsData(params)
     if (response.success) {
       const { dates = [], amounts = [] } = response.data || {}
       isEmpty.value = !dates.length || !amounts.length

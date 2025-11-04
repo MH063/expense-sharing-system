@@ -6,17 +6,17 @@
     </div>
     
     <div v-else-if="!expense" class="error-state">
-      <div class="error-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-      </div>
-      <h2>费用记录不存在</h2>
-      <p>您要查看的费用记录不存在或已被删除</p>
-      <button class="primary-button" @click="goBack">返回列表</button>
+    <div class="error-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
     </div>
+    <h2>费用详情加载失败</h2>
+    <p>无法加载费用详情，请稍后重试</p>
+    <button class="primary-button" @click="refreshData">重新加载</button>
+  </div>
     
     <div v-else class="expense-detail">
       <div class="detail-header">
@@ -29,6 +29,15 @@
         </button>
         
         <div class="header-actions">
+          <button class="refresh-button" @click="refreshData" :disabled="refreshing">
+            <svg v-if="!refreshing" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <div v-else class="refresh-spinner"></div>
+            {{ refreshing ? '刷新中...' : '刷新' }}
+          </button>
+          
           <button v-if="canEdit" class="edit-button" @click="editExpense">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -72,8 +81,8 @@
             </div>
             
             <div class="expense-amount">
-              <div class="amount-value">¥{{ expense.amount.toFixed(2) }}</div>
-              <div class="my-share">我的份额: ¥{{ expense.myShare.toFixed(2) }}</div>
+              <div class="amount-value">{{ formattedAmount }}</div>
+              <div class="my-share">我的份额: {{ formattedMyShare }}</div>
             </div>
           </div>
           
@@ -89,11 +98,7 @@
               <div class="detail-label">参与成员</div>
               <div class="detail-value">
                 <div class="participants">
-                  <div 
-                    v-for="participant in expense.participants" 
-                    :key="participant.id" 
-                    class="participant"
-                  >
+                  <div v-for="participant in expense.participants" :key="participant.id" class="participant">
                     <div class="participant-avatar">
                       {{ participant.name.charAt(0) }}
                     </div>
@@ -103,6 +108,9 @@
                     </div>
                   </div>
                 </div>
+                <div class="participants-summary">
+                  共 {{ participantsCount }} 人参与
+                </div>
               </div>
             </div>
             
@@ -111,18 +119,26 @@
               <div class="detail-value">{{ expense.description }}</div>
             </div>
             
-            <div v-if="expense.receipt" class="detail-row">
+            <div v-if="hasReceipt" class="detail-row">
               <div class="detail-label">收据</div>
               <div class="detail-value">
-                <div class="receipt-preview" @click="viewReceipt">
-                  <img :src="expense.receipt" alt="收据" />
+                <div v-if="!imageLoadError" class="receipt-preview" @click="viewReceipt">
+                  <img :src="expense.receipt" alt="收据" @error="handleImageError" />
                   <div class="receipt-overlay">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                       <circle cx="12" cy="12" r="3"></circle>
                     </svg>
-                    查看大图
+                    <span>查看收据</span>
                   </div>
+                </div>
+                <div v-else class="receipt-error">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  <span>图片加载失败</span>
                 </div>
               </div>
             </div>
@@ -200,7 +216,7 @@
           </div>
           
           <div class="comments-card">
-            <h2>评论</h2>
+            <h2>评论 ({{ commentsCount }})</h2>
             
             <div v-if="comments.length === 0" class="empty-comments">
               <p>暂无评论</p>
@@ -214,7 +230,9 @@
                 <div class="comment-content">
                   <div class="comment-header">
                     <div class="comment-author">{{ comment.authorName }}</div>
-                    <div class="comment-time">{{ formatDateTime(comment.createdAt) }}</div>
+                    <div class="comment-time" :title="formatDateTime(comment.createdAt)">
+                      {{ formatRelativeTime(comment.createdAt) }}
+                    </div>
                   </div>
                   <div class="comment-text">{{ comment.text }}</div>
                 </div>
@@ -228,12 +246,18 @@
                   type="text" 
                   placeholder="添加评论..."
                   @keyup.enter="addComment"
+                  :disabled="submittingComment"
                 />
-                <button class="comment-button" @click="addComment">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button 
+                  class="comment-button" 
+                  @click="addComment"
+                  :disabled="submittingComment || !newComment.trim()"
+                >
+                  <svg v-if="!submittingComment" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"></line>
                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                   </svg>
+                  <div v-else class="comment-spinner"></div>
                 </button>
               </div>
             </div>
@@ -283,9 +307,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { expenseApi } from '@/api/expenses'
+import { ElMessage, ElNotification } from 'element-plus'
 
 // 路由和状态管理
 const router = useRouter()
@@ -299,6 +325,9 @@ const comments = ref([])
 const newComment = ref('')
 const showDeleteModal = ref(false)
 const showReceiptModal = ref(false)
+const refreshing = ref(false)
+const submittingComment = ref(false)
+const imageLoadError = ref(false)
 
 // 计算属性
 const canEdit = computed(() => {
@@ -326,6 +355,34 @@ const netBalance = computed(() => {
   
   // 如果当前用户不是支付者，则净影响为份额
   return expense.value.myShare
+})
+
+// 格式化金额显示
+const formattedAmount = computed(() => {
+  if (!expense.value) return '¥0.00'
+  return `¥${expense.value.amount.toFixed(2)}`
+})
+
+// 格式化个人份额
+const formattedMyShare = computed(() => {
+  if (!expense.value) return '¥0.00'
+  return `¥${expense.value.myShare.toFixed(2)}`
+})
+
+// 获取参与者总数
+const participantsCount = computed(() => {
+  if (!expense.value || !expense.value.participants) return 0
+  return expense.value.participants.length
+})
+
+// 是否有收据
+const hasReceipt = computed(() => {
+  return expense.value && expense.value.receipt
+})
+
+// 评论数量
+const commentsCount = computed(() => {
+  return comments.value ? comments.value.length : 0
 })
 
 // 获取类别图标
@@ -390,6 +447,63 @@ const formatDateTime = (timestamp) => {
   })
 }
 
+// 格式化相对时间
+const formatRelativeTime = (timestamp) => {
+  const now = new Date()
+  const date = new Date(timestamp)
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins}分钟前`
+  if (diffHours < 24) return `${diffHours}小时前`
+  if (diffDays < 7) return `${diffDays}天前`
+  
+  return formatDateTime(timestamp)
+}
+
+// 显示提示消息
+const showToast = (message, type = 'info') => {
+  ElMessage({
+    message,
+    type,
+    duration: 3000
+  })
+}
+
+// 显示通知
+const showNotification = (title, message, type = 'info') => {
+  ElNotification({
+    title,
+    message,
+    type,
+    duration: 4000
+  })
+}
+
+// 刷新数据
+const refreshData = async () => {
+  if (refreshing.value) return
+  refreshing.value = true
+  
+  try {
+    await loadExpenseDetail(true) // 强制刷新，忽略缓存
+    showToast('数据已刷新', 'success')
+  } catch (error) {
+    console.error('刷新数据失败:', error)
+    showToast('刷新失败，请稍后重试', 'error')
+  } finally {
+    refreshing.value = false
+  }
+}
+
+// 处理图片加载错误
+const handleImageError = () => {
+  imageLoadError.value = true
+}
+
 // 返回上一页
 const goBack = () => {
   router.go(-1)
@@ -407,33 +521,51 @@ const confirmDelete = () => {
 
 // 删除费用
 const deleteExpense = async () => {
+  if (!expense.value) return
+  
   try {
-    // await api.deleteExpense(expense.value.id)
+    console.log('删除费用:', expense.value.id)
+    const response = await expenseApi.deleteExpense(expense.value.id)
     
-    // 模拟删除成功
-    showDeleteModal.value = false
-    
-    // 返回列表页
-    router.push('/expenses')
-    
+    if (response.data && response.data.success) {
+      console.log('费用删除成功')
+      showDeleteModal.value = false
+      showToast('费用删除成功', 'success')
+      showNotification('删除成功', `费用"${expense.value.title}"已成功删除`, 'success')
+      router.push('/expenses')
+    } else {
+      console.error('费用删除失败:', response.data?.message || '未知错误')
+      showToast('费用删除失败: ' + (response.data?.message || '未知错误'), 'error')
+    }
   } catch (error) {
     console.error('删除费用失败:', error)
-    // 显示错误提示
+    showToast('删除费用失败，请稍后重试', 'error')
   }
 }
 
 // 结算费用
 const settleExpense = async () => {
+  if (!expense.value) return
+  
   try {
-    // await api.settleExpense(expense.value.id)
+    console.log('结算费用:', expense.value.id)
+    const response = await expenseApi.settleExpense(expense.value.id)
     
-    // 模拟结算成功
-    expense.value.status = 'settled'
-    expense.value.settledAt = new Date().toISOString()
-    
+    if (response.data && response.data.success) {
+      console.log('费用结算成功')
+      showSettleModal.value = false
+      showToast('费用结算成功', 'success')
+      showNotification('结算成功', `费用"${expense.value.title}"已成功结算`, 'success')
+      
+      // 重新加载费用详情
+      await loadExpenseDetail(true) // 强制刷新，忽略缓存
+    } else {
+      console.error('费用结算失败:', response.data?.message || '未知错误')
+      showToast('费用结算失败: ' + (response.data?.message || '未知错误'), 'error')
+    }
   } catch (error) {
     console.error('结算费用失败:', error)
-    // 显示错误提示
+    showToast('结算费用失败，请稍后重试', 'error')
   }
 }
 
@@ -444,94 +576,111 @@ const viewReceipt = () => {
 
 // 添加评论
 const addComment = async () => {
-  if (!newComment.value.trim()) return
+  if (!newComment.value.trim() || !expense.value || submittingComment.value) return
+  
+  submittingComment.value = true
   
   try {
-    // const comment = await api.addComment(expense.value.id, newComment.value)
+    console.log('添加评论:', newComment.value)
+    const response = await expenseApi.addExpenseComment(expense.value.id, {
+      text: newComment.value
+    })
     
-    // 模拟添加评论
-    const comment = {
-      id: `comment-${Date.now()}`,
-      authorId: authStore.user.id,
-      authorName: authStore.user.name,
-      text: newComment.value,
-      createdAt: new Date().toISOString()
+    if (response.data && response.data.success) {
+      console.log('评论添加成功')
+      newComment.value = ''
+      showToast('评论添加成功', 'success')
+      
+      // 重新加载评论
+      const commentsResponse = await expenseApi.getExpenseComments(expense.value.id)
+      if (commentsResponse.data && commentsResponse.data.success) {
+        comments.value = commentsResponse.data.data || []
+        
+        // 更新缓存中的评论
+        const cacheKey = `expense_detail_${expense.value.id}`
+        const cachedData = localStorage.getItem(cacheKey)
+        if (cachedData) {
+          const cache = JSON.parse(cachedData)
+          cache.comments = comments.value
+          localStorage.setItem(cacheKey, JSON.stringify(cache))
+        }
+      }
+    } else {
+      console.error('评论添加失败:', response.data?.message || '未知错误')
+      showToast('评论添加失败: ' + (response.data?.message || '未知错误'), 'error')
     }
-    
-    comments.value.push(comment)
-    newComment.value = ''
-    
   } catch (error) {
     console.error('添加评论失败:', error)
-    // 显示错误提示
+    showToast('添加评论失败，请稍后重试', 'error')
+  } finally {
+    submittingComment.value = false
   }
 }
 
 // 加载费用详情
-const loadExpenseDetail = async () => {
+const loadExpenseDetail = async (forceRefresh = false) => {
   const expenseId = route.params.id
+  
+  // 检查缓存
+  const cacheKey = `expense_detail_${expenseId}`
+  const cachedData = localStorage.getItem(cacheKey)
+  const cacheTime = cachedData ? JSON.parse(cachedData).timestamp : 0
+  const now = Date.now()
+  const cacheExpiry = 5 * 60 * 1000 // 5分钟缓存
+  
+  // 如果有缓存且未过期，且不是强制刷新，则使用缓存数据
+  if (cachedData && !forceRefresh && (now - cacheTime) < cacheExpiry) {
+    const { expense: cachedExpense, comments: cachedComments } = JSON.parse(cachedData)
+    expense.value = cachedExpense
+    comments.value = cachedComments
+    loading.value = false
+    console.log('使用缓存数据加载费用详情')
+    return
+  }
+  
   loading.value = true
   
   try {
-    // expense.value = await api.getExpense(expenseId)
-    // comments.value = await api.getExpenseComments(expenseId)
+    console.log('加载费用详情:', expenseId)
     
-    // 模拟费用详情数据
-    expense.value = {
-      id: expenseId,
-      title: '超市购物',
-      amount: 156.50,
-      category: 'groceries',
-      date: new Date('2023-10-15').toISOString(),
-      payerId: 'user-1',
-      payerName: '张三',
-      status: 'pending',
-      myShare: 52.17,
-      description: '购买了一些生活用品和食材',
-      receipt: 'https://picsum.photos/seed/receipt123/400/600.jpg',
-      createdAt: new Date('2023-10-15T10:30:00').toISOString(),
-      updatedAt: new Date('2023-10-15T10:30:00').toISOString(),
-      settledAt: null,
-      participants: [
-        {
-          id: 'user-1',
-          name: '张三',
-          share: 52.17
-        },
-        {
-          id: 'user-2',
-          name: '李四',
-          share: 52.17
-        },
-        {
-          id: 'user-3',
-          name: '王五',
-          share: 52.16
-        }
-      ]
+    // 并行获取费用详情和评论
+    const [expenseResponse, commentsResponse] = await Promise.all([
+      expenseApi.getExpenseById(expenseId),
+      expenseApi.getExpenseComments(expenseId)
+    ])
+    
+    let expenseData = null
+    let commentsData = []
+    
+    if (expenseResponse.data && expenseResponse.data.success) {
+      expenseData = expenseResponse.data.data
+      expense.value = expenseData
+      console.log('费用详情加载成功:', expense.value)
+    } else {
+      console.error('费用详情加载失败:', expenseResponse.data?.message || '未知错误')
+      expense.value = null
     }
     
-    // 模拟评论数据
-    comments.value = [
-      {
-        id: 'comment-1',
-        authorId: 'user-2',
-        authorName: '李四',
-        text: '下次可以多买点水果',
-        createdAt: new Date('2023-10-15T14:20:00').toISOString()
-      },
-      {
-        id: 'comment-2',
-        authorId: 'user-3',
-        authorName: '王五',
-        text: '已收到，谢谢',
-        createdAt: new Date('2023-10-15T16:45:00').toISOString()
-      }
-    ]
+    if (commentsResponse.data && commentsResponse.data.success) {
+      commentsData = commentsResponse.data.data || []
+      comments.value = commentsData
+      console.log('费用评论加载成功:', comments.value)
+    } else {
+      console.error('费用评论加载失败:', commentsResponse.data?.message || '未知错误')
+      comments.value = []
+    }
+    
+    // 更新缓存
+    localStorage.setItem(cacheKey, JSON.stringify({
+      expense: expenseData,
+      comments: commentsData,
+      timestamp: now
+    }))
     
   } catch (error) {
     console.error('加载费用详情失败:', error)
     expense.value = null
+    comments.value = []
   } finally {
     loading.value = false
   }
@@ -540,6 +689,13 @@ const loadExpenseDetail = async () => {
 // 组件挂载时加载数据
 onMounted(() => {
   loadExpenseDetail()
+})
+
+// 监听费用ID变化，重新加载数据
+watch(() => route.params.id, () => {
+  if (route.params.id) {
+    loadExpenseDetail()
+  }
 })
 </script>
 
@@ -646,6 +802,39 @@ onMounted(() => {
 .header-actions {
   display: flex;
   gap: 12px;
+}
+
+.refresh-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: white;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: #f5f5f5;
+}
+
+.refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refresh-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(106, 17, 203, 0.1);
+  border-radius: 50%;
+  border-top-color: #6a11cb;
+  animation: spin 1s ease-in-out infinite;
 }
 
 .edit-button, .delete-button {
@@ -1119,8 +1308,42 @@ onMounted(() => {
   transition: opacity 0.3s;
 }
 
-.comment-button:hover {
+.comment-button:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.comment-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.comment-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+.receipt-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  border-radius: 8px;
+  background-color: #f5f5f5;
+  color: #999;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.participants-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
 }
 
 /* 模态框样式 */
@@ -1271,6 +1494,16 @@ onMounted(() => {
     gap: 12px;
   }
   
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .refresh-button {
+    flex: 1;
+    justify-content: center;
+  }
+  
   .detail-content {
     grid-template-columns: 1fr;
   }
@@ -1291,6 +1524,25 @@ onMounted(() => {
   
   .detail-label {
     width: auto;
+  }
+  
+  .participants {
+    justify-content: center;
+  }
+  
+  .comment-input-container {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .comment-button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .modal-content, .receipt-modal-content {
+    width: 95%;
+    margin: 0 auto;
   }
 }
 </style>

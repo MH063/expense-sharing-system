@@ -48,14 +48,19 @@ export function checkRoutePermission(to, from, next, store) {
   if (to.meta.requiresPermission && user) {
     let hasRequiredPermission = false
     
-    if (Array.isArray(to.meta.requiresPermission)) {
-      // 检查是否具有任一权限
-      hasRequiredPermission = to.meta.requiresPermission.some(permission => 
-        hasPermission(user, permission)
-      )
+    // 如果用户拥有'all'权限，则具有所有权限
+    if (user.permissions && user.permissions.includes('all')) {
+      hasRequiredPermission = true
     } else {
-      // 检查是否具有指定权限
-      hasRequiredPermission = hasPermission(user, to.meta.requiresPermission)
+      if (Array.isArray(to.meta.requiresPermission)) {
+        // 检查是否具有任一权限
+        hasRequiredPermission = to.meta.requiresPermission.some(permission => 
+          hasPermission(user, permission)
+        )
+      } else {
+        // 检查是否具有指定权限
+        hasRequiredPermission = hasPermission(user, to.meta.requiresPermission)
+      }
     }
     
     if (!hasRequiredPermission) {

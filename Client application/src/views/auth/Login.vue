@@ -150,7 +150,7 @@ const handleLogin = async () => {
   errorMessage.value = ''
   
   try {
-    // 模拟API调用
+    // 模拟登录API调用
     console.log('模拟登录API调用:', {
       username: loginForm.username,
       password: loginForm.password,
@@ -179,15 +179,11 @@ const handleLogin = async () => {
       }
     }
     
-    // 更新authStore状态
-    authStore.accessToken = mockResponse.data.token
-    authStore.refreshToken = mockResponse.data.refreshToken
-    authStore.currentUser = mockResponse.data.user
-    authStore.roles = mockResponse.data.user.roles
-    authStore.permissions = mockResponse.data.user.permissions
-    
-    // 模拟连接WebSocket
-    console.log('模拟WebSocket连接')
+    // 使用authStore的login方法处理登录
+    await authStore.login({
+      username: loginForm.username,
+      password: loginForm.password
+    })
     
     // 登录成功，跳转到首页或之前访问的页面
     const redirectPath = router.currentRoute.value.query.redirect || '/'

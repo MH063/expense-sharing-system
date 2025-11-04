@@ -94,7 +94,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Refresh, MoreFilled, Bell, Money, Warning, Info } from '@element-plus/icons-vue';
+import { Refresh, MoreFilled, Bell, Money, Warning, InfoFilled } from '@element-plus/icons-vue';
 import notificationApi from '@/api/notifications';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -123,87 +123,40 @@ const filteredNotifications = computed(() => {
 const loadNotifications = async () => {
   loading.value = true;
   try {
-    console.log('模拟API调用 - 获取通知列表');
+    console.log('获取通知列表，参数:', {
+      page: currentPage.value,
+      limit: pageSize.value,
+      type: filterType.value === 'all' ? undefined : filterType.value,
+      isRead: filterType.value === 'unread' ? false : undefined
+    });
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // 模拟数据
-    const mockNotifications = [
-      {
-        id: 1,
-        title: '11月份电费账单已生成',
-        content: '您本月的电费账单已生成，请及时查看并完成支付。',
-        type: 'bill_due',
-        isRead: false,
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2小时前
-        actionUrl: '/bills'
-      },
-      {
-        id: 2,
-        title: '张三已完成支付',
-        content: '张三已支付11月份电费，金额为85.50元。',
-        type: 'payment_status',
-        isRead: true,
-        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5小时前
-        actionUrl: '/payment-history'
-      },
-      {
-        id: 3,
-        title: '新增费用：网费',
-        content: '李四添加了一笔网费，金额为50元，分摊给寝室所有成员。',
-        type: 'expense_added',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1天前
-        actionUrl: '/expenses'
-      },
-      {
-        id: 4,
-        title: '系统维护通知',
-        content: '系统将于本周六凌晨2:00-4:00进行维护升级，期间可能无法正常访问。',
-        type: 'system',
-        isRead: true,
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2天前
-        actionUrl: null
-      },
-      {
-        id: 5,
-        title: '账单即将到期提醒',
-        content: '您有3笔账单将在3天内到期，请及时完成支付。',
-        type: 'bill_due',
-        isRead: false,
-        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3天前
-        actionUrl: '/bills'
-      }
-    ];
-    
-    // 根据过滤条件筛选数据
-    let filteredData = [...mockNotifications];
+    const params = {
+      page: currentPage.value,
+      limit: pageSize.value
+    };
     
     if (filterType.value === 'unread') {
-      filteredData = filteredData.filter(n => !n.isRead);
+      params.isRead = false;
     } else if (filterType.value !== 'all') {
-      filteredData = filteredData.filter(n => n.type === filterType.value);
+      params.type = filterType.value;
     }
     
-    // 分页处理
-    const startIndex = (currentPage.value - 1) * pageSize.value;
-    const endIndex = startIndex + pageSize.value;
-    const paginatedData = filteredData.slice(startIndex, endIndex);
+    const response = await notificationApi.getNotifications(params);
     
-    notifications.value = paginatedData;
-    total.value = filteredData.length;
-    
-    // 更新未读数量
-    unreadCount.value = mockNotifications.filter(n => !n.isRead).length;
-    
-    console.log('模拟获取通知列表成功:', { 
-      通知数量: paginatedData.length, 
-      总数量: filteredData.length,
-      未读数量: unreadCount.value
-    });
+    if (response && response.data && response.data.success) {
+      notifications.value = response.data.data.notifications || [];
+      total.value = response.data.data.total || 0;
+      console.log('获取通知列表成功:', { 
+        通知数量: notifications.value.length, 
+        总数量: total.value
+      });
+    } else {
+      console.error('获取通知列表失败:', response);
+      ElMessage.error('获取通知列表失败');
+    }
   } catch (error) {
     console.error('获取通知列表出错:', error);
+    ElMessage.error('获取通知列表出错');
   } finally {
     loading.value = false;
   }
@@ -211,16 +164,16 @@ const loadNotifications = async () => {
 
 const loadUnreadCount = async () => {
   try {
-    console.log('模拟API调用 - 获取未读通知数量');
+    console.log('获取未读通知数量');
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 300));
+    const response = await notificationApi.getUnreadCount();
     
-    // 模拟数据 - 从已有的通知中计算未读数量
-    const mockUnreadCount = 3;
-    
-    unreadCount.value = mockUnreadCount;
-    console.log('模拟获取未读通知数量成功:', mockUnreadCount);
+    if (response && response.data && response.data.success) {
+      unreadCount.value = response.data.data.count || 0;
+      console.log('获取未读通知数量成功:', unreadCount.value);
+    } else {
+      console.error('获取未读通知数量失败:', response);
+    }
   } catch (error) {
     console.error('获取未读通知数量出错:', error);
   }
@@ -228,15 +181,11 @@ const loadUnreadCount = async () => {
 
 const markAsRead = async (id) => {
   try {
-    console.log('模拟API调用 - 标记通知已读:', id);
+    console.log('标记通知为已读，ID:', id);
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 400));
+    const response = await notificationApi.markAsRead(id);
     
-    // 模拟成功响应
-    const success = true;
-    
-    if (success) {
+    if (response && response.data && response.data.success) {
       // 更新本地状态
       const notification = notifications.value.find(n => n.id === id);
       if (notification) {
@@ -244,8 +193,9 @@ const markAsRead = async (id) => {
       }
       unreadCount.value = Math.max(0, unreadCount.value - 1);
       ElMessage.success('已标记为已读');
-      console.log('模拟标记通知已读成功:', id);
+      console.log('标记通知已读成功:', id);
     } else {
+      console.error('标记通知已读失败:', response);
       ElMessage.error('标记已读失败');
     }
   } catch (error) {
@@ -256,23 +206,20 @@ const markAsRead = async (id) => {
 
 const markAllAsRead = async () => {
   try {
-    console.log('模拟API调用 - 批量标记已读');
+    console.log('批量标记通知为已读');
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 600));
+    const response = await notificationApi.markAllAsRead();
     
-    // 模拟成功响应
-    const success = true;
-    
-    if (success) {
+    if (response && response.data && response.data.success) {
       // 更新本地状态
       notifications.value.forEach(n => {
         n.isRead = true;
       });
       unreadCount.value = 0;
       ElMessage.success('已全部标记为已读');
-      console.log('模拟批量标记已读成功');
+      console.log('批量标记已读成功');
     } else {
+      console.error('批量标记已读失败:', response);
       ElMessage.error('批量标记已读失败');
     }
   } catch (error) {
@@ -289,15 +236,11 @@ const deleteNotification = async (id) => {
       type: 'warning'
     });
 
-    console.log('模拟API调用 - 删除通知:', id);
+    console.log('删除通知，ID:', id);
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = await notificationApi.deleteNotification(id);
     
-    // 模拟成功响应
-    const success = true;
-    
-    if (success) {
+    if (response && response.data && response.data.success) {
       // 更新本地状态
       const index = notifications.value.findIndex(n => n.id === id);
       if (index !== -1) {
@@ -309,8 +252,9 @@ const deleteNotification = async (id) => {
         total.value = Math.max(0, total.value - 1);
       }
       ElMessage.success('通知已删除');
-      console.log('模拟删除通知成功:', id);
+      console.log('删除通知成功:', id);
     } else {
+      console.error('删除通知失败:', response);
       ElMessage.error('删除通知失败');
     }
   } catch (error) {
@@ -375,7 +319,7 @@ const getNotificationIcon = (type) => {
     case 'expense_added':
       return Bell;
     default:
-      return Info;
+      return InfoFilled;
   }
 };
 

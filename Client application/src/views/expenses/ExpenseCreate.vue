@@ -6,6 +6,10 @@
         返回
       </el-button>
       <h1>创建费用记录</h1>
+      <div class="auto-save-status" v-if="lastSaveTime">
+        <el-icon><Clock /></el-icon>
+        {{ formatLastSaveTime() }}
+      </div>
     </div>
 
     <div class="create-content">
@@ -87,6 +91,13 @@
 
           <el-form-item label="分摊成员" prop="splitMembers">
             <div class="split-members">
+              <div class="member-actions">
+                <el-button size="small" @click="selectAllMembers">全选</el-button>
+                <el-button size="small" @click="deselectAllMembers">取消全选</el-button>
+                <el-button v-if="expenseForm.splitType === 'custom'" size="small" @click="distributeCustomAmountEqually">平均分配金额</el-button>
+                <el-button v-if="expenseForm.splitType === 'percentage'" size="small" @click="distributePercentageEqually">平均分配比例</el-button>
+              </div>
+              
               <div class="member-list">
                 <div
                   v-for="member in roomMembers"
@@ -183,10 +194,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Clock } from '@element-plus/icons-vue'
+import { debounce } from 'lodash-es'
 import { expenseApi } from '@/api/expenses'
 import { roomsApi } from '@/api/rooms'
 import { useUserStore } from '@/stores/user'
@@ -203,6 +215,9 @@ const submitting = ref(false)
 const roomId = ref(route.query.roomId || '')
 const roomMembers = ref([])
 const fileList = ref([])
+const autoSaveTimer = ref(null)
+const lastSaveTime = ref(null)
+const formHasChanges = ref(false)
 
 // 表单数据
 const expenseForm = reactive({
@@ -221,11 +236,13 @@ const expenseForm = reactive({
 const expenseRules = {
   title: [
     { required: true, message: '请输入费用名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '费用名称长度在 2 到 50 个字符', trigger: 'blur' }
+    { min: 2, max: 50, message: '费用名称长度在 2 到 50 个字符', trigger: 'blur' },
+    { pattern: /^[\u4e00-\u9fa5a-zA-Z0-9\s]+$/, message: '费用名称只能包含中文、英文、数字和空格', trigger: 'blur' }
   ],
   amount: [
     { required: true, message: '请输入费用金额', trigger: 'blur' },
-    { type: 'number', min: 0.01, message: '费用金额必须大于0', trigger: 'blur' }
+    { type: 'number', min: 0.01, message: '费用金额必须大于0', trigger: 'blur' },
+    { type: 'number', max: 999999.99, message: '费用金额不能超过999999.99', trigger: 'blur' }
   ],
   category: [
     { required: true, message: '请选择费用类型', trigger: 'change' }
@@ -234,7 +251,27 @@ const expenseRules = {
     { required: true, message: '请选择支付方式', trigger: 'change' }
   ],
   paymentDate: [
-    { required: true, message: '请选择支付日期', trigger: 'change' }
+    { required: true, message: '请选择支付日期', trigger: 'change' },
+    { 
+      validator: (rule, value, callback) => {
+        const today = new Date()
+        const selectedDate = new Date(value)
+        const oneYearAgo = new Date()
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+        
+        if (selectedDate > today) {
+          callback(new Error('支付日期不能晚于今天'))
+        } else if (selectedDate < oneYearAgo) {
+          callback(new Error('支付日期不能早于一年前'))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'change' 
+    }
+  ],
+  splitType: [
+    { required: true, message: '请选择分摊方式', trigger: 'change' }
   ]
 }
 
@@ -300,18 +337,195 @@ const loadRoomMembers = async () => {
   }
 
   try {
-    // 模拟房间成员数据
-    roomMembers.value = [
-      { id: 'user-1', name: '张三', avatar: '', selected: false, customAmount: 0, percentage: 0 },
-      { id: 'user-2', name: '李四', avatar: '', selected: false, customAmount: 0, percentage: 0 },
-      { id: 'user-3', name: '王五', avatar: '', selected: false, customAmount: 0, percentage: 0 }
-    ]
+    console.log('加载房间成员，房间ID:', roomId.value)
+    const response = await roomsApi.getRoomById(roomId.value)
     
-    console.log('加载房间成员成功:', roomMembers.value)
+    if (response.data && response.data.success) {
+      const room = response.data.data
+      const members = room.members || []
+      
+      roomMembers.value = members.map(member => ({
+        id: member.id,
+        name: member.name,
+        avatar: member.avatar || '',
+        selected: false,
+        customAmount: 0,
+        percentage: 0
+      }))
+      
+      console.log('房间成员加载成功:', roomMembers.value)
+      
+      // 加载自动保存的数据
+      loadAutoSaveData()
+    } else {
+      console.error('房间成员加载失败:', response.data?.message || '未知错误')
+      ElMessage.error('房间成员加载失败: ' + (response.data?.message || '未知错误'))
+    }
   } catch (error) {
     console.error('加载房间成员失败:', error)
-    ElMessage.error('加载房间成员失败')
+    ElMessage.error('加载房间成员失败，请稍后重试')
   }
+}
+
+/**
+ * 加载自动保存的数据
+ */
+const loadAutoSaveData = () => {
+  try {
+    const savedData = localStorage.getItem(`expense_draft_${roomId.value}`)
+    if (savedData) {
+      const draft = JSON.parse(savedData)
+      Object.assign(expenseForm, draft)
+      
+      // 恢复分摊成员选择状态
+      if (draft.selectedMemberIds) {
+        roomMembers.value.forEach(member => {
+          member.selected = draft.selectedMemberIds.includes(member.id)
+        })
+      }
+      
+      // 恢复自定义分摊金额和比例
+      if (draft.memberCustomAmounts) {
+        roomMembers.value.forEach(member => {
+          if (draft.memberCustomAmounts[member.id] !== undefined) {
+            member.customAmount = draft.memberCustomAmounts[member.id]
+          }
+        })
+      }
+      
+      if (draft.memberPercentages) {
+        roomMembers.value.forEach(member => {
+          if (draft.memberPercentages[member.id] !== undefined) {
+            member.percentage = draft.memberPercentages[member.id]
+          }
+        })
+      }
+      
+      lastSaveTime.value = draft.saveTime
+      console.log('已加载自动保存的数据')
+    }
+  } catch (error) {
+    console.error('加载自动保存数据失败:', error)
+  }
+}
+
+/**
+ * 自动保存表单数据
+ */
+const autoSave = debounce(() => {
+  try {
+    const selectedMemberIds = roomMembers.value
+      .filter(member => member.selected)
+      .map(member => member.id)
+    
+    const memberCustomAmounts = {}
+    const memberPercentages = {}
+    
+    roomMembers.value.forEach(member => {
+      if (member.selected) {
+        memberCustomAmounts[member.id] = member.customAmount
+        memberPercentages[member.id] = member.percentage
+      }
+    })
+    
+    const draftData = {
+      ...expenseForm,
+      selectedMemberIds,
+      memberCustomAmounts,
+      memberPercentages,
+      saveTime: new Date().toISOString()
+    }
+    
+    localStorage.setItem(`expense_draft_${roomId.value}`, JSON.stringify(draftData))
+    lastSaveTime.value = draftData.saveTime
+    formHasChanges.value = false
+    console.log('表单数据已自动保存')
+  } catch (error) {
+    console.error('自动保存失败:', error)
+  }
+}, 2000)
+
+/**
+ * 清除自动保存的数据
+ */
+const clearAutoSaveData = () => {
+  try {
+    localStorage.removeItem(`expense_draft_${roomId.value}`)
+    lastSaveTime.value = null
+    console.log('已清除自动保存的数据')
+  } catch (error) {
+    console.error('清除自动保存数据失败:', error)
+  }
+}
+
+/**
+ * 快速选择所有成员
+ */
+const selectAllMembers = () => {
+  roomMembers.value.forEach(member => {
+    member.selected = true
+  })
+  formHasChanges.value = true
+  autoSave()
+}
+
+/**
+ * 取消选择所有成员
+ */
+const deselectAllMembers = () => {
+  roomMembers.value.forEach(member => {
+    member.selected = false
+  })
+  formHasChanges.value = true
+  autoSave()
+}
+
+/**
+ * 平均分配自定义金额
+ */
+const distributeCustomAmountEqually = () => {
+  if (expenseForm.amount > 0 && selectedMembers.value.length > 0) {
+    const amountPerPerson = expenseForm.amount / selectedMembers.value.length
+    roomMembers.value.forEach(member => {
+      if (member.selected) {
+        member.customAmount = amountPerPerson
+      }
+    })
+    formHasChanges.value = true
+    autoSave()
+  }
+}
+
+/**
+ * 平均分配比例
+ */
+const distributePercentageEqually = () => {
+  if (selectedMembers.value.length > 0) {
+    const percentagePerPerson = 100 / selectedMembers.value.length
+    roomMembers.value.forEach(member => {
+      if (member.selected) {
+        member.percentage = percentagePerPerson
+      }
+    })
+    formHasChanges.value = true
+    autoSave()
+  }
+}
+
+/**
+ * 格式化最后保存时间
+ */
+const formatLastSaveTime = () => {
+  if (!lastSaveTime.value) return ''
+  
+  const saveTime = new Date(lastSaveTime.value)
+  const now = new Date()
+  const diffInSeconds = Math.floor((now - saveTime) / 1000)
+  
+  if (diffInSeconds < 60) return '刚刚保存'
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}分钟前保存`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}小时前保存`
+  return `${Math.floor(diffInSeconds / 86400)}天前保存`
 }
 
 /**
@@ -418,30 +632,26 @@ const submitExpense = async () => {
     }
 
     submitting.value = true
-    
-    // 模拟创建费用记录
     console.log('提交费用记录:', data)
     
-    // 模拟API响应
-    const mockResponse = {
-      success: true,
-      data: {
-        id: 'expense-' + Date.now(),
-        ...data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    }
+    // 调用真实API
+    const response = await expenseApi.createExpense(data)
     
-    if (mockResponse.success) {
+    if (response.data && response.data.success) {
+      console.log('费用记录创建成功:', response.data.data)
       ElMessage.success('费用记录创建成功')
+      
+      // 清除自动保存的数据
+      clearAutoSaveData()
+      
       router.push(`/rooms/${roomId.value}/expenses`)
     } else {
-      ElMessage.error('创建费用记录失败')
+      console.error('创建费用记录失败:', response.data?.message || '未知错误')
+      ElMessage.error('创建费用记录失败: ' + (response.data?.message || '未知错误'))
     }
   } catch (error) {
     console.error('创建费用记录失败:', error)
-    ElMessage.error('创建费用记录失败')
+    ElMessage.error('创建费用记录失败，请稍后重试')
   } finally {
     submitting.value = false
   }
@@ -465,11 +675,45 @@ const resetForm = () => {
   // 重置文件列表
   fileList.value = []
   expenseForm.receipt = []
+  
+  // 重置状态
+  formHasChanges.value = false
+  
+  // 清除自动保存的数据
+  clearAutoSaveData()
+  
+  ElMessage.success('表单已重置')
 }
 
 // 生命周期
 onMounted(() => {
   loadRoomMembers()
+  
+  // 监听表单变化，自动保存
+watch(
+  [
+    () => expenseForm.title,
+    () => expenseForm.amount,
+    () => expenseForm.category,
+    () => expenseForm.paymentDate,
+    () => expenseForm.paymentMethod,
+    () => expenseForm.description,
+    () => expenseForm.splitType,
+    () => roomMembers.value.map(m => ({ id: m.id, selected: m.selected, customAmount: m.customAmount, percentage: m.percentage }))
+  ],
+  () => {
+    formHasChanges.value = true
+    autoSave()
+  },
+  { deep: true }
+)
+})
+
+onBeforeUnmount(() => {
+  // 清除自动保存定时器
+  if (autoSaveTimer.value) {
+    clearTimeout(autoSaveTimer.value)
+  }
 })
 </script>
 
@@ -482,10 +726,23 @@ onMounted(() => {
   display: flex;
   align-items: center;
   margin-bottom: 20px;
+  position: relative;
 }
 
 .back-button {
   margin-right: 15px;
+}
+
+.auto-save-status {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: #909399;
 }
 
 .form-card {
@@ -495,6 +752,13 @@ onMounted(() => {
 
 .split-members {
   width: 100%;
+}
+
+.member-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
 }
 
 .member-list {
@@ -508,6 +772,12 @@ onMounted(() => {
   padding: 10px;
   border: 1px solid #ebeef5;
   border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.member-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .member-info {
@@ -526,10 +796,46 @@ onMounted(() => {
   padding: 10px;
   background-color: #f5f7fa;
   border-radius: 4px;
+  border-left: 4px solid #409eff;
 }
 
 .summary-item {
   margin-bottom: 5px;
   font-size: 14px;
+}
+
+.summary-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .create-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .auto-save-status {
+    position: static;
+    transform: none;
+    margin-top: 10px;
+  }
+  
+  .member-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .member-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .custom-amount,
+  .percentage {
+    margin-left: 0;
+    margin-top: 10px;
+    width: 100%;
+  }
 }
 </style>

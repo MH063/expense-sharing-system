@@ -42,7 +42,7 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="loadExpenses">查询</el-button>
+          <el-button type="primary" @click="queryExpenses">查询</el-button>
           <el-button @click="resetFilter">重置</el-button>
         </el-form-item>
       </el-form>
@@ -91,6 +91,49 @@
             </div>
             <div class="stat-icon owing">
               <el-icon><ArrowUp /></el-icon>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="charts-section">
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-card shadow="hover" class="chart-card">
+            <template #header>
+              <div class="chart-header">
+                <span>费用趋势</span>
+                <el-radio-group v-model="trendPeriod" size="small">
+                  <el-radio-button label="week">本周</el-radio-button>
+                  <el-radio-button label="month">本月</el-radio-button>
+                  <el-radio-button label="year">本年</el-radio-button>
+                </el-radio-group>
+              </div>
+            </template>
+            <div class="chart-container">
+              <div v-loading="chartLoading" class="chart-placeholder">
+                <div ref="trendChartRef" class="chart"></div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="12">
+          <el-card shadow="hover" class="chart-card">
+            <template #header>
+              <div class="chart-header">
+                <span>费用分类</span>
+                <el-radio-group v-model="categoryChartType" size="small">
+                  <el-radio-button label="pie">饼图</el-radio-button>
+                  <el-radio-button label="bar">柱状图</el-radio-button>
+                </el-radio-group>
+              </div>
+            </template>
+            <div class="chart-container">
+              <div v-loading="chartLoading" class="chart-placeholder">
+                <div ref="categoryChartRef" class="chart"></div>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -278,13 +321,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Money, User, ArrowDown, ArrowUp, List, Grid } from '@element-plus/icons-vue'
 import { expenseApi } from '@/api/expenses'
 import { roomsApi } from '@/api/rooms'
 import { useUserStore } from '@/stores/user'
+import { debounce } from 'lodash-es'
+
+// 引入 ECharts
+import * as echarts from 'echarts'
 
 // 路由
 const router = useRouter()
@@ -292,12 +339,21 @@ const router = useRouter()
 // 状态
 const userStore = useUserStore()
 const loading = ref(false)
+const chartLoading = ref(false)
 const viewMode = ref('list')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const expenses = ref([])
 const rooms = ref([])
+
+// 图表相关状态
+const trendPeriod = ref('month')
+const categoryChartType = ref('pie')
+const trendChartRef = ref(null)
+const categoryChartRef = ref(null)
+let trendChart = null
+let categoryChart = null
 
 // 过滤表单
 const filterForm = reactive({
@@ -334,7 +390,43 @@ const currentUserId = computed(() => userStore.userId)
 /**
  * 加载费用列表
  */
-const loadExpenses = async () => {
+const loadExpenses = async (forceRefresh = false) => {
+  // 生成缓存键
+  const cacheKey = `expenses_${currentPage.value}_${pageSize.value}_${filterForm.roomId || 'all'}_${filterForm.category || 'all'}_${filterForm.dateRange?.[0] || 'all'}_${filterForm.dateRange?.[1] || 'all'}`
+  
+  // 检查缓存
+  if (!forceRefresh) {
+    const cachedData = localStorage.getItem(cacheKey)
+    if (cachedData) {
+      try {
+        const { data, timestamp } = JSON.parse(cachedData)
+        // 缓存5分钟有效
+        if (Date.now() - timestamp < 5 * 60 * 1000) {
+          expenses.value = data.expenses || []
+          total.value = data.total || 0
+          console.log('使用缓存数据:', expenses.value)
+          
+          // 异步加载统计数据和图表数据
+          loadStatsAsync({
+            roomId: filterForm.roomId || undefined,
+            startDate: filterForm.dateRange?.[0] || undefined,
+            endDate: filterForm.dateRange?.[1] || undefined
+          })
+          
+          loadChartDataAsync({
+            roomId: filterForm.roomId || undefined,
+            startDate: filterForm.dateRange?.[0] || undefined,
+            endDate: filterForm.dateRange?.[1] || undefined
+          })
+          
+          return
+        }
+      } catch (error) {
+        console.error('解析缓存数据失败:', error)
+      }
+    }
+  }
+  
   loading.value = true
   try {
     const params = {
@@ -346,106 +438,102 @@ const loadExpenses = async () => {
       endDate: filterForm.dateRange?.[1] || undefined
     }
     
-    // 模拟API调用
     console.log('加载费用列表，参数:', params)
     
-    // 模拟费用数据
-    const mockExpenses = [
-      {
-        id: 'expense-1',
-        title: '超市购物',
-        amount: 256.8,
-        category: 'daily',
-        payerId: 'user-1',
-        payerName: '张三',
-        paymentDate: '2023-11-05',
-        splitMembers: [
-          { userId: 'user-1', userName: '张三', amount: 85.6, paid: true },
-          { userId: 'user-2', userName: '李四', amount: 85.6, paid: false },
-          { userId: 'user-3', userName: '王五', amount: 85.6, paid: true }
-        ],
-        createdAt: '2023-11-05T10:30:00Z'
-      },
-      {
-        id: 'expense-2',
-        title: '水电费',
-        amount: 420.0,
-        category: 'utilities',
-        payerId: 'user-2',
-        payerName: '李四',
-        paymentDate: '2023-11-01',
-        splitMembers: [
-          { userId: 'user-1', userName: '张三', amount: 140.0, paid: true },
-          { userId: 'user-2', userName: '李四', amount: 140.0, paid: true },
-          { userId: 'user-3', userName: '王五', amount: 140.0, paid: false }
-        ],
-        createdAt: '2023-11-01T09:15:00Z'
-      },
-      {
-        id: 'expense-3',
-        title: '聚餐',
-        amount: 580.0,
-        category: 'food',
-        payerId: 'user-3',
-        payerName: '王五',
-        paymentDate: '2023-10-28',
-        splitMembers: [
-          { userId: 'user-1', userName: '张三', amount: 193.33, paid: true },
-          { userId: 'user-2', userName: '李四', amount: 193.33, paid: true },
-          { userId: 'user-3', userName: '王五', amount: 193.34, paid: true }
-        ],
-        createdAt: '2023-10-28T18:45:00Z'
-      },
-      {
-        id: 'expense-4',
-        title: '网费',
-        amount: 99.0,
-        category: 'other',
-        payerId: 'user-1',
-        payerName: '张三',
-        paymentDate: '2023-10-15',
-        splitMembers: [
-          { userId: 'user-1', userName: '张三', amount: 33.0, paid: true },
-          { userId: 'user-2', userName: '李四', amount: 33.0, paid: true },
-          { userId: 'user-3', userName: '王五', amount: 33.0, paid: true }
-        ],
-        createdAt: '2023-10-15T14:20:00Z'
-      }
-    ]
+    // 并行执行多个API请求
+    const [expensesResponse] = await Promise.all([
+      expenseApi.getExpenses(params),
+      // 并行加载统计数据，但不等待完成
+      loadStatsAsync(params),
+      // 并行加载图表数据，但不等待完成
+      loadChartDataAsync(params)
+    ])
     
-    // 应用筛选条件
-    let filteredExpenses = [...mockExpenses]
-    
-    if (filterForm.roomId) {
-      filteredExpenses = filteredExpenses.filter(expense => expense.roomId === filterForm.roomId)
+    if (expensesResponse.data && expensesResponse.data.success) {
+      const { data, total: totalCount } = expensesResponse.data.data
+      expenses.value = data || []
+      total.value = totalCount || 0
+      
+      // 缓存数据
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: {
+          expenses: expenses.value,
+          total: total.value
+        },
+        timestamp: Date.now()
+      }))
+      
+      console.log('费用列表加载成功:', expenses.value)
+    } else {
+      console.error('费用列表加载失败:', expensesResponse.data?.message || '未知错误')
+      ElMessage.error('加载费用列表失败')
     }
-    
-    if (filterForm.category) {
-      filteredExpenses = filteredExpenses.filter(expense => expense.category === filterForm.category)
-    }
-    
-    if (filterForm.dateRange && filterForm.dateRange.length === 2) {
-      const startDate = new Date(filterForm.dateRange[0])
-      const endDate = new Date(filterForm.dateRange[1])
-      filteredExpenses = filteredExpenses.filter(expense => {
-        const expenseDate = new Date(expense.paymentDate)
-        return expenseDate >= startDate && expenseDate <= endDate
-      })
-    }
-    
-    // 分页处理
-    total.value = filteredExpenses.length
-    const startIndex = (currentPage.value - 1) * pageSize.value
-    const endIndex = startIndex + pageSize.value
-    expenses.value = filteredExpenses.slice(startIndex, endIndex)
-    
-    // 加载统计数据
-    loadStats()
   } catch (error) {
     console.error('加载费用列表失败:', error)
     ElMessage.error('加载费用列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 异步加载统计数据
+ */
+const loadStatsAsync = async (params) => {
+  // 生成缓存键
+  const cacheKey = `stats_${params.roomId || 'all'}_${params.startDate || 'all'}_${params.endDate || 'all'}`
+  
+  // 检查缓存
+  const cachedData = localStorage.getItem(cacheKey)
+  if (cachedData) {
+    try {
+      const { data, timestamp } = JSON.parse(cachedData)
+      // 缓存5分钟有效
+      if (Date.now() - timestamp < 5 * 60 * 1000) {
+        Object.assign(stats, data)
+        console.log('使用缓存统计数据:', data)
+        return
+      }
+    } catch (error) {
+      console.error('解析统计数据缓存失败:', error)
+    }
+  }
+  
+  try {
+    console.log('加载统计数据，参数:', params)
+    
+    // 使用真实API调用
+    const response = await expenseApi.getExpenseStatistics(params)
+    
+    if (response.data && response.data.success) {
+      const statsData = response.data.data
+      Object.assign(stats, statsData)
+      
+      // 缓存数据
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: statsData,
+        timestamp: Date.now()
+      }))
+      
+      console.log('统计数据加载成功:', statsData)
+    } else {
+      console.error('统计数据加载失败:', response.data?.message || '未知错误')
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+/**
+ * 异步加载图表数据
+ */
+const loadChartDataAsync = (params) => {
+  // 更新图表数据
+  if (trendChart) {
+    loadTrendChartData(params)
+  }
+  if (categoryChart) {
+    loadCategoryChartData(params)
   }
 }
 
@@ -460,21 +548,310 @@ const loadStats = async () => {
       endDate: filterForm.dateRange?.[1] || undefined
     }
     
-    // 模拟API调用
     console.log('加载统计数据，参数:', params)
     
-    // 模拟统计数据
-    const mockStats = {
-      totalAmount: 1355.8,
-      myAmount: 511.93,
-      owedAmount: 140.0,
-      owingAmount: 85.6
-    }
+    // 使用真实API调用
+    const response = await expenseApi.getExpenseStatistics(params)
     
-    Object.assign(stats, mockStats)
+    if (response.data && response.data.success) {
+      const statsData = response.data.data
+      Object.assign(stats, statsData)
+      console.log('统计数据加载成功:', statsData)
+    } else {
+      console.error('统计数据加载失败:', response.data?.message || '未知错误')
+    }
   } catch (error) {
     console.error('加载统计数据失败:', error)
   }
+}
+
+/**
+ * 初始化图表
+ */
+const initCharts = () => {
+  nextTick(() => {
+    if (trendChartRef.value) {
+      trendChart = echarts.init(trendChartRef.value)
+      loadTrendChartData()
+    }
+    
+    if (categoryChartRef.value) {
+      categoryChart = echarts.init(categoryChartRef.value)
+      loadCategoryChartData()
+    }
+  })
+}
+
+/**
+ * 加载费用趋势图表数据
+ */
+const loadTrendChartData = async (params) => {
+  if (!trendChart) return
+  
+  // 生成缓存键
+  const cacheKey = `trend_${trendPeriod.value}_${params?.roomId || 'all'}_${params?.startDate || 'all'}_${params?.endDate || 'all'}`
+  
+  // 检查缓存
+  const cachedData = localStorage.getItem(cacheKey)
+  if (cachedData) {
+    try {
+      const { data, timestamp } = JSON.parse(cachedData)
+      // 缓存5分钟有效
+      if (Date.now() - timestamp < 5 * 60 * 1000) {
+        renderTrendChart(data)
+        console.log('使用缓存趋势数据:', data)
+        return
+      }
+    } catch (error) {
+      console.error('解析趋势数据缓存失败:', error)
+    }
+  }
+  
+  chartLoading.value = true
+  try {
+    const requestParams = {
+      period: trendPeriod.value,
+      roomId: params?.roomId || filterForm.roomId || undefined,
+      startDate: params?.startDate || filterForm.dateRange?.[0] || undefined,
+      endDate: params?.endDate || filterForm.dateRange?.[1] || undefined
+    }
+    
+    console.log('加载费用趋势数据，参数:', requestParams)
+    
+    // 使用真实API调用
+    const response = await expenseApi.getExpenseTrends(requestParams)
+    
+    if (response.data && response.data.success) {
+      const trendData = response.data.data
+      
+      // 缓存数据
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: trendData,
+        timestamp: Date.now()
+      }))
+      
+      console.log('费用趋势数据加载成功:', trendData)
+      renderTrendChart(trendData)
+    } else {
+      console.error('费用趋势数据加载失败:', response.data?.message || '未知错误')
+      // 使用模拟数据
+      renderTrendChart(getMockTrendData())
+    }
+  } catch (error) {
+    console.error('加载费用趋势数据失败:', error)
+    // 使用模拟数据
+    renderTrendChart(getMockTrendData())
+  } finally {
+    chartLoading.value = false
+  }
+}
+
+/**
+ * 加载费用分类图表数据
+ */
+const loadCategoryChartData = async (params) => {
+  if (!categoryChart) return
+  
+  // 生成缓存键
+  const cacheKey = `category_${categoryChartType.value}_${params?.roomId || 'all'}_${params?.startDate || 'all'}_${params?.endDate || 'all'}`
+  
+  // 检查缓存
+  const cachedData = localStorage.getItem(cacheKey)
+  if (cachedData) {
+    try {
+      const { data, timestamp } = JSON.parse(cachedData)
+      // 缓存5分钟有效
+      if (Date.now() - timestamp < 5 * 60 * 1000) {
+        renderCategoryChart(data)
+        console.log('使用缓存分类数据:', data)
+        return
+      }
+    } catch (error) {
+      console.error('解析分类数据缓存失败:', error)
+    }
+  }
+  
+  chartLoading.value = true
+  try {
+    const requestParams = {
+      roomId: params?.roomId || filterForm.roomId || undefined,
+      startDate: params?.startDate || filterForm.dateRange?.[0] || undefined,
+      endDate: params?.endDate || filterForm.dateRange?.[1] || undefined
+    }
+    
+    console.log('加载费用分类数据，参数:', requestParams)
+    
+    // 使用真实API调用
+    const response = await expenseApi.getExpenseCategoryStats(requestParams)
+    
+    if (response.data && response.data.success) {
+      const categoryData = response.data.data
+      
+      // 缓存数据
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: categoryData,
+        timestamp: Date.now()
+      }))
+      
+      console.log('费用分类数据加载成功:', categoryData)
+      renderCategoryChart(categoryData)
+    } else {
+      console.error('费用分类数据加载失败:', response.data?.message || '未知错误')
+      // 使用模拟数据
+      renderCategoryChart(getMockCategoryData())
+    }
+  } catch (error) {
+    console.error('加载费用分类数据失败:', error)
+    // 使用模拟数据
+    renderCategoryChart(getMockCategoryData())
+  } finally {
+    chartLoading.value = false
+  }
+}
+
+/**
+ * 渲染费用趋势图表
+ */
+const renderTrendChart = (data) => {
+  if (!trendChart) return
+  
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: '{b}<br/>{a}: {c}'
+    },
+    xAxis: {
+      type: 'category',
+      data: data.dates || []
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        formatter: '¥{value}'
+      }
+    },
+    series: [
+      {
+        name: '费用金额',
+        type: 'line',
+        data: data.amounts || [],
+        smooth: true,
+        areaStyle: {
+          opacity: 0.3
+        },
+        itemStyle: {
+          color: '#409eff'
+        }
+      }
+    ]
+  }
+  
+  trendChart.setOption(option)
+}
+
+/**
+ * 渲染费用分类图表
+ */
+const renderCategoryChart = (data) => {
+  if (!categoryChart) return
+  
+  let option = {}
+  
+  if (categoryChartType.value === 'pie') {
+    option = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b}: ¥{c} ({d}%)'
+      },
+      legend: {
+        orient: 'vertical',
+        left: 'left'
+      },
+      series: [
+        {
+          name: '费用分类',
+          type: 'pie',
+          radius: '60%',
+          data: data.categories || [],
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    }
+  } else {
+    option = {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'shadow'
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: data.categories?.map(item => item.name) || []
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          formatter: '¥{value}'
+        }
+      },
+      series: [
+        {
+          name: '费用金额',
+          type: 'bar',
+          data: data.categories?.map(item => item.value) || [],
+          itemStyle: {
+            color: '#67c23a'
+          }
+        }
+      ]
+    }
+  }
+  
+  categoryChart.setOption(option)
+}
+
+/**
+ * 获取模拟费用趋势数据
+ */
+const getMockTrendData = () => {
+  const dates = []
+  const amounts = []
+  const today = new Date()
+  
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - i)
+    dates.push(date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
+    amounts.push(Math.floor(Math.random() * 1000) + 200)
+  }
+  
+  return { dates, amounts }
+}
+
+/**
+ * 获取模拟费用分类数据
+ */
+const getMockCategoryData = () => {
+  const categories = [
+    { name: '餐饮', value: Math.floor(Math.random() * 1000) + 500 },
+    { name: '水电费', value: Math.floor(Math.random() * 500) + 200 },
+    { name: '房租', value: Math.floor(Math.random() * 2000) + 1000 },
+    { name: '日用品', value: Math.floor(Math.random() * 300) + 100 },
+    { name: '娱乐', value: Math.floor(Math.random() * 500) + 200 },
+    { name: '交通', value: Math.floor(Math.random() * 200) + 50 },
+    { name: '医疗', value: Math.floor(Math.random() * 800) + 100 },
+    { name: '教育', value: Math.floor(Math.random() * 1000) + 300 },
+    { name: '其他', value: Math.floor(Math.random() * 300) + 100 }
+  ]
+  
+  return { categories }
 }
 
 /**
@@ -482,28 +859,17 @@ const loadStats = async () => {
  */
 const loadRooms = async () => {
   try {
-    // 模拟API调用
     console.log('加载房间列表')
     
-    // 模拟房间数据
-    const mockRooms = [
-      {
-        id: 'room-1',
-        name: '我的寝室',
-        description: '404寝室',
-        memberCount: 3,
-        createdAt: '2023-09-01T00:00:00Z'
-      },
-      {
-        id: 'room-2',
-        name: '家庭账本',
-        description: '家庭日常开销',
-        memberCount: 5,
-        createdAt: '2023-08-15T00:00:00Z'
-      }
-    ]
+    // 使用真实API调用
+    const response = await roomsApi.getRooms()
     
-    rooms.value = mockRooms
+    if (response.data && response.data.success) {
+      rooms.value = response.data.data || []
+      console.log('房间列表加载成功:', rooms.value)
+    } else {
+      console.error('房间列表加载失败:', response.data?.message || '未知错误')
+    }
   } catch (error) {
     console.error('加载房间列表失败:', error)
   }
@@ -541,17 +907,40 @@ const deleteExpense = async (expense) => {
       type: 'warning'
     })
     
-    // 模拟API调用
     console.log('删除费用记录:', expense.id)
     
-    // 模拟删除成功
-    ElMessage.success('删除成功')
-    loadExpenses()
+    // 使用真实API调用
+    const response = await expenseApi.deleteExpense(expense.id)
+    
+    if (response.data && response.data.success) {
+      ElMessage.success('删除成功')
+      loadExpenses()
+      console.log('费用记录删除成功:', expense.id)
+    } else {
+      console.error('费用记录删除失败:', response.data?.message || '未知错误')
+      ElMessage.error('删除费用记录失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除费用记录失败:', error)
       ElMessage.error('删除费用记录失败')
     }
+  }
+}
+
+/**
+ * 查询费用数据
+ */
+const queryExpenses = () => {
+  currentPage.value = 1
+  loadExpenses()
+  
+  // 更新图表
+  if (trendChart) {
+    loadTrendChartData()
+  }
+  if (categoryChart) {
+    loadCategoryChartData()
   }
 }
 
@@ -564,6 +953,14 @@ const resetFilter = () => {
   filterForm.dateRange = []
   currentPage.value = 1
   loadExpenses()
+  
+  // 重置后更新图表
+  if (trendChart) {
+    loadTrendChartData()
+  }
+  if (categoryChart) {
+    loadCategoryChartData()
+  }
 }
 
 /**
@@ -679,7 +1076,44 @@ const getStatusText = (status) => {
 onMounted(() => {
   loadExpenses()
   loadRooms()
+  // 初始化图表
+  initCharts()
+  
+  // 添加窗口大小变化监听，使用防抖优化性能
+  let resizeTimer = null
+  window.addEventListener('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => {
+      if (trendChart) {
+        trendChart.resize()
+      }
+      if (categoryChart) {
+        categoryChart.resize()
+      }
+    }, 200) // 200ms防抖
+  })
 })
+
+// 创建防抖函数
+const debouncedLoadCategoryChartData = debounce(() => {
+  loadCategoryChartData()
+}, 300)
+
+const debouncedLoadTrendChartData = debounce(() => {
+  loadTrendChartData()
+}, 300)
+
+// 监听图表类型变化
+watch(categoryChartType, () => {
+  debouncedLoadCategoryChartData()
+})
+
+// 监听趋势周期变化
+watch(trendPeriod, () => {
+  debouncedLoadTrendChartData()
+})
+
+
 </script>
 
 <style scoped>
@@ -706,6 +1140,36 @@ onMounted(() => {
 
 .stats-section {
   margin-bottom: 20px;
+}
+
+.charts-section {
+  margin-bottom: 20px;
+}
+
+.chart-card {
+  height: 400px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chart-container {
+  height: 320px;
+}
+
+.chart-placeholder {
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chart {
+  width: 100%;
+  height: 100%;
 }
 
 .stat-card {
@@ -821,5 +1285,79 @@ onMounted(() => {
   margin-top: 20px;
   display: flex;
   justify-content: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .expense-dashboard {
+    padding: 16px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .filter-form {
+    padding: 12px;
+  }
+  
+  .filter-form .el-form-item {
+    margin-bottom: 12px;
+  }
+  
+  .stats-section .el-row {
+    margin: 0 !important;
+  }
+  
+  .stats-section .el-col {
+    padding: 0 0 10px 0 !important;
+  }
+  
+  .charts-section .el-row {
+    margin: 0 !important;
+  }
+  
+  .charts-section .el-col {
+    padding: 0 0 10px 0 !important;
+  }
+  
+  .chart-card {
+    height: 350px;
+  }
+  
+  .chart-container {
+    height: 270px;
+  }
+  
+  .expense-list .el-table {
+    font-size: 14px;
+  }
+  
+  .expense-list .el-table .cell {
+    padding: 8px 5px;
+  }
+  
+  .card-view .el-col {
+    margin-bottom: 15px;
+  }
+  
+  .expense-card {
+    margin-bottom: 15px;
+  }
+  
+  .expense-info {
+    margin-bottom: 10px;
+  }
+  
+  .info-item {
+    margin-bottom: 5px;
+  }
+  
+  .card-actions {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
 }
 </style>

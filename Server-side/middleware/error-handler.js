@@ -85,11 +85,28 @@ function notFoundHandler(req, res) {
     userAgent: req.get('User-Agent')
   });
 
-  res.status(404).json({
-    success: false,
-    message: '请求的资源不存在',
-    timestamp: new Date().toISOString()
-  });
+  // 检查是否是静态资源请求
+  const isStaticResource = req.url.includes('/assets/') || 
+                          req.url.includes('/static/') || 
+                          req.url.endsWith('.js') || 
+                          req.url.endsWith('.css') || 
+                          req.url.endsWith('.png') || 
+                          req.url.endsWith('.jpg') || 
+                          req.url.endsWith('.gif') || 
+                          req.url.endsWith('.ico') || 
+                          req.url.endsWith('.svg');
+
+  if (isStaticResource) {
+    // 对于静态资源请求，返回空内容而不是JSON，避免浏览器控制台错误
+    res.status(404).send('');
+  } else {
+    // 对于API请求，返回JSON响应
+    res.status(404).json({
+      success: false,
+      message: '请求的资源不存在',
+      timestamp: new Date().toISOString()
+    });
+  }
 }
 
 /**

@@ -1,14 +1,15 @@
 const express = require('express');
 const userController = require('../controllers/user-controller');
-const { authenticateToken } = require('../middleware/auth-middleware');
+const { authenticateToken } = require('../middleware/tokenManager');
+const { loginRateLimiter, devLoginRateLimiter, registerRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
-// 用户注册
-router.post('/register', userController.register);
+// 用户注册（专用更严格的限流）
+router.post('/register', registerRateLimiter, userController.register);
 
-// 用户登录
-router.post('/login', userController.login);
+// 用户登录（专用更严格的限流）
+router.post('/login', devLoginRateLimiter, userController.login);
 
 // 获取用户资料 - 需要认证
 router.get('/profile', authenticateToken, userController.getProfile);

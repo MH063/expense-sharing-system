@@ -104,6 +104,13 @@ const sequelize = new Sequelize({
   pool: dbConfig.pool,
   define: {
     freezeTableName: true
+  },
+  dialectOptions: {
+    // 添加SSL选项
+    ssl: process.env.DB_SSL === 'true' ? {
+      require: true,
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
+    } : false
   }
 });
 

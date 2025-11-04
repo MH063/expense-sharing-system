@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const qrCodeController = require('../controllers/qr-code-controller');
-const { authenticateToken } = require('../middleware/auth-middleware');
+const { authenticateToken } = require('../middleware/tokenManager');
 
 const router = express.Router();
 

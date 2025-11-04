@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const paymentOptimizationController = require('../controllers/payment-optimization-controller');
-const { authenticateToken } = require('../middleware/auth-middleware');
+const { authenticateToken } = require('../middleware/tokenManager');
 
 // 应用身份验证中间件
 router.use(authenticateToken);

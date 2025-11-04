@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const expenseController = require('../controllers/expense-controller');
-const { authenticateToken } = require('../middleware/auth-middleware');
+const { authenticateToken } = require('../middleware/tokenManager');
 
 // 创建费用记录
 router.post('/', authenticateToken, expenseController.createExpense);

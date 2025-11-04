@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const roomController = require('../controllers/room-controller');
-const { authenticateToken, checkRole } = require('../middleware/auth-middleware');
+const { authenticateToken, checkRole } = require('../middleware/tokenManager');
 
 // 创建寝室
 router.post('/', authenticateToken, roomController.createRoom);

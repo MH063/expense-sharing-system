@@ -12,7 +12,7 @@ const {
   cancelPaymentTransfer,
   getPaymentTransferById
 } = require('../controllers/payment-transfer-controller');
-const { authenticateToken } = require('../middleware/auth-middleware');
+const { authenticateToken } = require('../middleware/tokenManager');
 const { body, param, query } = require('express-validator');
 
 // 所有路由都需要身份验证

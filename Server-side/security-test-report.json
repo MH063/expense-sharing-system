@@ -1,0 +1,217 @@
+{
+  "timestamp": "2025-11-04T04:56:29.433Z",
+  "summary": {
+    "totalPassed": 33,
+    "totalFailed": 0,
+    "score": 100
+  },
+  "results": {
+    "sqlInjection": {
+      "passed": 9,
+      "failed": 0,
+      "details": [
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: ' OR '1'='1"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: ' OR '1'='1' --"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: ' OR '1'='1' /*"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: admin'--"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: admin'/*"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: ' OR 'x'='x"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: '; DROP TABLE users; --"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: '; INSERT INTO users VALUES('hacker','password'); --"
+        },
+        {
+          "test": "SQL注入测试",
+          "passed": true,
+          "details": "正确处理恶意输入: 1' UNION SELECT username, password FROM users --"
+        }
+      ]
+    },
+    "xss": {
+      "passed": 15,
+      "failed": 0,
+      "details": [
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <script>alert(\"XSS\")</script>"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <img src=\"x\" onerror=\"alert('XSS')\">"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <svg onload=\"alert('XSS')\">"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: javascript:alert(\"XSS\")"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <iframe src=\"javascript:alert('XSS')\"></iframe>"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <body onload=\"alert('XSS')\">"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <input autofocus onfocus=\"alert('XSS')\">"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <select onfocus=\"alert('XSS')\" autofocus>"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <textarea onfocus=\"alert('XSS')\" autofocus>"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <keygen onfocus=\"alert('XSS')\" autofocus>"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <video><source onerror=\"alert('XSS')\">"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <details open ontoggle=\"alert('XSS')\">"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: <marquee onstart=\"alert('XSS')\">"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: \"<script>alert(\"XSS\")</script>"
+        },
+        {
+          "test": "XSS测试",
+          "passed": true,
+          "details": "正确处理恶意输入: '<script>alert('XSS')</script>"
+        }
+      ]
+    },
+    "csrf": {
+      "passed": 1,
+      "failed": 0,
+      "details": [
+        {
+          "test": "CSRF测试",
+          "passed": true,
+          "details": "可能存在CSRF保护"
+        }
+      ]
+    },
+    "authBypass": {
+      "passed": 2,
+      "failed": 0,
+      "details": [
+        {
+          "test": "无效Token测试",
+          "passed": true,
+          "details": "正确拒绝无效Token"
+        },
+        {
+          "test": "无Token测试",
+          "passed": true,
+          "details": "正确拒绝无Token请求"
+        }
+      ]
+    },
+    "rateLimiting": {
+      "passed": 1,
+      "failed": 0,
+      "details": [
+        {
+          "test": "限流测试",
+          "passed": true,
+          "details": "正确限流，10/20 请求被阻止"
+        }
+      ]
+    },
+    "inputValidation": {
+      "passed": 3,
+      "failed": 0,
+      "details": [
+        {
+          "test": "空用户名测试",
+          "passed": true,
+          "details": "正确拒绝空用户名"
+        },
+        {
+          "test": "空密码测试",
+          "passed": true,
+          "details": "正确拒绝空密码"
+        },
+        {
+          "test": "无效邮箱测试",
+          "passed": true,
+          "details": "正确拒绝无效邮箱"
+        }
+      ]
+    },
+    "sensitiveDataExposure": {
+      "passed": 2,
+      "failed": 0,
+      "details": [
+        {
+          "test": "错误信息泄露测试",
+          "passed": true,
+          "details": "错误信息未泄露敏感信息"
+        },
+        {
+          "test": "响应头信息泄露测试",
+          "passed": true,
+          "details": "响应头未泄露敏感信息"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1275 @@
+{
+  "timestamp": "2025-11-04T05:05:04.321Z",
+  "testDuration": 19586,
+  "endpoints": [
+    {
+      "path": "/api/categories",
+      "method": "POST",
+      "requests": 55,
+      "successfulRequests": 0,
+      "failedRequests": 55,
+      "responseTimes": [
+        42,
+        4,
+        4,
+        3,
+        3,
+        3,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        4,
+        2,
+        4,
+        3,
+        4,
+        3,
+        3,
+        2,
+        2,
+        3,
+        3,
+        3,
+        5,
+        4,
+        5,
+        3,
+        3,
+        4,
+        3,
+        3,
+        4,
+        3,
+        6,
+        3,
+        2,
+        3,
+        3,
+        3,
+        4,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "errors": [
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Error",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404"
+      ],
+      "averageResponseTime": 3.890909090909091,
+      "minResponseTime": 2,
+      "maxResponseTime": 42,
+      "medianResponseTime": 3,
+      "p95ResponseTime": 5,
+      "p99ResponseTime": 22.56000000000003,
+      "errorRate": "100.00",
+      "requestsPerSecond": "Infinity",
+      "performanceRating": "excellent"
+    },
+    {
+      "path": "/api/transactions",
+      "method": "POST",
+      "requests": 58,
+      "successfulRequests": 0,
+      "failedRequests": 58,
+      "responseTimes": [
+        3,
+        4,
+        5,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        3,
+        3,
+        3,
+        5,
+        8,
+        3,
+        3,
+        3,
+        2,
+        2,
+        4,
+        2,
+        4,
+        3,
+        3,
+        4,
+        4,
+        4,
+        3,
+        2,
+        4,
+        3,
+        3,
+        2,
+        3,
+        3,
+        4,
+        4,
+        2,
+        3,
+        3,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        2,
+        3,
+        3,
+        3,
+        2
+      ],
+      "errors": [
+        "Error",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404"
+      ],
+      "averageResponseTime": 3.189655172413793,
+      "minResponseTime": 2,
+      "maxResponseTime": 8,
+      "medianResponseTime": 3,
+      "p95ResponseTime": 4.149999999999999,
+      "p99ResponseTime": 6.289999999999999,
+      "errorRate": "100.00",
+      "requestsPerSecond": "Infinity",
+      "performanceRating": "excellent"
+    },
+    {
+      "path": "/api/users/login",
+      "method": "POST",
+      "requests": 66,
+      "successfulRequests": 0,
+      "failedRequests": 66,
+      "responseTimes": [
+        3,
+        23,
+        6,
+        4,
+        102,
+        5,
+        4,
+        4,
+        4,
+        3,
+        3,
+        4,
+        4,
+        6,
+        4,
+        2,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4,
+        4,
+        3,
+        3,
+        3,
+        4,
+        4,
+        5,
+        3,
+        4,
+        5,
+        5,
+        4,
+        4,
+        4,
+        4,
+        3,
+        3,
+        3,
+        4,
+        3,
+        3,
+        4,
+        3,
+        4,
+        5,
+        3,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4,
+        4,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        3
+      ],
+      "errors": [
+        "Error",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401",
+        "Request failed with status code 401"
+      ],
+      "averageResponseTime": 5.46969696969697,
+      "minResponseTime": 2,
+      "maxResponseTime": 102,
+      "medianResponseTime": 4,
+      "p95ResponseTime": 5.75,
+      "p99ResponseTime": 50.64999999999955,
+      "errorRate": "100.00",
+      "requestsPerSecond": "Infinity",
+      "performanceRating": "excellent"
+    },
+    {
+      "path": "/api/accounts",
+      "method": "POST",
+      "requests": 61,
+      "successfulRequests": 0,
+      "failedRequests": 61,
+      "responseTimes": [
+        6,
+        3,
+        4,
+        3,
+        4,
+        3,
+        2,
+        3,
+        2,
+        4,
+        2,
+        3,
+        2,
+        4,
+        4,
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        2,
+        2,
+        2,
+        4,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        2,
+        4,
+        3,
+        3,
+        4,
+        5,
+        5,
+        3,
+        3,
+        2,
+        3,
+        3,
+        3,
+        2,
+        3,
+        3,
+        2,
+        3,
+        3,
+        3,
+        4,
+        3,
+        3,
+        3
+      ],
+      "errors": [
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404",
+        "Request failed with status code 404"
+      ],
+      "averageResponseTime": 3.098360655737705,
+      "minResponseTime": 2,
+      "maxResponseTime": 6,
+      "medianResponseTime": 3,
+      "p95ResponseTime": 4,
+      "p99ResponseTime": 5.399999999999999,
+      "errorRate": "100.00",
+      "requestsPerSecond": "Infinity",
+      "performanceRating": "excellent"
+    }
+  ],
+  "systemMetrics": {
+    "before": {
+      "timestamp": 1762232704323,
+      "cpu": {
+        "usage": {
+          "user": 46000,
+          "system": 62000
+        },
+        "loadAverage": [
+          0,
+          0,
+          0
+        ]
+      },
+      "memory": {
+        "total": 51461881856,
+        "free": 37180596224,
+        "used": 14281285632,
+        "usagePercent": "27.75"
+      },
+      "process": {
+        "memoryUsage": {
+          "rss": 49442816,
+          "heapTotal": 11845632,
+          "heapUsed": 9061624,
+          "external": 3203811,
+          "arrayBuffers": 65748
+        },
+        "uptime": 0.1009778
+      }
+    },
+    "after": {
+      "timestamp": 1762232723907,
+      "cpu": {
+        "usage": {
+          "user": 187000,
+          "system": 125000
+        },
+        "loadAverage": [
+          0,
+          0,
+          0
+        ]
+      },
+      "memory": {
+        "total": 51461881856,
+        "free": 37361045504,
+        "used": 14100836352,
+        "usagePercent": "27.40"
+      },
+      "process": {
+        "memoryUsage": {
+          "rss": 51900416,
+          "heapTotal": 10498048,
+          "heapUsed": 9260976,
+          "external": 3360950,
+          "arrayBuffers": 71001
+        },
+        "uptime": 19.6850253
+      }
+    },
+    "during": [
+      {
+        "timestamp": 1762232705326,
+        "cpu": {
+          "usage": {
+            "user": 156000,
+            "system": 78000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37249331200,
+          "used": 14212550656,
+          "usagePercent": "27.62"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 54124544,
+            "heapTotal": 13049856,
+            "heapUsed": 10003928,
+            "external": 3364423,
+            "arrayBuffers": 70702
+          },
+          "uptime": 1.103845
+        }
+      },
+      {
+        "timestamp": 1762232706333,
+        "cpu": {
+          "usage": {
+            "user": 156000,
+            "system": 78000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37271834624,
+          "used": 14190047232,
+          "usagePercent": "27.57"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 55205888,
+            "heapTotal": 14360576,
+            "heapUsed": 10549736,
+            "external": 3371113,
+            "arrayBuffers": 77392
+          },
+          "uptime": 2.1108433
+        }
+      },
+      {
+        "timestamp": 1762232707347,
+        "cpu": {
+          "usage": {
+            "user": 156000,
+            "system": 78000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37271040000,
+          "used": 14190841856,
+          "usagePercent": "27.58"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 55947264,
+            "heapTotal": 19341312,
+            "heapUsed": 11202512,
+            "external": 3376417,
+            "arrayBuffers": 82696
+          },
+          "uptime": 3.124824
+        }
+      },
+      {
+        "timestamp": 1762232708362,
+        "cpu": {
+          "usage": {
+            "user": 156000,
+            "system": 78000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37266669568,
+          "used": 14195212288,
+          "usagePercent": "27.58"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 58150912,
+            "heapTotal": 19603456,
+            "heapUsed": 11084944,
+            "external": 3368992,
+            "arrayBuffers": 75271
+          },
+          "uptime": 4.1399082
+        }
+      },
+      {
+        "timestamp": 1762232709363,
+        "cpu": {
+          "usage": {
+            "user": 156000,
+            "system": 78000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37253873664,
+          "used": 14208008192,
+          "usagePercent": "27.61"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 60768256,
+            "heapTotal": 19865600,
+            "heapUsed": 11974968,
+            "external": 3373918,
+            "arrayBuffers": 80197
+          },
+          "uptime": 5.1412764
+        }
+      },
+      {
+        "timestamp": 1762232710364,
+        "cpu": {
+          "usage": {
+            "user": 171000,
+            "system": 93000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37252292608,
+          "used": 14209589248,
+          "usagePercent": "27.61"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 60616704,
+            "heapTotal": 19865600,
+            "heapUsed": 14873072,
+            "external": 3409135,
+            "arrayBuffers": 115414
+          },
+          "uptime": 6.1421078
+        }
+      },
+      {
+        "timestamp": 1762232711373,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 93000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37227028480,
+          "used": 14234853376,
+          "usagePercent": "27.66"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 61087744,
+            "heapTotal": 20652032,
+            "heapUsed": 14363904,
+            "external": 3400498,
+            "arrayBuffers": 106777
+          },
+          "uptime": 7.1511844
+        }
+      },
+      {
+        "timestamp": 1762232712374,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 93000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37224255488,
+          "used": 14237626368,
+          "usagePercent": "27.67"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 62099456,
+            "heapTotal": 21176320,
+            "heapUsed": 13753840,
+            "external": 3390826,
+            "arrayBuffers": 97105
+          },
+          "uptime": 8.1517001
+        }
+      },
+      {
+        "timestamp": 1762232713373,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37264932864,
+          "used": 14196948992,
+          "usagePercent": "27.59"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 51245056,
+            "heapTotal": 10235904,
+            "heapUsed": 8747592,
+            "external": 3360692,
+            "arrayBuffers": 70743
+          },
+          "uptime": 9.1511647
+        }
+      },
+      {
+        "timestamp": 1762232714384,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37263437824,
+          "used": 14198444032,
+          "usagePercent": "27.59"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 51109888,
+            "heapTotal": 9973760,
+            "heapUsed": 8935912,
+            "external": 3363167,
+            "arrayBuffers": 73218
+          },
+          "uptime": 10.1622405
+        }
+      },
+      {
+        "timestamp": 1762232715398,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37257412608,
+          "used": 14204469248,
+          "usagePercent": "27.60"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 51712000,
+            "heapTotal": 11022336,
+            "heapUsed": 8528408,
+            "external": 3357650,
+            "arrayBuffers": 67701
+          },
+          "uptime": 11.1757577
+        }
+      },
+      {
+        "timestamp": 1762232716406,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37263749120,
+          "used": 14198132736,
+          "usagePercent": "27.59"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 52293632,
+            "heapTotal": 11022336,
+            "heapUsed": 9255032,
+            "external": 3363635,
+            "arrayBuffers": 73686
+          },
+          "uptime": 12.1837572
+        }
+      },
+      {
+        "timestamp": 1762232717421,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37270122496,
+          "used": 14191759360,
+          "usagePercent": "27.58"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 52314112,
+            "heapTotal": 11284480,
+            "heapUsed": 9025344,
+            "external": 3360413,
+            "arrayBuffers": 70464
+          },
+          "uptime": 13.1988137
+        }
+      },
+      {
+        "timestamp": 1762232718434,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37280837632,
+          "used": 14181044224,
+          "usagePercent": "27.56"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 52199424,
+            "heapTotal": 11284480,
+            "heapUsed": 9422920,
+            "external": 3365525,
+            "arrayBuffers": 75576
+          },
+          "uptime": 14.2118971
+        }
+      },
+      {
+        "timestamp": 1762232719434,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37283643392,
+          "used": 14178238464,
+          "usagePercent": "27.55"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 51249152,
+            "heapTotal": 10498048,
+            "heapUsed": 9243216,
+            "external": 3362552,
+            "arrayBuffers": 72603
+          },
+          "uptime": 15.212325
+        }
+      },
+      {
+        "timestamp": 1762232720449,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 109000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37270761472,
+          "used": 14191120384,
+          "usagePercent": "27.58"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 50737152,
+            "heapTotal": 10498048,
+            "heapUsed": 9118096,
+            "external": 3360647,
+            "arrayBuffers": 70698
+          },
+          "uptime": 16.2267709
+        }
+      },
+      {
+        "timestamp": 1762232721461,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 125000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37269557248,
+          "used": 14192324608,
+          "usagePercent": "27.58"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 51159040,
+            "heapTotal": 10498048,
+            "heapUsed": 9604336,
+            "external": 3367037,
+            "arrayBuffers": 77088
+          },
+          "uptime": 17.2389463
+        }
+      },
+      {
+        "timestamp": 1762232722472,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 125000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37266243584,
+          "used": 14195638272,
+          "usagePercent": "27.58"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 52277248,
+            "heapTotal": 11546624,
+            "heapUsed": 9413872,
+            "external": 3363947,
+            "arrayBuffers": 73998
+          },
+          "uptime": 18.2498127
+        }
+      },
+      {
+        "timestamp": 1762232723473,
+        "cpu": {
+          "usage": {
+            "user": 187000,
+            "system": 125000
+          },
+          "loadAverage": [
+            0,
+            0,
+            0
+          ]
+        },
+        "memory": {
+          "total": 51461881856,
+          "free": 37363216384,
+          "used": 14098665472,
+          "usagePercent": "27.40"
+        },
+        "process": {
+          "memoryUsage": {
+            "rss": 52678656,
+            "heapTotal": 11546624,
+            "heapUsed": 9844128,
+            "external": 3369059,
+            "arrayBuffers": 79110
+          },
+          "uptime": 19.251423
+        }
+      }
+    ]
+  },
+  "summary": {
+    "totalRequests": 240,
+    "successfulRequests": 0,
+    "failedRequests": 240,
+    "averageResponseTime": 3.9541666666666666,
+    "minResponseTime": 2,
+    "maxResponseTime": 102,
+    "requestsPerSecond": "12.25",
+    "errorRate": "100.00",
+    "medianResponseTime": 3,
+    "p95ResponseTime": 5,
+    "p99ResponseTime": 17.14999999999978,
+    "performanceRating": "excellent",
+    "testDate": "2025-11-04T05:05:23.908Z",
+    "recommendations": [
+      {
+        "priority": "high",
+        "issue": "错误率过高",
+        "currentValue": "100.00%",
+        "recommendedValue": "<1%",
+        "recommendation": "检查错误日志，修复导致请求失败的bug，提高系统稳定性"
+      },
+      {
+        "priority": "high",
+        "issue": "存在错误率较高的端点",
+        "details": [
+          {
+            "endpoint": "/api/categories",
+            "errorRate": "100.00%",
+            "errors": [
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404"
+            ]
+          },
+          {
+            "endpoint": "/api/transactions",
+            "errorRate": "100.00%",
+            "errors": [
+              "Error",
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404"
+            ]
+          },
+          {
+            "endpoint": "/api/users/login",
+            "errorRate": "100.00%",
+            "errors": [
+              "Error",
+              "Request failed with status code 401",
+              "Request failed with status code 401",
+              "Request failed with status code 401",
+              "Request failed with status code 401"
+            ]
+          },
+          {
+            "endpoint": "/api/accounts",
+            "errorRate": "100.00%",
+            "errors": [
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404",
+              "Request failed with status code 404"
+            ]
+          }
+        ],
+        "recommendation": "优先修复高错误率端点的问题，提高系统稳定性"
+      }
+    ]
+  }
+}

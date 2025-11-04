@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const statsController = require('../controllers/stats-controller');
-const { authenticateToken, checkRole } = require('../middleware/auth-middleware');
+const { authenticateToken, checkRole } = require('../middleware/tokenManager');
 
 // 获取用户统计信息
 router.get('/user', authenticateToken, statsController.getUserStats);

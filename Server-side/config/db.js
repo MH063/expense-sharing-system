@@ -14,7 +14,7 @@ require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
     max: 20, // 最大连接数
     idleTimeoutMillis: 30000, // 连接空闲超时时间
     connectionTimeoutMillis: 2000, // 连接超时时间
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: (process.env.DB_SSL === 'true') ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' } : false
   };
 
   // 创建PostgreSQL连接池
@@ -58,9 +58,21 @@ require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
     }
   }
 
+  async function ensureMfaColumns() {
+    try {
+      await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT");
+      await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE");
+      console.log('MFA 列检查/创建完成');
+    } catch (e) {
+      console.error('MFA 列创建失败:', e.message);
+      throw e;
+    }
+  }
+
   module.exports = {
     pool,
     query,
     testConnection,
+    ensureMfaColumns,
     getConfig: () => dbConfig,
   };

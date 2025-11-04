@@ -1,0 +1,14 @@
+{
+  "history": [
+    {
+      "date": "2025-11-04T05:05:23.909Z",
+      "totalRequests": 240,
+      "successfulRequests": 0,
+      "failedRequests": 240,
+      "averageResponseTime": 3.9541666666666666,
+      "requestsPerSecond": "12.25",
+      "errorRate": "100.00",
+      "performanceRating": "excellent"
+    }
+  ]
+}

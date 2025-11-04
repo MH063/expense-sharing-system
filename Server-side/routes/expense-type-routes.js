@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const expenseTypeController = require('../controllers/expense-type-controller');
-const { authenticateToken, checkRole } = require('../middleware/auth-middleware');
+const { authenticateToken, checkRole } = require('../middleware/tokenManager');
 
 // 创建费用类型（登录用户）
 router.post('/', authenticateToken, expenseTypeController.createExpenseType);

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const specialPaymentRulesController = require('../controllers/special-payment-rules-controller');
-const { authenticateToken, checkPermission } = require('../middleware/auth-middleware');
+const { authenticateToken, checkPermission } = require('../middleware/tokenManager');
 
 // 获取房间的特殊支付规则列表
 router.get('/rooms/:roomId/rules', 

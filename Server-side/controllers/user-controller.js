@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const winston = require('winston');
+const { TokenManager } = require('../middleware/tokenManager');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -26,12 +27,14 @@ class UserController {
     try {
       const { username, password, email, displayName } = req.body;
 
-      // 验证必填字段
+      // 基于 express-validator 的校验已在路由层，额外后备校验
       if (!username || !password || !email) {
-        return res.status(400).json({
-          success: false,
-          message: '用户名、密码和邮箱为必填项'
-        });
+        return res.status(400).json({ success: false, message: '用户名、密码和邮箱为必填项' });
+      }
+      // 密码强度：至少8位，包含大小写、数字、特殊字符各一
+      const strongPwd = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
+      if (!strongPwd.test(password)) {
+        return res.status(400).json({ success: false, message: '密码需包含大小写、数字、特殊字符且至少8位' });
       }
 
       // 检查用户名是否已存在
@@ -107,10 +110,8 @@ class UserController {
       const { username, password } = req.body;
 
       if (!username || !password) {
-        return res.status(400).json({
-          success: false,
-          message: '用户名/邮箱/手机号和密码为必填项'
-        });
+        if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+        return res.status(400).json({ success: false, message: '登录信息不完整' });
       }
 
       // 查找用户 - 支持用户名、邮箱或手机号登录
@@ -121,45 +122,51 @@ class UserController {
       const users = usersResult.rows;
 
       if (users.length === 0) {
-        return res.status(401).json({
-          success: false,
-          message: '用户名/邮箱/手机号或密码错误'
-        });
+        if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+        return res.status(401).json({ success: false, message: '登录信息不正确' });
       }
 
       const user = users[0];
+
+      // 若启用 MFA，需要校验一次 TOTP
+      if (user.mfa_enabled) {
+        const mfaCode = req.body && req.body.mfa_code;
+        if (!mfaCode) {
+          if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+          return res.status(401).json({ success: false, message: '需要多因素验证码' });
+        }
+        const { totpVerify } = require('../utils/totp');
+        const ok = totpVerify(String(mfaCode), user.mfa_secret, { window: 1 });
+        if (!ok) {
+          if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+          return res.status(401).json({ success: false, message: '多因素验证码错误' });
+        }
+      }
 
       // 验证密码
       const isPasswordValid = await bcrypt.compare(password, user.password);
 
       if (!isPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: '用户名/邮箱/手机号或密码错误'
-        });
+        if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+        return res.status(401).json({ success: false, message: '登录信息不正确' });
       }
 
       // 移除密码字段
-      const { password, ...userWithoutPassword } = user;
+      const { password: userPassword, ...userWithoutPassword } = user;
 
-      // 生成JWT token
-      const jwt = require('jsonwebtoken');
-      const accessToken = jwt.sign(
-        { 
-          sub: user.id.toString(),
-          username: user.username,
-          roles: ['user'],
-          permissions: ['read', 'write']
-        },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '1h' }
-      );
+      // 使用TokenManager生成JWT token
+      const { TokenManager } = require('../middleware/tokenManager');
+      const accessToken = TokenManager.generateAccessToken({
+        sub: user.id.toString(),
+        username: user.username,
+        roles: [user.role || 'user'],
+        permissions: ['read', 'write']
+      });
+      
+      const refreshToken = TokenManager.generateRefreshToken(user.id.toString());
 
-      const refreshToken = jwt.sign(
-        { sub: user.id.toString() },
-        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-        { expiresIn: '7d' }
-      );
+      // 记录登录成功
+      if (typeof req._recordLoginSuccess === 'function') req._recordLoginSuccess(username);
 
       logger.info(`用户登录成功: ${username}`);
 
@@ -194,12 +201,18 @@ class UserController {
         });
       }
 
-      // 验证刷新Token
-      const jwt = require('jsonwebtoken');
+      // 使用TokenManager验证刷新Token
+      const { TokenManager } = require('../middleware/tokenManager');
       let decoded;
       
       try {
-        decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key');
+        decoded = TokenManager.verifyRefreshToken(refreshToken);
+        if (!decoded) {
+          return res.status(401).json({
+            success: false,
+            message: '无效的刷新Token'
+          });
+        }
       } catch (error) {
         return res.status(401).json({
           success: false,
@@ -223,23 +236,15 @@ class UserController {
 
       const user = users[0];
 
-      // 生成新的JWT token
-      const newAccessToken = jwt.sign(
-        { 
-          sub: user.id.toString(),
-          username: user.username,
-          roles: ['user'],
-          permissions: ['read', 'write']
-        },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '1h' }
-      );
-
-      const newRefreshToken = jwt.sign(
-        { sub: user.id.toString() },
-        process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-        { expiresIn: '7d' }
-      );
+      // 使用TokenManager生成新的JWT token
+      const newAccessToken = TokenManager.generateAccessToken({
+        sub: user.id.toString(),
+        username: user.username,
+        roles: [user.role || 'user'],
+        permissions: ['read', 'write']
+      });
+      
+      const newRefreshToken = TokenManager.generateRefreshToken(user.id.toString());
 
       logger.info(`Token刷新成功: ${user.username}`);
 
@@ -669,11 +674,10 @@ class UserController {
       }
       
       // 验证新密码长度
-      if (newPassword.length < 6) {
-        return res.status(400).json({
-          success: false,
-          message: '新密码长度不能少于6位'
-        });
+      // 强密码策略（同注册）
+      const strongPwd = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
+      if (!strongPwd.test(newPassword)) {
+        return res.status(400).json({ success: false, message: '新密码需包含大小写、数字、特殊字符且至少8位' });
       }
       
       // 查询用户

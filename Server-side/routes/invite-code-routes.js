@@ -1,6 +1,6 @@
 const express = require('express');
 const InviteCodeController = require('../controllers/invite-code-controller');
-const { authenticateToken } = require('../middleware/auth-middleware');
+const { authenticateToken } = require('../middleware/tokenManager');
 
 const router = express.Router();
 const inviteCodeController = new InviteCodeController();

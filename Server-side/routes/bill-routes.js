@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const billController = require('../controllers/bill-controller');
-const { authenticateToken, requireRole } = require('../middleware/auth-middleware');
+const { authenticateToken, checkRole } = require('../middleware/tokenManager');
 const { uploadReceipt } = require('../middleware/upload');
 
 // 创建账单

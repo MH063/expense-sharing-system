@@ -5,7 +5,7 @@
 
 const pool = require('../config/db');
 const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
+const { logger } = require('../config/logger');
 
 /**
  * 获取支付转移记录列表

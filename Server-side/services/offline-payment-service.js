@@ -4,7 +4,7 @@
  */
 
 const pool = require('../config/db').pool;
-const logger = require('../config/winston');
+const { logger } = require('../config/logger');
 const { v4: uuidv4 } = require('uuid');
 
 /**

@@ -457,12 +457,45 @@ const getTaskStatus = async (req, res) => {
   }
 };
 
+// 标记同步失败
+const markSyncFailed = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { reason } = req.body;
+    if (!paymentId) {
+      return res.status(400).json({ success: false, message: '缺少支付记录ID' });
+    }
+    const result = await offlinePaymentService.markPaymentSyncFailed(paymentId, reason || '');
+    res.status(200).json({ success: true, data: result, message: '已标记同步失败' });
+  } catch (error) {
+    console.error('标记同步失败错误:', error);
+    res.status(500).json({ success: false, message: '标记同步失败错误', error: error.message });
+  }
+};
+
+// 重试同步失败的记录
+const retrySyncOfflinePayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    if (!paymentId) {
+      return res.status(400).json({ success: false, message: '缺少支付记录ID' });
+    }
+    const result = await offlinePaymentService.retryPaymentSync(paymentId);
+    res.status(200).json({ success: true, data: result, message: '重试已触发' });
+  } catch (error) {
+    console.error('重试同步失败错误:', error);
+    res.status(500).json({ success: false, message: '重试同步失败错误', error: error.message });
+  }
+};
+
 module.exports = {
   // 离线支付相关
   createOfflinePayment,
   syncOfflinePayment,
   getUserOfflinePayments,
   getPendingSyncPayments,
+  markSyncFailed,
+  retrySyncOfflinePayment,
   
   // 支付提醒相关
   createPaymentReminder,

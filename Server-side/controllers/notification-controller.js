@@ -229,7 +229,7 @@ class NotificationController {
    * @param {string} type - 通知类型 (可选)
    * @returns {Promise<number>} 未读通知数量
    */
-  static async getUnreadNotificationCount(userId, type = null) {
+  static async getUnreadNotificationsCount(userId, type = null) {
     try {
       logger.info('获取未读通知数量，用户ID:', userId, '类型:', type);
       
@@ -487,6 +487,64 @@ class NotificationController {
       return totalNotifications;
     } catch (error) {
       console.error('检查并发送逾期账单提醒失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取账单到期提醒
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>} 账单到期提醒列表
+   */
+  static async getBillDueReminders(userId) {
+    try {
+      logger.info('获取账单到期提醒，用户ID:', userId);
+      
+      // 查询用户相关的账单到期提醒
+      const result = await pool.query(
+        `SELECT n.*, b.description as bill_description, b.amount as bill_amount, b.due_date
+         FROM notifications n
+         JOIN bills b ON n.related_id = b.id
+         WHERE n.user_id = $1 AND n.type = 'bill_due' AND n.is_read = false
+         ORDER BY b.due_date ASC`,
+        [userId]
+      );
+      
+      const reminders = result.rows;
+      logger.info(`找到 ${reminders.length} 条账单到期提醒`);
+      
+      return reminders;
+    } catch (error) {
+      logger.error('获取账单到期提醒失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取支付状态变更通知
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>} 支付状态变更通知列表
+   */
+  static async getPaymentStatusNotifications(userId) {
+    try {
+      logger.info('获取支付状态变更通知，用户ID:', userId);
+      
+      // 查询用户相关的支付状态变更通知
+      const result = await pool.query(
+        `SELECT n.*, b.description as bill_description, b.amount as bill_amount
+         FROM notifications n
+         JOIN bills b ON n.related_id = b.id
+         WHERE n.user_id = $1 AND n.type = 'payment_status' AND n.is_read = false
+         ORDER BY n.created_at DESC`,
+        [userId]
+      );
+      
+      const notifications = result.rows;
+      logger.info(`找到 ${notifications.length} 条支付状态变更通知`);
+      
+      return notifications;
+    } catch (error) {
+      logger.error('获取支付状态变更通知失败:', error);
       throw error;
     }
   }

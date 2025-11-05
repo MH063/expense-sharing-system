@@ -34,10 +34,10 @@ console.log('即将加载安全配置...');
 const { setupSecurityHeaders } = require('./config/security');
 console.log('安全配置加载完成');
 
-// // 导入速率限制中间件
-// console.log('即将加载速率限制中间件...');
-// const { defaultRateLimiter } = require('./middleware/rateLimiter');
-// console.log('速率限制中间件加载完成');
+// 导入速率限制中间件
+console.log('即将加载速率限制中间件...');
+const { defaultRateLimiter } = require('./middleware/rateLimiter');
+console.log('速率限制中间件加载完成');
 
 // 导入指标中间件
 console.log('即将加载指标中间件...');
@@ -59,10 +59,10 @@ console.log('即将加载响应处理中间件...');
 const { standardResponseMiddleware } = require('./middleware/responseHandler');
 console.log('响应处理中间件加载完成');
 
-// // 导入token管理中间件
-// console.log('即将加载token管理中间件...');
-// const { TokenManager, authenticateToken, checkRole, checkPermission, checkRequestBodySize, checkTokenLength, aiTokenHandler } = require('./middleware/tokenManager');
-// console.log('token管理中间件加载完成');
+// 导入token管理中间件
+console.log('即将加载token管理中间件...');
+const { TokenManager, authenticateToken, checkRole, checkPermission, checkRequestBodySize, checkTokenLength, aiTokenHandler } = require('./middleware/tokenManager');
+console.log('token管理中间件加载完成');
 
 const path = require('path');
 const fs = require('fs');
@@ -86,6 +86,7 @@ console.log('定时任务服务已临时禁用，用于排查启动问题');
 
 // 导入路由
 const authRoutes = require('./routes/auth-routes');
+const adminAuthRoutes = require('./routes/admin-auth-routes');
 const userRoutes = require('./routes/user-routes');
 const roomRoutes = require('./routes/room-routes');
 const expenseRoutes = require('./routes/expense-routes');
@@ -151,17 +152,17 @@ setupSecurityHeaders(app);
 // 响应处理中间件
 app.use(standardResponseMiddleware);
 
-// Token 相关中间件（长度/大小校验应早于限流）- 临时禁用以排查问题
-console.log('token管理中间件已临时禁用，用于排查启动问题');
-// app.use(checkRequestBodySize);
-// app.use(checkTokenLength);
+// Token 相关中间件（长度/大小校验应早于限流）
+app.use(checkRequestBodySize);
+app.use(checkTokenLength);
 
-// 速率限制中间件（可按需在全局或路由粒度启用）- 临时禁用以排查问题
-console.log('速率限制中间件已临时禁用，用于排查启动问题');
-// app.use(defaultRateLimiter);
+// 速率限制中间件（可按需在全局或路由粒度启用）
+if (config.security.enableRateLimiting) {
+  app.use(defaultRateLimiter);
+}
 
-// AI 接口专用 token 处理 - 临时禁用以排查问题
-// app.use('/api/ai', aiTokenHandler);
+// AI 接口专用 token 处理
+app.use('/api/ai', aiTokenHandler);
 
 // HTTP请求日志中间件
 app.use(httpLogger);
@@ -1891,6 +1892,7 @@ app.get('/api/health', async (req, res) => {
 
 // API路由
 app.use('/api/auth', authRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/expenses', expenseRoutes);

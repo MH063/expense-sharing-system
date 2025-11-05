@@ -5,46 +5,37 @@
 const express = require('express');
 const router = express.Router();
 const userPreferencesController = require('../controllers/user-preferences-controller');
-// const { authenticateToken } = require('../middleware/auth');
-console.log('auth中间件已临时禁用，用于排查启动问题');
+const { authenticateToken } = require('../middleware/tokenManager');
+const { strictRateLimiter, looseRateLimiter } = require('../middleware/rateLimiter');
+const { logger } = require('../config/logger');
 
-// 获取用户所有偏好设置
-router.get('/', /* authenticateToken, */ (req, res, next) => {
-  // 临时设置用户ID，用于排查启动问题
-  req.user = req.user || {};
-  req.user.sub = req.user.sub || 'temp-user-id';
+// 获取用户所有偏好设置（读接口：宽松限流）
+router.get('/', authenticateToken, looseRateLimiter, (req, res, next) => {
+  logger.info('audit:preferences:list', { userId: req.user.sub });
   userPreferencesController.getUserPreferences(req, res, next);
 });
 
-// 获取用户特定偏好设置
-router.get('/:category/:key', /* authenticateToken, */ (req, res, next) => {
-  // 临时设置用户ID，用于排查启动问题
-  req.user = req.user || {};
-  req.user.sub = req.user.sub || 'temp-user-id';
+// 获取用户特定偏好设置（读接口：宽松限流）
+router.get('/:category/:key', authenticateToken, looseRateLimiter, (req, res, next) => {
+  logger.info('audit:preferences:get', { userId: req.user.sub, category: req.params.category, key: req.params.key });
   userPreferencesController.getUserPreference(req, res, next);
 });
 
-// 更新用户偏好设置
-router.put('/:category/:key', /* authenticateToken, */ (req, res, next) => {
-  // 临时设置用户ID，用于排查启动问题
-  req.user = req.user || {};
-  req.user.sub = req.user.sub || 'temp-user-id';
+// 更新用户偏好设置（写接口：严格限流）
+router.put('/:category/:key', authenticateToken, strictRateLimiter, (req, res, next) => {
+  logger.info('audit:preferences:update', { userId: req.user.sub, category: req.params.category, key: req.params.key });
   userPreferencesController.updateUserPreference(req, res, next);
 });
 
-// 批量更新用户偏好设置
-router.put('/:category', /* authenticateToken, */ (req, res, next) => {
-  // 临时设置用户ID，用于排查启动问题
-  req.user = req.user || {};
-  req.user.sub = req.user.sub || 'temp-user-id';
+// 批量更新用户偏好设置（写接口：严格限流）
+router.put('/:category', authenticateToken, strictRateLimiter, (req, res, next) => {
+  logger.info('audit:preferences:batch_update', { userId: req.user.sub, category: req.params.category, keys: Object.keys(req.body || {}) });
   userPreferencesController.batchUpdateUserPreferences(req, res, next);
 });
 
-// 删除用户偏好设置
-router.delete('/:category/:key', /* authenticateToken, */ (req, res, next) => {
-  // 临时设置用户ID，用于排查启动问题
-  req.user = req.user || {};
-  req.user.sub = req.user.sub || 'temp-user-id';
+// 删除用户偏好设置（写接口：严格限流）
+router.delete('/:category/:key', authenticateToken, strictRateLimiter, (req, res, next) => {
+  logger.info('audit:preferences:delete', { userId: req.user.sub, category: req.params.category, key: req.params.key });
   userPreferencesController.deleteUserPreference(req, res, next);
 });
 

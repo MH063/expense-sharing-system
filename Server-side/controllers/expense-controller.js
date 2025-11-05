@@ -1364,6 +1364,159 @@ class ExpenseController {
       client.release();
     }
   }
+
+  // 获取费用统计
+  async getExpenseStats(req, res) {
+    const client = await pool.connect();
+    try {
+      const { roomId } = req.params;
+      const { startDate, endDate } = req.query;
+      const userId = req.user.sub;
+
+      // 验证用户是否是寝室成员
+      const membershipResult = await client.query(
+        'SELECT 1 FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, roomId]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: '您不是该寝室的成员'
+        });
+      }
+
+      // 构建日期条件
+      let dateCondition = '';
+      const queryParams = [roomId];
+      let paramIndex = 2;
+
+      if (startDate) {
+        dateCondition += ` AND e.expense_date >= $${paramIndex}`;
+        queryParams.push(startDate);
+        paramIndex++;
+      }
+
+      if (endDate) {
+        dateCondition += ` AND e.expense_date <= $${paramIndex}`;
+        queryParams.push(endDate);
+        paramIndex++;
+      }
+
+      // 获取总费用统计
+      const totalStatsQuery = `
+        SELECT 
+          COUNT(*) as total_expenses,
+          COALESCE(SUM(e.amount), 0) as total_amount,
+          COALESCE(AVG(e.amount), 0) as average_amount
+        FROM expenses e
+        WHERE e.room_id = $1 ${dateCondition}
+      `;
+
+      const totalStatsResult = await client.query(totalStatsQuery, queryParams);
+
+      // 获取按费用类型分组的统计
+      const typeStatsQuery = `
+        SELECT 
+          et.name as type_name,
+          et.icon as type_icon,
+          COUNT(*) as count,
+          COALESCE(SUM(e.amount), 0) as total_amount
+        FROM expenses e
+        JOIN expense_types et ON e.expense_type_id = et.id
+        WHERE e.room_id = $1 ${dateCondition}
+        GROUP BY et.id, et.name, et.icon
+        ORDER BY total_amount DESC
+      `;
+
+      const typeStatsResult = await client.query(typeStatsQuery, queryParams);
+
+      // 获取按用户分组的统计（作为付款人）
+      const payerStatsQuery = `
+        SELECT 
+          u.id as user_id,
+          u.username,
+          u.name,
+          COUNT(*) as count,
+          COALESCE(SUM(e.amount), 0) as total_amount
+        FROM expenses e
+        JOIN users u ON e.payer_id = u.id
+        WHERE e.room_id = $1 ${dateCondition}
+        GROUP BY u.id, u.username, u.name
+        ORDER BY total_amount DESC
+      `;
+
+      const payerStatsResult = await client.query(payerStatsQuery, queryParams);
+
+      // 获取按月份分组的统计
+      const monthlyStatsQuery = `
+        SELECT 
+          TO_CHAR(e.expense_date, 'YYYY-MM') as month,
+          COUNT(*) as count,
+          COALESCE(SUM(e.amount), 0) as total_amount
+        FROM expenses e
+        WHERE e.room_id = $1 ${dateCondition}
+        GROUP BY TO_CHAR(e.expense_date, 'YYYY-MM')
+        ORDER BY month DESC
+        LIMIT 12
+      `;
+
+      const monthlyStatsResult = await client.query(monthlyStatsQuery, queryParams);
+
+      // 获取最近10笔费用
+      const recentExpensesQuery = `
+        SELECT 
+          e.id,
+          e.title,
+          e.amount,
+          e.expense_date,
+          e.status,
+          et.name as type_name,
+          et.icon as type_icon,
+          u.username as payer_username
+        FROM expenses e
+        JOIN expense_types et ON e.expense_type_id = et.id
+        JOIN users u ON e.payer_id = u.id
+        WHERE e.room_id = $1 ${dateCondition}
+        ORDER BY e.expense_date DESC, e.created_at DESC
+        LIMIT 10
+      `;
+
+      const recentExpensesResult = await client.query(recentExpensesQuery, queryParams);
+
+      // 构建响应数据
+      const statsData = {
+        room_id: roomId,
+        date_range: {
+          start_date: startDate || null,
+          end_date: endDate || null
+        },
+        summary: {
+          total_expenses: parseInt(totalStatsResult.rows[0].total_expenses),
+          total_amount: parseFloat(totalStatsResult.rows[0].total_amount),
+          average_amount: parseFloat(totalStatsResult.rows[0].average_amount)
+        },
+        by_type: typeStatsResult.rows,
+        by_payer: payerStatsResult.rows,
+        by_month: monthlyStatsResult.rows,
+        recent_expenses: recentExpensesResult.rows
+      };
+
+      res.status(200).json({
+        success: true,
+        data: statsData
+      });
+    } catch (error) {
+      logger.error('获取费用统计失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取费用统计失败',
+        error: error.message
+      });
+    } finally {
+      client.release();
+    }
+  }
 }
 
 module.exports = new ExpenseController();

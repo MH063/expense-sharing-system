@@ -1,6 +1,5 @@
-const { Pool } = require('pg');
 const winston = require('winston');
-const { authenticateToken, requireRole } = require('../middleware/auth-middleware');
+const { pool } = require('../config/db');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -22,10 +21,8 @@ const logger = winston.createLogger({
  */
 class StatsController {
   constructor() {
-    this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
+    // 使用共享连接池，避免重复创建
+    this.pool = pool;
   }
 
   /**
@@ -36,7 +33,7 @@ class StatsController {
   async getUserStats(req, res) {
     const client = await this.pool.connect();
     try {
-      const user_id = req.user.id;
+      const user_id = req.user.sub;
       const { room_id, period = 'month' } = req.query; // period: week, month, quarter, year
       
       // 验证用户是否为寝室成员
@@ -46,7 +43,7 @@ class StatsController {
       
       if (room_id) {
         const memberCheck = await client.query(
-          'SELECT * FROM room_members WHERE room_id = $1 AND user_id = $2',
+          'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
           [room_id, user_id]
         );
         
@@ -115,8 +112,8 @@ class StatsController {
           COALESCE(SUM(CASE WHEN bs.user_id = $1 AND bs.status = 'PENDING_PAYMENT' THEN bs.amount ELSE 0 END), 0) as total_bill_pending
         FROM bills b
         LEFT JOIN bill_splits bs ON b.id = bs.bill_id
-        JOIN room_members rm ON b.room_id = rm.room_id
-        WHERE rm.user_id = $1 ${roomFilter} ${timeFilter}
+        JOIN user_room_relations urr ON b.room_id = urr.room_id AND urr.is_active = TRUE
+        WHERE urr.user_id = $1 ${roomFilter} ${timeFilter}
       `;
       
       const billStatsResult = await client.query(billStatsQuery, params);
@@ -205,12 +202,12 @@ class StatsController {
   async getRoomStats(req, res) {
     const client = await this.pool.connect();
     try {
-      const user_id = req.user.id;
+      const user_id = req.user.sub;
       const { room_id, period = 'month' } = req.query;
       
       // 验证用户是否为寝室成员
       const memberCheck = await client.query(
-        'SELECT * FROM room_members WHERE room_id = $1 AND user_id = $2',
+        'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
         [room_id, user_id]
       );
       
@@ -261,11 +258,10 @@ class StatsController {
           COALESCE(SUM(es.amount), 0) as total_owed,
           COALESCE(SUM(CASE WHEN es.status = 'PAID' THEN es.amount ELSE 0 END), 0) as total_paid_split
         FROM users u
-        JOIN room_members rm ON u.id = rm.user_id
+        JOIN user_room_relations urr ON u.id = urr.user_id AND urr.room_id = $1 AND urr.is_active = TRUE
         LEFT JOIN expenses e ON u.id = e.payer_id AND e.room_id = $1 ${timeFilter.replace('AND', 'AND')}
         LEFT JOIN expense_splits es ON u.id = es.user_id
         LEFT JOIN expenses e2 ON es.expense_id = e2.id AND e2.room_id = $1 ${timeFilter.replace('AND', 'AND')}
-        WHERE rm.room_id = $1
         GROUP BY u.id, u.username
         ORDER BY total_paid DESC
       `;
@@ -548,13 +544,13 @@ class StatsController {
   async getExpenseForecast(req, res) {
     const client = await this.pool.connect();
     try {
-      const user_id = req.user.id;
+      const user_id = req.user.sub;
       const { room_id, period = 'month' } = req.query;
       
       // 验证用户是否为寝室成员
       if (room_id) {
         const memberCheck = await client.query(
-          'SELECT * FROM room_members WHERE room_id = $1 AND user_id = $2',
+          'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
           [room_id, user_id]
         );
         

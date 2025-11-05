@@ -14,12 +14,11 @@ function getClientIp(req) {
 }
 
 function verifyRequestSignature(req, res, next) {
-  // 跳过健康检查端点的签名验证
-  if (req.path === '/health') {
+  // 跳过健康检查和非 API 端点的签名验证
+  if (!config.security.enableRequestSignature || !req.path.startsWith('/api/')) {
     return next();
   }
-  
-  if (!config.security.enableRequestSignature) return next();
+
   const secret = config.security.apiSigningSecret;
   if (!secret) {
     logger.error('请求签名启用但缺少 API_SIGNING_SECRET');
@@ -61,12 +60,16 @@ function verifyRequestSignature(req, res, next) {
 }
 
 function ipWhitelist(req, res, next) {
-  if (!config.security.enableIpWhitelist) return next();
+  if (!config.security.enableIpWhitelist || !req.path.startsWith('/api/')) {
+    return next();
+  }
+
   const whitelist = config.security.ipWhitelist;
   if (!Array.isArray(whitelist) || whitelist.length === 0) {
     logger.error('IP 白名单启用但未配置 IP_WHITELIST');
     return res.status(500).json({ success: false, message: '服务器白名单配置错误' });
   }
+
   const ip = getClientIp(req);
   if (!whitelist.includes(ip)) {
     logger.warn('IP 不在白名单', { ip, path: req.path });

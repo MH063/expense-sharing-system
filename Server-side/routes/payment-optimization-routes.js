@@ -27,6 +27,10 @@ router.get('/records/:paymentId', paymentOptimizationController.getPaymentRecord
 router.get('/stats/user/:userId', paymentOptimizationController.getUserPaymentStats);
 router.get('/stats/room/:roomId', paymentOptimizationController.getRoomPaymentStats);
 
+// 离线支付同步失败标记与重试
+router.patch('/offline-payments/:paymentId/failed', paymentOptimizationController.markSyncFailed);
+router.post('/offline-payments/:paymentId/retry', paymentOptimizationController.retrySyncOfflinePayment);
+
 // 定时任务相关路由
 router.post('/tasks/trigger/:taskName', paymentOptimizationController.triggerTask);
 router.get('/tasks/status', paymentOptimizationController.getTaskStatus);

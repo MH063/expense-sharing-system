@@ -336,14 +336,9 @@ class WebSocketEventsHandler {
     try {
       // 这里需要查询数据库获取寝室成员列表
       // 为了简化，这里使用一个假设的查询
-      const { Pool } = require('pg');
-      const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-      });
-      
+      const { pool } = require('../config/db');
       const result = await pool.query(
-        'SELECT user_id FROM room_members WHERE room_id = $1',
+        'SELECT user_id FROM user_room_relations WHERE room_id = $1',
         [roomId]
       );
       
@@ -351,8 +346,6 @@ class WebSocketEventsHandler {
       for (const member of result.rows) {
         this.sendToUser(member.user_id, message);
       }
-      
-      await pool.end();
     } catch (error) {
       this.logger.error(`向寝室成员发送消息失败: ${error.message}`);
     }

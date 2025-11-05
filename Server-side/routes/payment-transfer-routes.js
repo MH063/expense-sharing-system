@@ -13,7 +13,10 @@ const {
   getPaymentTransferById
 } = require('../controllers/payment-transfer-controller');
 const { authenticateToken } = require('../middleware/tokenManager');
-const { body, param, query } = require('express-validator');
+const { 
+  paymentTransferValidationRules, 
+  handleValidationErrors 
+} = require('../middleware/validation-middleware');
 
 // 所有路由都需要身份验证
 router.use(authenticateToken);
@@ -30,15 +33,11 @@ router.use(authenticateToken);
  * @param {number} page - 页码（默认为1）
  * @param {number} pageSize - 每页数量（默认为10）
  */
-router.get('/', [
-  query('billId').optional().isUUID().withMessage('账单ID必须是有效的UUID'),
-  query('transferType').optional().isIn(['self_pay', 'multiple_payers', 'payer_transfer']).withMessage('转移类型无效'),
-  query('status').optional().isIn(['pending', 'completed', 'cancelled']).withMessage('状态无效'),
-  query('startDate').optional().isISO8601().withMessage('开始日期格式无效'),
-  query('endDate').optional().isISO8601().withMessage('结束日期格式无效'),
-  query('page').optional().isInt({ min: 1 }).withMessage('页码必须是大于0的整数'),
-  query('pageSize').optional().isInt({ min: 1, max: 100 }).withMessage('每页数量必须是1-100之间的整数')
-], getPaymentTransfers);
+router.get('/', 
+  paymentTransferValidationRules.getPaymentTransfers,
+  handleValidationErrors,
+  getPaymentTransfers
+);
 
 /**
  * @route POST /api/payment-transfers
@@ -51,14 +50,11 @@ router.get('/', [
  * @param {string} toUserId - 收款人ID
  * @param {string} note - 备注（可选）
  */
-router.post('/', [
-  body('billId').isUUID().withMessage('账单ID必须是有效的UUID'),
-  body('transferType').isIn(['self_pay', 'multiple_payers', 'payer_transfer']).withMessage('转移类型无效'),
-  body('amount').isFloat({ min: 0.01 }).withMessage('金额必须是大于0的数字'),
-  body('fromUserId').isUUID().withMessage('付款人ID必须是有效的UUID'),
-  body('toUserId').isUUID().withMessage('收款人ID必须是有效的UUID'),
-  body('note').optional().isLength({ max: 500 }).withMessage('备注长度不能超过500个字符')
-], createPaymentTransfer);
+router.post('/', 
+  paymentTransferValidationRules.createPaymentTransfer,
+  handleValidationErrors,
+  createPaymentTransfer
+);
 
 /**
  * @route GET /api/payment-transfers/:id
@@ -66,9 +62,11 @@ router.post('/', [
  * @access Private
  * @param {string} id - 转移记录ID
  */
-router.get('/:id', [
-  param('id').isUUID().withMessage('转移记录ID必须是有效的UUID')
-], getPaymentTransferById);
+router.get('/:id', 
+  paymentTransferValidationRules.getPaymentTransferById,
+  handleValidationErrors,
+  getPaymentTransferById
+);
 
 /**
  * @route PUT /api/payment-transfers/:id/confirm
@@ -76,9 +74,11 @@ router.get('/:id', [
  * @access Private
  * @param {string} id - 转移记录ID
  */
-router.put('/:id/confirm', [
-  param('id').isUUID().withMessage('转移记录ID必须是有效的UUID')
-], confirmPaymentTransfer);
+router.put('/:id/confirm', 
+  paymentTransferValidationRules.confirmPaymentTransfer,
+  handleValidationErrors,
+  confirmPaymentTransfer
+);
 
 /**
  * @route PUT /api/payment-transfers/:id/cancel
@@ -86,8 +86,10 @@ router.put('/:id/confirm', [
  * @access Private
  * @param {string} id - 转移记录ID
  */
-router.put('/:id/cancel', [
-  param('id').isUUID().withMessage('转移记录ID必须是有效的UUID')
-], cancelPaymentTransfer);
+router.put('/:id/cancel', 
+  paymentTransferValidationRules.cancelPaymentTransfer,
+  handleValidationErrors,
+  cancelPaymentTransfer
+);
 
 module.exports = router;

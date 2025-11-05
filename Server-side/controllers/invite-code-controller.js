@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { pool } = require('../config/db');
 const crypto = require('crypto');
 
 /**
@@ -7,9 +7,7 @@ const crypto = require('crypto');
  */
 class InviteCodeController {
   constructor() {
-    this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-    });
+    this.pool = pool;
   }
 
   /**
@@ -20,10 +18,10 @@ class InviteCodeController {
   async generateInviteCode(req, res) {
     try {
       const { roomId, maxUses = 10, expiresAt } = req.body;
-      const userId = req.user.id;
+      const userId = req.user.sub;
 
       // 验证用户是否是房间管理员
-      const roomQuery = 'SELECT created_by FROM rooms WHERE id = $1';
+      const roomQuery = 'SELECT creator_id FROM rooms WHERE id = $1';
       const roomResult = await this.pool.query(roomQuery, [roomId]);
       
       if (roomResult.rows.length === 0) {
@@ -33,7 +31,7 @@ class InviteCodeController {
         });
       }
 
-      if (roomResult.rows[0].created_by !== userId) {
+      if (roomResult.rows[0].creator_id !== userId) {
         return res.status(403).json({ 
           success: false, 
           message: '只有房间管理员可以生成邀请码' 
@@ -81,7 +79,7 @@ class InviteCodeController {
   async verifyInviteCode(req, res) {
     try {
       const { code } = req.body;
-      const userId = req.user.id;
+      const userId = req.user.sub;
 
       if (!code) {
         return res.status(400).json({
@@ -92,7 +90,7 @@ class InviteCodeController {
 
       // 查询邀请码信息
       const query = `
-        SELECT ic.*, r.name as room_name, r.created_by as room_admin
+        SELECT ic.*, r.name as room_name, r.creator_id as room_admin
         FROM invite_codes ic
         JOIN rooms r ON ic.room_id = r.id
         WHERE ic.code = $1
@@ -126,7 +124,7 @@ class InviteCodeController {
       }
 
       // 检查用户是否已经是房间成员
-      const memberQuery = 'SELECT id FROM room_members WHERE room_id = $1 AND user_id = $2';
+      const memberQuery = 'SELECT user_id FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE';
       const memberResult = await this.pool.query(memberQuery, [inviteCode.room_id, userId]);
       
       if (memberResult.rows.length > 0) {
@@ -168,7 +166,7 @@ class InviteCodeController {
       await client.query('BEGIN');
       
       const { code } = req.body;
-      const userId = req.user.id;
+      const userId = req.user.sub;
 
       // 查询邀请码信息
       const codeQuery = `
@@ -208,7 +206,7 @@ class InviteCodeController {
       }
 
       // 检查用户是否已经是房间成员
-      const memberQuery = 'SELECT id FROM room_members WHERE room_id = $1 AND user_id = $2';
+      const memberQuery = 'SELECT user_id FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE';
       const memberResult = await client.query(memberQuery, [inviteCode.room_id, userId]);
       
       if (memberResult.rows.length > 0) {
@@ -231,7 +229,7 @@ class InviteCodeController {
       // 更新邀请码使用次数
       const updateQuery = `
         UPDATE invite_codes 
-        SET used_count = used_count + 1
+        SET uses_count = uses_count + 1, updated_at = NOW()
         WHERE id = $1
       `;
       
@@ -276,10 +274,10 @@ class InviteCodeController {
   async getRoomInviteCodes(req, res) {
     try {
       const { roomId } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.sub;
 
       // 验证用户是否是房间管理员
-      const roomQuery = 'SELECT created_by FROM rooms WHERE id = $1';
+      const roomQuery = 'SELECT creator_id FROM rooms WHERE id = $1';
       const roomResult = await this.pool.query(roomQuery, [roomId]);
       
       if (roomResult.rows.length === 0) {
@@ -289,7 +287,7 @@ class InviteCodeController {
         });
       }
 
-      if (roomResult.rows[0].created_by !== userId) {
+      if (roomResult.rows[0].creator_id !== userId) {
         return res.status(403).json({ 
           success: false, 
           message: '只有房间管理员可以查看邀请码' 
@@ -331,11 +329,11 @@ class InviteCodeController {
   async revokeInviteCode(req, res) {
     try {
       const { id } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.sub;
 
       // 查询邀请码信息并验证权限
       const query = `
-        SELECT ic.*, r.created_by as room_admin
+        SELECT ic.*, r.creator_id as room_admin
         FROM invite_codes ic
         JOIN rooms r ON ic.room_id = r.id
         WHERE ic.id = $1
@@ -360,7 +358,7 @@ class InviteCodeController {
       }
 
       // 撤销邀请码（设置过期时间为当前时间）
-      const revokeQuery = 'UPDATE invite_codes SET expires_at = NOW() WHERE id = $1';
+      const revokeQuery = 'UPDATE invite_codes SET revoked = TRUE, updated_at = NOW() WHERE id = $1';
       await this.pool.query(revokeQuery, [id]);
 
       res.status(200).json({

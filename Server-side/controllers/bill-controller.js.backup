@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 const winston = require('winston');
-const { authenticateToken, requireRole } = require('../middleware/auth-middleware');
+const { authenticateToken, checkRole } = require('../middleware/tokenManager');
 const fs = require('fs');
 const path = require('path');
 
@@ -40,11 +40,6 @@ class BillController {
     this.getBillSettlements = this.getBillSettlements.bind(this);
     this.getRoomBillStats = this.getRoomBillStats.bind(this);
     this.getBillStatsByDateRange = this.getBillStatsByDateRange.bind(this);
-    // 新增：评论与分享方法绑定
-    this.addBillComment = this.addBillComment.bind(this);
-    this.getBillComments = this.getBillComments.bind(this);
-    this.createBillShare = this.createBillShare.bind(this);
-    this.getBillByShareCode = this.getBillByShareCode.bind(this);
   }
 
   /**
@@ -1786,130 +1781,5 @@ class BillController {
     }
   }
 }
-
-// 账单评论
-BillController.prototype.addBillComment = async function addBillComment(req, res) {
-  const client = await pool.connect();
-  try {
-    const { id } = req.params; // bill_id
-    const user_id = req.user.id;
-    const { content } = req.body;
-
-    if (!content || content.trim().length < 1) {
-      return res.status(400).json({ success: false, message: '评论内容不能为空' });
-    }
-
-    // 权限：需为房间成员
-    const permission = await client.query(
-      `SELECT 1 FROM bills b JOIN room_members rm ON b.room_id = rm.room_id WHERE b.id = $1 AND rm.user_id = $2`,
-      [id, user_id]
-    );
-    if (permission.rows.length === 0) {
-      return res.status(403).json({ success: false, message: '您无权评论该账单' });
-    }
-
-    const insert = await client.query(
-      `INSERT INTO bill_comments (bill_id, user_id, content) VALUES ($1, $2, $3) RETURNING *`,
-      [id, user_id, content.trim()]
-    );
-
-    return res.status(201).json({ success: true, data: insert.rows[0] });
-  } catch (error) {
-    logger.error('添加账单评论失败:', error);
-    return res.status(500).json({ success: false, message: '添加账单评论失败', error: error.message });
-  } finally {
-    client.release();
-  }
-};
-
-BillController.prototype.getBillComments = async function getBillComments(req, res) {
-  const client = await pool.connect();
-  try {
-    const { id } = req.params; // bill_id
-    const user_id = req.user.id;
-
-    // 权限：需为房间成员
-    const permission = await client.query(
-      `SELECT 1 FROM bills b JOIN room_members rm ON b.room_id = rm.room_id WHERE b.id = $1 AND rm.user_id = $2`,
-      [id, user_id]
-    );
-    if (permission.rows.length === 0) {
-      return res.status(403).json({ success: false, message: '您无权查看该账单评论' });
-    }
-
-    const result = await client.query(
-      `SELECT bc.*, u.username FROM bill_comments bc JOIN users u ON bc.user_id = u.id WHERE bc.bill_id = $1 ORDER BY bc.created_at DESC`,
-      [id]
-    );
-
-    return res.status(200).json({ success: true, data: result.rows });
-  } catch (error) {
-    logger.error('获取账单评论失败:', error);
-    return res.status(500).json({ success: false, message: '获取账单评论失败', error: error.message });
-  } finally {
-    client.release();
-  }
-};
-
-// 账单分享
-BillController.prototype.createBillShare = async function createBillShare(req, res) {
-  const client = await pool.connect();
-  try {
-    const { id } = req.params; // bill_id
-    const user_id = req.user.id;
-    const { expires_in_minutes = 60 } = req.body;
-
-    // 只有账单创建者或房间管理员可生成分享码
-    const permission = await client.query(
-      `SELECT b.*, rm.role as member_role FROM bills b JOIN room_members rm ON b.room_id = rm.room_id WHERE b.id = $1 AND rm.user_id = $2`,
-      [id, user_id]
-    );
-    if (permission.rows.length === 0) {
-      return res.status(403).json({ success: false, message: '您无权分享该账单' });
-    }
-    const bill = permission.rows[0];
-    if (bill.creator_id !== user_id && bill.member_role !== 'admin') {
-      return res.status(403).json({ success: false, message: '仅创建者或房间管理员可分享账单' });
-    }
-
-    const share_code = Math.random().toString(36).slice(2, 10);
-    const expires_at = new Date(Date.now() + expires_in_minutes * 60000);
-
-    const update = await client.query(
-      `UPDATE bills SET share_code = $1, share_expires_at = $2, updated_at = now() WHERE id = $3 RETURNING share_code, share_expires_at`,
-      [share_code, expires_at, id]
-    );
-
-    return res.status(200).json({ success: true, data: update.rows[0] });
-  } catch (error) {
-    logger.error('创建账单分享失败:', error);
-    return res.status(500).json({ success: false, message: '创建账单分享失败', error: error.message });
-  } finally {
-    client.release();
-  }
-};
-
-BillController.prototype.getBillByShareCode = async function getBillByShareCode(req, res) {
-  const client = await pool.connect();
-  try {
-    const { code } = req.params;
-
-    const billQuery = await client.query(
-      `SELECT b.*, u.username as creator_name, r.name as room_name FROM bills b JOIN users u ON b.creator_id = u.id JOIN rooms r ON b.room_id = r.id WHERE b.share_code = $1 AND (b.share_expires_at IS NULL OR b.share_expires_at > now())`,
-      [code]
-    );
-    if (billQuery.rows.length === 0) {
-      return res.status(404).json({ success: false, message: '分享链接无效或已过期' });
-    }
-
-    const bill = billQuery.rows[0];
-    return res.status(200).json({ success: true, data: { bill } });
-  } catch (error) {
-    logger.error('通过分享码获取账单失败:', error);
-    return res.status(500).json({ success: false, message: '通过分享码获取账单失败', error: error.message });
-  } finally {
-    client.release();
-  }
-};
 
 module.exports = new BillController();

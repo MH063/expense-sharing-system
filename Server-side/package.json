@@ -17,6 +17,11 @@
     "create:testdb": "set NODE_ENV=test && node scripts/create-test-database.js",
     "init:testdb": "psql -U postgres -d test_expense_system -f scripts/init-test-database.sql",
     "init:proddb": "psql -U postgres -d prod_expense_system -f scripts/init-prod-database.sql",
+    "create:schema": "node scripts/create-database-schema.js",
+    "schema:dev": "node scripts/create-database-schema.js --env development",
+    "schema:test": "node scripts/create-database-schema.js --env test",
+    "schema:prod": "node scripts/create-database-schema.js --env production",
+    "schema:examples": "node scripts/database-schema-creator-examples.js",
     "zeabur:init": "node scripts/zeabur-init.js",
     "zeabur:deploy": "npm run zeabur:init && npm start"
   },

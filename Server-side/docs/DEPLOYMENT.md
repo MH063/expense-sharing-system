@@ -82,6 +82,22 @@ brew services start redis
 
 ## 数据库设置
 
+> 提示：已新增三环境一键初始化脚本与指南，详见 `Server-side/docs/DB_INIT_GUIDE.md`。
+
+### 快速初始化（推荐）
+```bash
+psql -U postgres -h localhost -f "Server-side/db/init_all_envs.sql"
+```
+上述命令将创建 `expense_dev/expense_test/expense_prod` 并导入统一 schema。
+
+### 手动初始化（单环境）
+```bash
+psql -U postgres -h localhost -c "CREATE DATABASE expense_dev" || echo 已存在
+psql -U postgres -h localhost -f "Server-side/db/init_dev.sql"
+```
+
+
+
 ### 1. 创建数据库
 
 登录PostgreSQL控制台：

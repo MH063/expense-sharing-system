@@ -353,6 +353,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ElMessage } from 'element-plus'
+import { getBillDetail, deleteBill as deleteBillAPI } from '@/api/bills'
+import { paymentApi } from '@/api/payments'
+import billAPI from '@/api/bill-api'
+import notificationApi from '@/api/notifications'
 
 // 图标组件
 const BillIcon = {
@@ -535,51 +540,65 @@ const confirmDelete = () => {
 // 删除账单
 const deleteBill = async () => {
   try {
-    // await api.deleteBill(bill.value.id)
+    console.log('删除账单:', bill.value.id)
     
-    // 模拟删除成功
-    showDeleteModal.value = false
+    // 调用删除账单API
+    const response = await deleteBillAPI(bill.value.id)
     
-    // 返回列表页
-    router.push('/bills')
-    
+    if (response && response.success) {
+      showDeleteModal.value = false
+      ElMessage.success('账单删除成功')
+      router.push('/bills')
+    } else {
+      ElMessage.error('删除账单失败，请稍后再试')
+    }
   } catch (error) {
     console.error('删除账单失败:', error)
-    // 显示错误提示
+    ElMessage.error('删除账单失败，请稍后再试')
   }
 }
 
 // 支付账单
-const payBill = () => {
-  router.push(`/payments/${bill.value.id}/scan`)
+const payBill = async () => {
+  try {
+    console.log('支付账单:', bill.value.id)
+    
+    // 调用支付账单API
+    const response = await paymentApi.confirmPayment(bill.value.id)
+    
+    if (response && response.success) {
+      ElMessage.success('支付成功')
+      showPayModal.value = false
+      // 重新加载账单详情
+      loadBillDetail()
+    } else {
+      ElMessage.error('支付失败，请稍后再试')
+    }
+  } catch (error) {
+    console.error('支付失败:', error)
+    ElMessage.error('支付失败，请稍后再试')
+  }
 }
 
 // 确认支付
 const confirmPay = async () => {
   try {
-    // await api.payBill(bill.value.id, selectedPaymentMethod.value)
+    console.log('确认支付账单:', bill.value.id)
     
-    // 模拟支付成功
-    showPayModal.value = false
+    // 调用确认支付API
+    const response = await paymentApi.confirmPayment(bill.value.id)
     
-    // 更新账单状态
-    const participant = bill.value.participants.find(p => p.id === authStore.user.id)
-    if (participant) {
-      participant.paymentStatus = 'paid'
-    }
-    
-    // 检查是否所有参与者都已支付
-    const allPaid = bill.value.participants.every(p => p.paymentStatus === 'paid')
-    if (allPaid) {
-      bill.value.status = 'paid'
-      bill.value.paidAt = new Date().toISOString()
+    if (response && response.success) {
+      ElMessage.success('支付确认成功')
+      showPayModal.value = false
+      // 重新加载账单详情
+      loadBillDetail()
     } else {
-      bill.value.status = 'partial'
+      ElMessage.error('支付确认失败，请稍后再试')
     }
-    
   } catch (error) {
-    console.error('支付账单失败:', error)
-    // 显示错误提示
+    console.error('支付确认失败:', error)
+    ElMessage.error('支付确认失败，请稍后再试')
   }
 }
 
@@ -621,65 +640,56 @@ const addComment = async () => {
 // 加载账单详情
 const loadBillDetail = async () => {
   loading.value = true
+  bill.value = null
   
   try {
-    // 模拟API调用
-    console.log('加载账单详情:', route.params.id)
+    // 调用API获取账单详情
+    console.log('加载账单详情:', route.params.billId)
     
-    // 模拟账单数据
-    const bill = {
-      id: route.params.id,
-      title: '11月水电费',
-      amount: 156.50,
-      category: 'utilities',
-      due_date: '2023-11-30',
-      description: '11月份的水电费账单，包含水费和电费',
-      receipt_url: 'https://picsum.photos/seed/bill123/400/600.jpg',
-      split_type: 'equal',
-      status: 'pending',
-      created_at: '2023-11-01T10:00:00Z',
-      creator: {
-        id: 'user-1',
-        name: '张三'
-      },
-      participants: [
-        {
-          user_id: 'user-1',
-          user_name: '张三',
-          share: 52.17,
-          paid: true,
-          paid_at: '2023-11-02T14:30:00Z'
-        },
-        {
-          user_id: 'user-2',
-          user_name: '李四',
-          share: 52.17,
-          paid: false,
-          paid_at: null
-        },
-        {
-          user_id: 'user-3',
-          user_name: '王五',
-          share: 52.16,
-          paid: false,
-          paid_at: null
-        }
-      ]
+    const response = await getBillDetail(route.params.billId)
+    
+    // 检查响应是否成功
+    if (response && response.success && response.data) {
+      // 处理账单数据，确保字段名称一致
+      const billData = response.data
+      
+      // 标准化字段名称
+      billData.dueDate = billData.due_date || billData.dueDate
+      billData.createdAt = billData.created_at || billData.createdAt
+      billData.updatedAt = billData.updated_at || billData.updatedAt
+      billData.totalAmount = billData.total_amount || billData.amount || billData.totalAmount
+      billData.creatorId = billData.creator_id || billData.creator?.id
+      billData.creatorName = billData.creator_name || billData.creator?.name
+      
+      // 处理参与者数据
+      if (billData.participants && Array.isArray(billData.participants)) {
+        billData.participants = billData.participants.map(participant => ({
+          id: participant.user_id || participant.id,
+          name: participant.user_name || participant.name,
+          share: participant.share || 0,
+          paymentStatus: participant.paid ? 'paid' : 'unpaid',
+          paymentTime: participant.paid_at
+        }))
+      }
+      
+      // 计算当前用户的份额
+      if (authStore.user && billData.participants) {
+        const currentUserParticipant = billData.participants.find(p => p.id === authStore.user.id)
+        billData.myShare = currentUserParticipant ? currentUserParticipant.share : 0
+      } else {
+        billData.myShare = 0
+      }
+      
+      bill.value = billData
+      console.log('账单详情加载成功:', bill.value)
+    } else {
+      console.error('账单不存在或API响应格式错误:', response)
+      // 不设置bill.value，保持为null，这样会显示"账单不存在"的错误状态
     }
-    
-    // 获取类别名称
-    const category = categories.value.find(c => c.id === bill.category)
-    bill.category_name = category ? category.name : bill.category
-    
-    // 获取状态名称
-    const status = billStatuses.value.find(s => s.id === bill.status)
-    bill.status_name = status ? status.name : bill.status
-    
-    bill.value = bill
     
   } catch (error) {
     console.error('加载账单详情失败:', error)
-    ElMessage.error('加载账单详情失败，请稍后再试')
+    // 不设置bill.value，保持为null，这样会显示"账单不存在"的错误状态
   } finally {
     loading.value = false
   }
@@ -688,42 +698,49 @@ const loadBillDetail = async () => {
 // 标记为已支付
 const markAsPaid = async () => {
   try {
-    // 模拟API调用
-    console.log('标记账单为已支付:', route.params.id)
+    console.log('标记账单为已支付:', bill.value.id)
     
-    // 模拟成功响应
-    ElMessage.success('已标记为已支付')
+    // 调用标记支付API
+    const response = await billAPI.confirmBillPayment(bill.value.id, {})
     
-    // 更新账单状态
-    bill.value.status = 'paid'
-    bill.value.status_name = '已支付'
-    
-    // 更新当前用户的支付状态
-    const currentUser = authStore.user
-    const participant = bill.value.participants.find(p => p.user_id === currentUser.id)
-    if (participant) {
-      participant.paid = true
-      participant.paid_at = new Date().toISOString()
+    if (response && response.success) {
+      ElMessage.success('账单已标记为已支付')
+      // 重新加载账单详情
+      loadBillDetail()
+    } else {
+      ElMessage.error('标记支付失败，请稍后再试')
     }
-    
   } catch (error) {
-    console.error('标记支付状态失败:', error)
-    ElMessage.error('标记支付状态失败，请稍后再试')
+    console.error('标记支付失败:', error)
+    ElMessage.error('标记支付失败，请稍后再试')
   }
 }
 
 // 发送支付提醒
-const sendReminder = async (participant) => {
+const sendPaymentReminder = async (participant) => {
   try {
-    // 模拟API调用
-    console.log('发送支付提醒:', participant.user_name)
+    console.log('发送支付提醒:', bill.value.id, participant.id)
     
-    // 模拟成功响应
-    ElMessage.success(`已向${participant.user_name}发送支付提醒`)
+    // 创建支付提醒通知
+    const notificationData = {
+      type: 'payment_reminder',
+      title: '支付提醒',
+      message: `您有一笔账单需要支付：${bill.value.title}`,
+      recipient_id: participant.user_id,
+      bill_id: bill.value.id,
+      participant_id: participant.id
+    }
     
+    const response = await notificationApi.createNotification(notificationData)
+    
+    if (response && response.success) {
+      ElMessage.success(`已向${participant.user_name}发送支付提醒`)
+    } else {
+      ElMessage.error('发送提醒失败，请稍后再试')
+    }
   } catch (error) {
-    console.error('发送支付提醒失败:', error)
-    ElMessage.error('发送支付提醒失败，请稍后再试')
+    console.error('发送提醒失败:', error)
+    ElMessage.error('发送提醒失败，请稍后再试')
   }
 }
 

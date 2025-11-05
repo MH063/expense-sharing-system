@@ -41,9 +41,12 @@ const config = {
     }
   },
   test: {
-    dialect: process.env.DB_DIALECT || 'sqlite',
-    storage: process.env.DB_STORAGE || './database.sqlite',
-    database: process.env.DB_NAME || 'test_expense_system',
+    dialect: process.env.DB_DIALECT || 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'expense_test',
+    username: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '123456789',
     logging: false,
     pool: {
       max: 5,

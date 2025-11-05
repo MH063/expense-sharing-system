@@ -4,7 +4,8 @@
  */
 
 const userPreferencesService = require('../services/database/user-preferences-service');
-const logger = require('../utils/logger');
+// const logger = require('../utils/logger');
+console.log('logger已临时禁用，用于排查启动问题');
 
 class UserPreferencesController {
   /**
@@ -24,7 +25,8 @@ class UserPreferencesController {
         preferences = await userPreferencesService.getUserPreferencesGrouped(userId);
       }
       
-      logger.info(`获取用户偏好设置成功，用户ID: ${userId}`);
+      // logger.info(`获取用户偏好设置成功，用户ID: ${userId}`);
+      console.log(`获取用户偏好设置成功，用户ID: ${userId}`);
       
       res.status(200).json({
         success: true,
@@ -32,7 +34,8 @@ class UserPreferencesController {
         message: '获取用户偏好设置成功'
       });
     } catch (error) {
-      logger.error('获取用户偏好设置失败:', error);
+      // logger.error('获取用户偏好设置失败:', error);
+      console.error('获取用户偏好设置失败:', error);
       res.status(500).json({
         success: false,
         message: '获取用户偏好设置失败',
@@ -60,7 +63,8 @@ class UserPreferencesController {
         });
       }
       
-      logger.info(`获取用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
+      // logger.info(`获取用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
+      console.log(`获取用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
       
       res.status(200).json({
         success: true,
@@ -68,7 +72,8 @@ class UserPreferencesController {
         message: '获取用户偏好设置成功'
       });
     } catch (error) {
-      logger.error('获取用户偏好设置失败:', error);
+      // logger.error('获取用户偏好设置失败:', error);
+      console.error('获取用户偏好设置失败:', error);
       res.status(500).json({
         success: false,
         message: '获取用户偏好设置失败',
@@ -97,7 +102,8 @@ class UserPreferencesController {
       
       const preference = await userPreferencesService.upsertUserPreference(userId, category, key, value);
       
-      logger.info(`更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
+      // logger.info(`更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
+      console.log(`更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
       
       res.status(200).json({
         success: true,
@@ -105,7 +111,8 @@ class UserPreferencesController {
         message: '更新用户偏好设置成功'
       });
     } catch (error) {
-      logger.error('更新用户偏好设置失败:', error);
+      // logger.error('更新用户偏好设置失败:', error);
+      console.error('更新用户偏好设置失败:', error);
       res.status(500).json({
         success: false,
         message: '更新用户偏好设置失败',
@@ -134,7 +141,8 @@ class UserPreferencesController {
       
       const results = await userPreferencesService.batchUpdateUserPreferences(userId, category, preferences);
       
-      logger.info(`批量更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}`);
+      // logger.info(`批量更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}`);
+      console.log(`批量更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}`);
       
       res.status(200).json({
         success: true,
@@ -142,7 +150,8 @@ class UserPreferencesController {
         message: '批量更新用户偏好设置成功'
       });
     } catch (error) {
-      logger.error('批量更新用户偏好设置失败:', error);
+      // logger.error('批量更新用户偏好设置失败:', error);
+      console.error('批量更新用户偏好设置失败:', error);
       res.status(500).json({
         success: false,
         message: '批量更新用户偏好设置失败',
@@ -170,14 +179,16 @@ class UserPreferencesController {
         });
       }
       
-      logger.info(`删除用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
+      // logger.info(`删除用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
+      console.log(`删除用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
       
       res.status(200).json({
         success: true,
         message: '删除用户偏好设置成功'
       });
     } catch (error) {
-      logger.error('删除用户偏好设置失败:', error);
+      // logger.error('删除用户偏好设置失败:', error);
+      console.error('删除用户偏好设置失败:', error);
       res.status(500).json({
         success: false,
         message: '删除用户偏好设置失败',

@@ -9,7 +9,8 @@
 
     <div v-if="loading" class="loading-container">
       <div class="loading-spinner"></div>
-      <p>加载账单信息中...</p>
+      <p>正在加载账单信息...</p>
+      <p class="loading-subtitle">请稍候，这可能需要几秒钟</p>
     </div>
 
     <div v-else-if="bill" class="payment-content">
@@ -143,6 +144,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { paymentApi } from '@/api/payments'
 
 export default {
   name: 'BillPayment',
@@ -209,78 +211,65 @@ export default {
       try {
         loading.value = true
         
-        // 模拟API调用
-        console.log('获取账单详情:', props.billId)
+        // 调用真实API获取账单支付状态
+        console.log('API调用 - 获取账单支付状态:', props.billId)
         
-        // 模拟账单数据
-        const billData = {
-          id: props.billId,
-          title: '11月水电费',
-          description: '11月份的水电费账单，包含水费和电费',
-          total_amount: 156.50,
-          due_date: '2023-11-30',
-          created_at: '2023-11-01T10:00:00Z',
-          status: 'pending',
-          creator_id: 'user-1',
-          creator_name: '张三',
-          splits: [
-            {
-              user_id: 'user-1',
-              user_name: '张三',
-              amount: 52.17,
-              status: 'PAID',
-              paid_at: '2023-11-02T14:30:00Z'
+        const response = await paymentApi.getBillPaymentStatus(props.billId)
+        
+        // 处理响应数据
+        if (response.success) {
+          const paymentStatus = response.data.payment_status
+          const splits = response.data.splits || []
+          
+          // 转换数据格式以匹配前端需求
+          bill.value = {
+            id: paymentStatus.bill_id,
+            title: paymentStatus.bill_title,
+            description: paymentStatus.description || '',
+            totalAmount: parseFloat(paymentStatus.total_amount),
+            dueDate: paymentStatus.due_date,
+            createdAt: paymentStatus.created_at,
+            status: paymentStatus.status.toLowerCase(),
+            creator: {
+              id: paymentStatus.creator_id,
+              name: paymentStatus.creator_name || '未知用户'
             },
-            {
-              user_id: 'user-2',
-              user_name: '李四',
-              amount: 52.17,
-              status: 'PENDING',
-              paid_at: null
-            },
-            {
-              user_id: 'user-3',
-              user_name: '王五',
-              amount: 52.16,
-              status: 'PENDING',
-              paid_at: null
-            }
-          ]
-        }
-        
-        // 转换数据格式以匹配前端需求
-        bill.value = {
-          id: billData.id,
-          title: billData.title,
-          description: billData.description,
-          totalAmount: parseFloat(billData.total_amount),
-          dueDate: billData.due_date,
-          createdAt: billData.created_at,
-          status: billData.status.toLowerCase(),
-          creator: {
-            id: billData.creator_id,
-            name: billData.creator_name || '未知用户'
-          },
-          // 转换分摊记录为参与者信息
-          participants: billData.splits.map(split => ({
-            id: split.user_id,
-            name: split.user_name,
-            share: parseFloat(split.amount),
-            paid: split.status === 'PAID',
-            paymentTime: split.paid_at
-          }))
-        }
-        
-        // 检查当前用户是否已支付
-        const participant = bill.value.participants.find(
-          p => p.id === currentUser.value.id
-        )
-        if (participant && participant.paid) {
-          paymentTime.value = participant.paymentTime
+            // 转换分摊记录为参与者信息
+            participants: splits.map(split => ({
+              id: split.user_id,
+              name: split.user_name,
+              share: parseFloat(split.amount),
+              paid: split.status === 'PAID',
+              paymentTime: split.paid_at
+            }))
+          }
+          
+          // 检查当前用户是否已支付
+          const participant = bill.value.participants.find(
+            p => p.id === currentUser.value.id
+          )
+          if (participant && participant.paid) {
+            paymentTime.value = participant.paymentTime
+          }
+          
+          console.log('获取账单详情成功:', bill.value)
+        } else {
+          console.error('获取账单详情失败:', response.message)
+          ElMessage.error({
+            message: response.message || '获取账单详情失败',
+            duration: 5000,
+            showClose: true
+          })
+          bill.value = null
         }
         
       } catch (error) {
         console.error('获取账单详情出错:', error)
+        ElMessage.error({
+          message: '获取账单详情失败，请检查网络连接后重试',
+          duration: 5000,
+          showClose: true
+        })
         bill.value = null
       } finally {
         loading.value = false
@@ -297,32 +286,59 @@ export default {
       try {
         processing.value = true
         
-        // 模拟支付处理
-        console.log('处理支付:', selectedPaymentMethod.value)
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // 调用真实API处理支付
+        console.log('API调用 - 确认支付:', {
+          billId: props.billId,
+          paymentMethod: selectedPaymentMethod.value
+        })
         
-        // 模拟成功响应
-        console.log('支付成功')
+        const response = await paymentApi.confirmPayment(props.billId, {
+          payment_method: selectedPaymentMethod.value,
+          transaction_id: `TXN${Date.now()}`, // 生成一个模拟的交易ID
+          payment_time: new Date().toISOString()
+        })
         
-        // 更新账单状态
-        const participant = bill.value.participants.find(
-          p => p.id === currentUser.value.id
-        )
-        if (participant) {
-          participant.paid = true
-          participant.paymentTime = new Date().toISOString()
-          paymentTime.value = participant.paymentTime
+        // 处理响应数据
+        if (response.success) {
+          console.log('支付成功:', response.data)
+          
+          // 更新账单状态
+          const participant = bill.value.participants.find(
+            p => p.id === currentUser.value.id
+          )
+          if (participant) {
+            participant.paid = true
+            participant.paymentTime = new Date().toISOString()
+            paymentTime.value = participant.paymentTime
+          }
+          
+          // 显示成功消息
+          ElMessage.success({
+            message: '支付成功！',
+            duration: 3000,
+            showClose: true
+          })
+          
+          // 跳转到账单详情页
+          setTimeout(() => {
+            router.push(`/bills/${props.billId}`)
+          }, 1500)
+        } else {
+          console.error('支付失败:', response.message)
+          ElMessage.error({
+            message: response.message || '支付失败，请重试',
+            duration: 5000,
+            showClose: true
+          })
         }
-        
-        // 显示成功消息
-        ElMessage.success('支付成功！')
-        
-        // 跳转到账单详情页
-        router.push(`/bills/${props.billId}`)
         
       } catch (error) {
         console.error('支付出错:', error)
-        ElMessage.error('支付出错，请重试')
+        ElMessage.error({
+          message: '支付出错，请检查网络连接后重试',
+          duration: 5000,
+          showClose: true
+        })
       } finally {
         processing.value = false
       }
@@ -441,6 +457,16 @@ export default {
   border-top-color: #4a6cf7;
   animation: spin 1s ease-in-out infinite;
   margin-bottom: 15px;
+}
+
+.loading-container p {
+  color: #666;
+  margin: 5px 0;
+}
+
+.loading-subtitle {
+  font-size: 0.9rem;
+  color: #999;
 }
 
 @keyframes spin {

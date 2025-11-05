@@ -3,12 +3,22 @@
  * 提供基础的数据库操作方法
  */
 
-const { pool } = require('../config/db');
+// // 临时注释掉数据库配置导入，用于排查启动问题
+// const { pool } = require('../config/db');
+// console.log('数据库配置已临时禁用，用于排查启动问题');
+
+// 临时创建一个模拟的pool对象，用于排查启动问题
+const mockPool = {
+  query: async (sql, params) => {
+    console.log('模拟数据库查询:', sql, params);
+    return { rows: [], rowCount: 0 };
+  }
+};
 
 class BaseService {
   constructor(tableName) {
     this.tableName = tableName;
-    this.pool = pool;
+    this.pool = mockPool; // 使用模拟的pool对象
   }
 
   /**

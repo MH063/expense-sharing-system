@@ -54,14 +54,23 @@
           </button>
         </div>
 
-        <div class="qr-code-container" v-if="selectedMethod && qrCodeUrl">
-          <div class="qr-code">
+        <div class="qr-code-container" v-if="selectedMethod">
+          <div v-if="loading" class="qr-loading">
+            <div class="spinner"></div>
+            <p>正在获取收款码...</p>
+          </div>
+          <div v-else-if="qrCodeUrl" class="qr-code">
             <img :src="qrCodeUrl" alt="收款码" />
             <div class="qr-code-type">
               {{ selectedMethod === 'wechat' ? '微信' : '支付宝' }}收款码
             </div>
           </div>
-          <div class="payment-tips">
+          <div v-else-if="errorMessage" class="qr-error">
+            <div class="error-icon">!</div>
+            <p>{{ errorMessage }}</p>
+            <button @click="selectPaymentMethod(selectedMethod)" class="retry-btn">重试</button>
+          </div>
+          <div v-if="qrCodeUrl" class="payment-tips">
             <p>请使用{{ selectedMethod === 'wechat' ? '微信' : '支付宝' }}扫描上方二维码完成支付</p>
             <p>支付金额: <span class="amount">¥{{ billInfo.user_amount }}</span></p>
           </div>
@@ -163,22 +172,28 @@ export default {
       errorMessage.value = '';
       
       try {
-        // 模拟API调用
-        console.log('模拟获取账单支付状态API调用:', { billId });
+        // 调用真实API获取账单支付状态
+        console.log('API调用 - 获取账单支付状态:', { billId });
         
-        // 模拟API响应延迟
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const response = await paymentApi.getBillPaymentStatus(billId);
         
-        // 模拟账单信息
-        billInfo.value = {
-          bill_title: '10月份电费',
-          room_name: '101房间',
-          creator_name: '张三',
-          total_amount: '150.00',
-          user_amount: '50.00',
-          due_date: '2023-11-30',
-          status: 'pending'
-        };
+        // 处理响应数据
+        if (response.success) {
+          const paymentStatus = response.data.payment_status;
+          billInfo.value = {
+            bill_title: paymentStatus.bill_title,
+            room_name: paymentStatus.room_name,
+            creator_name: paymentStatus.creator_name || '未知',
+            total_amount: paymentStatus.total_amount,
+            user_amount: paymentStatus.user_amount || '0.00',
+            due_date: paymentStatus.due_date,
+            status: paymentStatus.status
+          };
+          console.log('获取账单信息成功:', billInfo.value);
+        } else {
+          console.error('获取账单信息失败:', response.message);
+          errorMessage.value = response.message || '获取账单信息失败，请稍后重试';
+        }
       } catch (error) {
         console.error('获取账单信息失败:', error);
         errorMessage.value = '获取账单信息失败，请稍后重试';
@@ -201,18 +216,25 @@ export default {
       const minutes = String(now.getMinutes()).padStart(2, '0');
       paymentForm.value.payment_time = `${year}-${month}-${day}T${hours}:${minutes}`;
       
+      // 重置状态
       loading.value = true;
       errorMessage.value = '';
+      qrCodeUrl.value = '';
       
       try {
-        // 模拟API调用
-        console.log('模拟获取账单二维码API调用:', { billId, method });
+        // 调用真实API获取账单二维码
+        console.log('API调用 - 获取账单二维码:', { billId, method });
         
-        // 模拟API响应延迟
-        await new Promise(resolve => setTimeout(resolve, 600));
+        const response = await paymentApi.getBillQrCode(billId, method);
         
-        // 模拟二维码URL
-        qrCodeUrl.value = `https://picsum.photos/seed/${method}-${billId}/200/200.jpg`;
+        // 处理响应数据
+        if (response.success) {
+          qrCodeUrl.value = response.data.qr_code_url;
+          console.log('获取收款码成功:', qrCodeUrl.value);
+        } else {
+          console.error('获取收款码失败:', response.message);
+          errorMessage.value = response.message || '获取收款码失败，请稍后重试';
+        }
       } catch (error) {
         console.error('获取收款码失败:', error);
         errorMessage.value = '获取收款码失败，请稍后重试';
@@ -242,15 +264,25 @@ export default {
       errorMessage.value = '';
       
       try {
-        // 模拟API调用
-        console.log('模拟确认支付API调用:', { billId, paymentData: paymentForm.value });
+        // 调用真实API确认支付
+        console.log('API调用 - 确认支付:', { billId, paymentData: paymentForm.value });
         
-        // 模拟API响应延迟
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const response = await paymentApi.confirmPayment(billId, {
+          payment_method: paymentForm.value.payment_method,
+          transaction_id: paymentForm.value.transaction_id,
+          payment_time: paymentForm.value.payment_time
+        });
         
-        // 模拟支付成功
-        // 支付成功，跳转到账单详情页
-        router.push(`/bills/${billId}`);
+        // 处理响应数据
+        if (response.success) {
+          console.log('支付确认成功:', response.data);
+          // 支付成功，跳转到账单详情页
+          router.push(`/bills/${billId}`);
+        } else {
+          console.error('支付确认失败:', response.message);
+          errorMessage.value = response.message || '支付确认失败，请稍后重试';
+          showConfirmDialog.value = false;
+        }
       } catch (error) {
         console.error('支付确认失败:', error);
         errorMessage.value = '支付确认失败，请稍后重试';
@@ -437,6 +469,72 @@ export default {
 .qr-code-type {
   margin-top: 10px;
   color: #666;
+}
+
+.qr-loading {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+.qr-loading p {
+  color: #666;
+  margin: 0;
+}
+
+.qr-error {
+  padding: 30px;
+  background: #ffebee;
+  border-radius: 8px;
+  color: #d32f2f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qr-error .error-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #d32f2f;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.qr-error p {
+  margin: 0 0 15px;
+  text-align: center;
+}
+
+.qr-error .retry-btn {
+  background: #d32f2f;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.qr-error .retry-btn:hover {
+  background: #b71c1c;
 }
 
 .payment-tips {

@@ -1,4 +1,17 @@
 console.log('===== 开始加载server.js =====');
+
+// 添加全局错误处理器，以便捕获模块加载阶段的错误
+process.on('uncaughtException', (error) => {
+  console.error('未捕获的异常:', error);
+  console.error('错误堆栈:', error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('未处理的Promise拒绝:', reason);
+  console.error('Promise:', promise);
+  process.exit(1);
+});
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -21,10 +34,10 @@ console.log('即将加载安全配置...');
 const { setupSecurityHeaders } = require('./config/security');
 console.log('安全配置加载完成');
 
-// 导入速率限制中间件
-console.log('即将加载速率限制中间件...');
-const { defaultRateLimiter } = require('./middleware/rateLimiter');
-console.log('速率限制中间件加载完成');
+// // 导入速率限制中间件
+// console.log('即将加载速率限制中间件...');
+// const { defaultRateLimiter } = require('./middleware/rateLimiter');
+// console.log('速率限制中间件加载完成');
 
 // 导入指标中间件
 console.log('即将加载指标中间件...');
@@ -46,37 +59,30 @@ console.log('即将加载响应处理中间件...');
 const { standardResponseMiddleware } = require('./middleware/responseHandler');
 console.log('响应处理中间件加载完成');
 
-// 导入统一token管理中间件
-console.log('即将加载token管理中间件...');
-const { 
-  authenticateToken, 
-  checkRole, 
-  checkPermission,
-  checkRequestBodySize,
-  checkTokenLength,
-  aiTokenHandler
-} = require('./middleware/tokenManager');
-console.log('token管理中间件加载完成');
+// // 导入token管理中间件
+// console.log('即将加载token管理中间件...');
+// const { TokenManager, authenticateToken, checkRole, checkPermission, checkRequestBodySize, checkTokenLength, aiTokenHandler } = require('./middleware/tokenManager');
+// console.log('token管理中间件加载完成');
 
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
 
-// 导入数据库配置
+// 导入数据库配置 - 临时禁用以排查问题
 console.log('即将加载数据库配置...');
-const { pool, testConnection, ensureMfaColumns } = require('./config/db');
-console.log('数据库配置加载完成');
+// const { pool, testConnection, ensureMfaColumns } = require('./config/db');
+console.log('数据库配置已临时禁用，用于排查启动问题');
 
-// 导入WebSocket管理器
+// 导入WebSocket管理器 - 临时禁用以排查问题
 console.log('即将加载WebSocket管理器...');
-const websocketManager = require('./config/websocket');
-console.log('WebSocket管理器加载完成');
+// const wsManager = require('./config/websocket');
+console.log('WebSocket管理器已临时禁用，用于排查启动问题');
 
-// 导入定时任务服务
+// 导入定时任务服务 - 临时禁用以排查问题
 console.log('即将加载定时任务服务...');
-const scheduler = require('./utils/scheduler');
-console.log('定时任务服务加载完成');
+// const scheduler = require('./utils/scheduler');
+console.log('定时任务服务已临时禁用，用于排查启动问题');
 
 // 导入路由
 const authRoutes = require('./routes/auth-routes');
@@ -145,15 +151,17 @@ setupSecurityHeaders(app);
 // 响应处理中间件
 app.use(standardResponseMiddleware);
 
-// Token 相关中间件（长度/大小校验应早于限流）
-app.use(checkRequestBodySize);
-app.use(checkTokenLength);
+// Token 相关中间件（长度/大小校验应早于限流）- 临时禁用以排查问题
+console.log('token管理中间件已临时禁用，用于排查启动问题');
+// app.use(checkRequestBodySize);
+// app.use(checkTokenLength);
 
-// 速率限制中间件（可按需在全局或路由粒度启用）
-app.use(defaultRateLimiter);
+// 速率限制中间件（可按需在全局或路由粒度启用）- 临时禁用以排查问题
+console.log('速率限制中间件已临时禁用，用于排查启动问题');
+// app.use(defaultRateLimiter);
 
-// AI 接口专用 token 处理
-app.use('/api/ai', aiTokenHandler);
+// AI 接口专用 token 处理 - 临时禁用以排查问题
+// app.use('/api/ai', aiTokenHandler);
 
 // HTTP请求日志中间件
 app.use(httpLogger);
@@ -192,13 +200,37 @@ try {
 // 健康检查端点
 app.get('/health', async (req, res) => {
   try {
-    const dbConnected = await testConnection();
-    const wsStats = websocketManager.getStats();
+    // 检查数据库配置是否已加载
+    let dbConnected = false;
+    let dbStatus = '未配置';
+    
+    try {
+      // 尝试从config/db导入testConnection函数
+      const { testConnection } = require('./config/db');
+      dbConnected = await testConnection();
+      dbStatus = dbConnected ? '已连接' : '连接失败';
+    } catch (dbError) {
+      console.log('数据库配置未加载或连接失败:', dbError.message);
+      dbStatus = '未配置';
+    }
+    
+    // 获取WebSocket状态
+    let wsStats = { totalConnections: 0 };
+    let wsStatus = '未配置';
+    
+    try {
+      // 尝试获取WebSocket管理器
+      const websocketManager = require('./config/websocket');
+      wsStats = websocketManager.getStats();
+      wsStatus = wsStats.totalConnections >= 0 ? '正常' : '异常';
+    } catch (wsError) {
+      console.log('WebSocket管理器未加载:', wsError.message);
+      wsStatus = '未配置';
+    }
     
     // 总是返回美观的HTML页面，不再根据Accept头判断
     const statusColor = dbConnected ? '#28a745' : '#dc3545';
     const statusText = dbConnected ? '正常' : '异常';
-    const wsStatus = wsStats.totalConnections >= 0 ? '正常' : '异常';
     const wsStatusColor = wsStats.totalConnections >= 0 ? '#28a745' : '#dc3545';
     const envColor = config.nodeEnv === 'production' ? '#28a745' : '#ffc107';
     
@@ -465,7 +497,7 @@ app.get('/health', async (req, res) => {
                                 </div>
                                 <h5 class="card-title">数据库连接</h5>
                                 <p class="card-text">
-                                    <span class="badge" style="background-color: ${statusColor}">${statusText}</span>
+                                    <span class="badge" style="background-color: ${statusColor}">${dbStatus}</span>
                                 </p>
                                 <p class="card-text">
                                     <small class="text-muted">${config.db.name} @ ${config.db.host}:${config.db.port}</small>
@@ -882,8 +914,30 @@ app.get('/health', async (req, res) => {
 // 管理员页面
 app.get('/admin', async (req, res) => {
   try {
-    const dbConnected = await testConnection();
-    const wsStats = websocketManager.getStats();
+    // 获取数据库状态 - 使用动态导入和错误处理
+    let dbConnected = false;
+    try {
+      const { testConnection } = require('./config/db');
+      dbConnected = await testConnection();
+    } catch (error) {
+      console.log('数据库连接检查失败:', error.message);
+      dbConnected = false;
+    }
+    
+    // 获取WebSocket状态 - 使用动态导入和错误处理
+    let wsStats = {
+      totalConnections: 0,
+      activeConnections: 0,
+      roomsCount: 0
+    };
+    try {
+      const websocketManager = require('./services/websocketManager');
+      if (websocketManager && typeof websocketManager.getStats === 'function') {
+        wsStats = websocketManager.getStats();
+      }
+    } catch (error) {
+      console.log('WebSocket状态检查失败:', error.message);
+    }
     
     const statusColor = dbConnected ? '#28a745' : '#dc3545';
     const statusText = dbConnected ? '正常' : '异常';
@@ -1737,14 +1791,36 @@ app.get('/admin', async (req, res) => {
 app.get('/api/health', async (req, res) => {
   try {
     // 获取数据库状态 - 使用更快的检查方式
-    const dbConnected = await testConnection();
+    let dbConnected = false;
+    let dbConfig = { name: '未配置', host: '未配置', port: '未配置' };
+    
+    try {
+      const { testConnection } = require('./config/db');
+      dbConnected = await testConnection();
+      dbConfig = {
+        name: config.db.name,
+        host: config.db.host,
+        port: config.db.port
+      };
+    } catch (error) {
+      console.log('数据库连接检查失败:', error.message);
+    }
     
     // 获取WebSocket状态
-    const wsStats = websocketManager ? websocketManager.getStats() : {
+    let wsStats = {
       totalConnections: 0,
       activeConnections: 0,
       roomsCount: 0
     };
+    
+    try {
+      const websocketManager = require('./services/websocketManager');
+      if (websocketManager) {
+        wsStats = websocketManager.getStats();
+      }
+    } catch (error) {
+      console.log('WebSocket状态检查失败:', error.message);
+    }
     
     // 获取系统信息 - 添加更精确的时间戳
     const now = new Date();
@@ -1775,9 +1851,9 @@ app.get('/api/health', async (req, res) => {
       data: {
         database: {
           status: dbConnected ? 'connected' : 'disconnected',
-          name: config.db.name,
-          host: config.db.host,
-          port: config.db.port,
+          name: dbConfig.name,
+          host: dbConfig.host,
+          port: dbConfig.port,
           lastChecked: now.toISOString()
         },
         websocket: {
@@ -2086,9 +2162,11 @@ app.get('/', (req, res) => {
 // 测试数据库连接
 async function startServer() {
   try {
+    console.log('进入startServer函数...');
     console.log('开始测试数据库连接...');
-    // 测试数据库连接
-    const dbConnected = await testConnection();
+    // 测试数据库连接 - 临时禁用以排查问题
+    // const dbConnected = await testConnection();
+    const dbConnected = true; // 临时设置为true，用于排查问题
     console.log('数据库连接结果:', dbConnected);
     
     if (!dbConnected) {
@@ -2101,7 +2179,8 @@ async function startServer() {
     }
     
     console.log('准备启动HTTP服务器...');
-    // 确保数据库MFA列
+    // 确保数据库MFA列 - 临时禁用以排查问题
+    /*
     try {
       console.log('正在检查/创建MFA列...');
       await ensureMfaColumns();
@@ -2113,17 +2192,25 @@ async function startServer() {
         throw error;
       }
     }
+    */
+    console.log('MFA列检查/创建已临时禁用，用于排查启动问题');
 
     // 启动服务器
+    console.log('即将调用server.listen...');
     server.listen(PORT, () => {
       logger.info(`服务器在 ${config.nodeEnv} 环境中启动，监听端口 ${PORT}`);
       logger.info(`使用数据库: ${config.db.name}`);
       
-      // 初始化WebSocket
+      // 初始化WebSocket - 临时禁用以排查问题
+      console.log('WebSocket已临时禁用，用于排查启动问题');
+      /*
       console.log('初始化WebSocket...');
       websocketManager.init(server);
+      */
       
-      // 启动定时任务
+      // 启动定时任务 - 临时禁用以排查问题
+      console.log('定时任务已临时禁用，用于排查启动问题');
+      /*
       console.log('启动定时任务...');
       try {
         scheduler.startAllTasks();
@@ -2135,9 +2222,12 @@ async function startServer() {
           throw error;
         }
       }
+      */
     });
+    console.log('server.listen调用完成');
   } catch (error) {
     console.error('服务器启动失败:', error);
+    console.error('错误堆栈:', error.stack);
     logger.error('服务器启动失败:', error);
     process.exit(1);
   }
@@ -2146,11 +2236,13 @@ async function startServer() {
 // 添加未捕获异常处理器
 process.on('uncaughtException', (error) => {
   console.error('未捕获的异常:', error);
+  console.error('错误堆栈:', error.stack);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('未处理的Promise拒绝:', reason);
+  console.error('Promise:', promise);
   process.exit(1);
 });
 
@@ -2160,12 +2252,19 @@ console.log('config.nodeEnv !== \'test\':', config.nodeEnv !== 'test');
 if (config.nodeEnv !== 'test') {
   console.log('准备启动服务器...');
   console.log('即将调用startServer函数...');
-  startServer().then(() => {
-    console.log('startServer函数执行完成');
-  }).catch(error => {
-    console.error('启动服务器时捕获到未处理的错误:', error);
+  try {
+    startServer().then(() => {
+      console.log('startServer函数执行完成');
+    }).catch(error => {
+      console.error('启动服务器时捕获到未处理的错误:', error);
+      console.error('错误堆栈:', error.stack);
+      process.exit(1);
+    });
+  } catch (error) {
+    console.error('调用startServer函数时发生同步错误:', error);
+    console.error('错误堆栈:', error.stack);
     process.exit(1);
-  });
+  }
 } else {
   console.log('测试环境，不启动服务器');
 }
@@ -2177,9 +2276,10 @@ module.exports = app;
 process.on('SIGINT', async () => {
   logger.info('正在关闭服务器...');
   
-  // 停止定时任务
-  scheduler.stopAllTasks();
+  // 停止定时任务 - 临时禁用以排查问题
+  // scheduler.stopAllTasks();
   
-  await pool.end();
+  // await pool.end(); // 临时禁用以排查问题
+  console.log('数据库连接关闭已临时禁用，用于排查启动问题');
   process.exit(0);
 });

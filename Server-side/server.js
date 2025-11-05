@@ -96,6 +96,7 @@ const notificationRoutes = require('./routes/notification-routes');
 const notificationSettingsRoutes = require('./routes/notification-settings-routes');
 const mfaRoutes = require('./routes/mfa-routes');
 const userPreferencesRoutes = require('./routes/user-preferences-routes');
+const abnormalExpenseRoutes = require('./routes/abnormal-expense-routes');
 
 // 导入错误处理中间件
 const { errorHandler, notFoundHandler } = require('./middleware/error-handler');
@@ -1830,6 +1831,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/notification-settings', notificationSettingsRoutes);
 app.use('/api/mfa', mfaRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
+app.use('/api/abnormal-expenses', abnormalExpenseRoutes);
 
 // 404处理中间件
 app.use(notFoundHandler);

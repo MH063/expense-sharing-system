@@ -445,7 +445,176 @@ const refreshData = () => {
 
 // 导出报告
 const exportReport = () => {
-  ElMessage.success('报告导出成功')
+  ElMessageBox.confirm(
+    '请选择导出格式',
+    '导出报告',
+    {
+      confirmButtonText: '导出Excel',
+      cancelButtonText: '导出PDF',
+      distinguishCancelAndClose: true,
+      type: 'info'
+    }
+  )
+    .then(() => {
+      // 导出Excel
+      exportToExcel()
+    })
+    .catch((action) => {
+      if (action === 'cancel') {
+        // 导出PDF
+        exportToPDF()
+      }
+    })
+}
+
+// 导出Excel
+const exportToExcel = () => {
+  // 导入所需库
+  import('xlsx').then(XLSX => {
+    import('file-saver').then(FileSaver => {
+      // 准备数据
+      const exportData = expenseList.value.map(expense => ({
+        'ID': expense.id,
+        '费用类型': getCategoryName(expense.category),
+        '金额': expense.amount,
+        '支付人': expense.payer,
+        '寝室': expense.dorm,
+        '日期': expense.date,
+        '状态': getStatusName(expense.status),
+        '是否异常': expense.isAbnormal ? '是' : '否',
+        '创建时间': expense.createTime,
+        '更新时间': expense.updateTime,
+        '备注': expense.remark || '无'
+      }))
+      
+      // 创建工作簿
+      const wb = XLSX.utils.book_new()
+      
+      // 创建工作表
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      
+      // 设置列宽
+      const colWidths = [
+        { wch: 5 },  // ID
+        { wch: 10 }, // 费用类型
+        { wch: 10 }, // 金额
+        { wch: 10 }, // 支付人
+        { wch: 10 }, // 寝室
+        { wch: 12 }, // 日期
+        { wch: 10 }, // 状态
+        { wch: 10 }, // 是否异常
+        { wch: 20 }, // 创建时间
+        { wch: 20 }, // 更新时间
+        { wch: 30 }  // 备注
+      ]
+      ws['!cols'] = colWidths
+      
+      // 添加工作表到工作簿
+      XLSX.utils.book_append_sheet(wb, ws, '费用报告')
+      
+      // 生成Excel文件
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      
+      // 保存文件
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      FileSaver.saveAs(blob, `费用报告_${new Date().toLocaleDateString()}.xlsx`)
+      
+      ElMessage.success('Excel报告导出成功')
+    })
+  })
+}
+
+// 导出PDF
+const exportToPDF = () => {
+  // 导入所需库
+  import('jspdf').then(jsPDF => {
+    import('html2canvas').then(html2canvas => {
+      // 创建PDF文档
+      const doc = new jsPDF.default()
+      
+      // 添加标题
+      doc.setFontSize(18)
+      doc.text('费用监控报告', 105, 15, { align: 'center' })
+      
+      // 添加生成日期
+      doc.setFontSize(10)
+      doc.text(`生成日期: ${new Date().toLocaleDateString()}`, 105, 22, { align: 'center' })
+      
+      // 添加统计信息
+      doc.setFontSize(14)
+      doc.text('统计概览', 20, 35)
+      
+      doc.setFontSize(10)
+      doc.text(`本月总费用: ¥${totalExpense.value.toFixed(2)}`, 25, 42)
+      doc.text(`人均费用: ¥${avgExpense.value.toFixed(2)}`, 25, 48)
+      doc.text(`异常费用数量: ${abnormalExpenseCount.value}`, 25, 54)
+      doc.text(`待审核费用数量: ${pendingExpenseCount.value}`, 25, 60)
+      
+      // 添加费用详情表格
+      doc.setFontSize(14)
+      doc.text('费用详情', 20, 75)
+      
+      // 表格标题
+      doc.setFontSize(10)
+      let yPosition = 85
+      doc.text('ID', 20, yPosition)
+      doc.text('类型', 35, yPosition)
+      doc.text('金额', 60, yPosition)
+      doc.text('支付人', 85, yPosition)
+      doc.text('寝室', 110, yPosition)
+      doc.text('日期', 130, yPosition)
+      doc.text('状态', 155, yPosition)
+      doc.text('异常', 175, yPosition)
+      
+      // 表格数据
+      yPosition += 7
+      const pageSize = 25 // 每页显示25条记录
+      let currentPage = 0
+      let recordCount = 0
+      
+      expenseList.value.forEach((expense, index) => {
+        // 检查是否需要添加新页
+        if (recordCount >= pageSize) {
+          doc.addPage()
+          yPosition = 20
+          recordCount = 0
+          currentPage++
+          
+          // 在新页面上添加表格标题
+          doc.setFontSize(10)
+          doc.text('ID', 20, yPosition)
+          doc.text('类型', 35, yPosition)
+          doc.text('金额', 60, yPosition)
+          doc.text('支付人', 85, yPosition)
+          doc.text('寝室', 110, yPosition)
+          doc.text('日期', 130, yPosition)
+          doc.text('状态', 155, yPosition)
+          doc.text('异常', 175, yPosition)
+          
+          yPosition += 7
+        }
+        
+        // 添加数据行
+        doc.setFontSize(9)
+        doc.text(expense.id.toString(), 20, yPosition)
+        doc.text(getCategoryName(expense.category), 35, yPosition)
+        doc.text(`¥${expense.amount.toFixed(2)}`, 60, yPosition)
+        doc.text(expense.payer, 85, yPosition)
+        doc.text(expense.dorm, 110, yPosition)
+        doc.text(expense.date, 130, yPosition)
+        doc.text(getStatusName(expense.status), 155, yPosition)
+        doc.text(expense.isAbnormal ? '是' : '否', 175, yPosition)
+        
+        yPosition += 7
+        recordCount++
+      })
+      
+      // 保存PDF
+      doc.save(`费用报告_${new Date().toLocaleDateString()}.pdf`)
+      
+      ElMessage.success('PDF报告导出成功')
+    })
+  })
 }
 
 // 更新趋势图

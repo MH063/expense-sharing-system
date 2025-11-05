@@ -317,6 +317,149 @@
         </span>
       </template>
     </el-dialog>
+    
+    <!-- 查看全部工作量对话框 -->
+    <el-dialog v-model="showAllWorkloadDialog" title="处理人员工作量详情" width="80%" top="5vh">
+      <el-table :data="allWorkloadData" style="width: 100%" v-loading="allWorkloadLoading">
+        <el-table-column prop="name" label="处理人" width="120" />
+        <el-table-column prop="department" label="部门" width="120" />
+        <el-table-column prop="role" label="角色" width="120">
+          <template #default="scope">
+            <el-tag :type="scope.row.role === '审核员' ? 'primary' : 'warning'">
+              {{ scope.row.role }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="totalTasks" label="总任务数" width="100" />
+        <el-table-column prop="completedTasks" label="已完成" width="100" />
+        <el-table-column prop="pendingTasks" label="待处理" width="100" />
+        <el-table-column prop="avgProcessTime" label="平均处理时长" width="140" />
+        <el-table-column prop="completionRate" label="完成率" width="120">
+          <template #default="scope">
+            <el-progress
+              :percentage="scope.row.completionRate"
+              :color="getProgressColor(scope.row.completionRate)"
+              :show-text="false"
+              :stroke-width="6"
+            />
+            <span class="progress-text">{{ scope.row.completionRate }}%</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="efficiency" label="效率评分" width="120">
+          <template #default="scope">
+            <el-rate
+              v-model="scope.row.efficiency"
+              disabled
+              show-score
+              text-color="#ff9900"
+              score-template="{value}"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="lastActiveTime" label="最后活跃时间" width="160" />
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="scope">
+            <el-button type="primary" size="small" @click="viewWorkloadDetail(scope.row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showAllWorkloadDialog = false">关闭</el-button>
+          <el-button type="primary" @click="exportWorkloadData">导出数据</el-button>
+        </span>
+      </template>
+    </el-dialog>
+    
+    <!-- 工作量详情对话框 -->
+    <el-dialog v-model="showWorkloadDetailDialog" :title="currentWorkload ? `${currentWorkload.name}的工作量详情` : '工作量详情'" width="70%" top="5vh">
+      <div v-if="currentWorkload" class="workload-detail">
+        <el-row :gutter="20" class="detail-overview">
+          <el-col :span="6">
+            <el-statistic title="总任务数" :value="currentWorkload.totalTasks" />
+          </el-col>
+          <el-col :span="6">
+            <el-statistic title="已完成" :value="currentWorkload.completedTasks" />
+          </el-col>
+          <el-col :span="6">
+            <el-statistic title="待处理" :value="currentWorkload.pendingTasks" />
+          </el-col>
+          <el-col :span="6">
+            <el-statistic title="完成率" :value="currentWorkload.completionRate" suffix="%" />
+          </el-col>
+        </el-row>
+        
+        <el-divider />
+        
+        <el-row :gutter="20" class="detail-stats">
+          <el-col :span="8">
+            <el-descriptions title="基本信息" :column="1" border>
+              <el-descriptions-item label="姓名">{{ currentWorkload.name }}</el-descriptions-item>
+              <el-descriptions-item label="部门">{{ currentWorkload.department }}</el-descriptions-item>
+              <el-descriptions-item label="角色">
+                <el-tag :type="currentWorkload.role === '审核员' ? 'primary' : 'warning'">
+                  {{ currentWorkload.role }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="平均处理时长">{{ currentWorkload.avgProcessTime }}</el-descriptions-item>
+              <el-descriptions-item label="效率评分">
+                <el-rate
+                  v-model="currentWorkload.efficiency"
+                  disabled
+                  show-score
+                  text-color="#ff9900"
+                  score-template="{value}"
+                />
+              </el-descriptions-item>
+              <el-descriptions-item label="最后活跃时间">{{ currentWorkload.lastActiveTime }}</el-descriptions-item>
+            </el-descriptions>
+          </el-col>
+          <el-col :span="16">
+            <div class="chart-container">
+              <h4>任务处理趋势</h4>
+              <div class="chart-placeholder">
+                <img src="https://picsum.photos/seed/workload-trend/600/300.jpg" alt="工作量趋势图" />
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+        
+        <el-divider />
+        
+        <div class="task-list">
+          <h4>最近处理任务</h4>
+          <el-table :data="currentWorkload.recentTasks" style="width: 100%">
+            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="type" label="类型" width="100">
+              <template #default="scope">
+                <el-tag :type="getTypeTagType(scope.row.type)">
+                  {{ getTypeName(scope.row.type) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="title" label="标题" width="200" />
+            <el-table-column prop="startTime" label="开始时间" width="160" />
+            <el-table-column prop="endTime" label="完成时间" width="160" />
+            <el-table-column prop="processTime" label="处理时长" width="120" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="scope">
+                <el-tag :type="scope.row.status === '已完成' ? 'success' : 'warning'">
+                  {{ scope.row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showWorkloadDetailDialog = false">关闭</el-button>
+          <el-button type="primary" @click="exportPersonalWorkload">导出个人数据</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -324,6 +467,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Download } from '@element-plus/icons-vue'
+
+// 动态导入XLSX
+let XLSX = null
+const importXLSX = async () => {
+  if (!XLSX) {
+    XLSX = await import('xlsx')
+  }
+  return XLSX
+}
 
 // 进度概览数据
 const reviewProgress = ref(75)
@@ -559,6 +711,8 @@ const loading = ref(false)
 // 对话框状态
 const showTaskDetailDialog = ref(false)
 const showUpdateProgressDialog = ref(false)
+const showAllWorkloadDialog = ref(false)
+const showWorkloadDetailDialog = ref(false)
 const currentTask = ref(null)
 const progressFormRef = ref(null)
 
@@ -578,6 +732,13 @@ const progressFormRules = {
     { required: true, message: '请输入处理备注', trigger: 'blur' }
   ]
 }
+
+// 全部工作量数据
+const allWorkloadData = ref([])
+const allWorkloadLoading = ref(false)
+
+// 当前工作量详情
+const currentWorkload = ref(null)
 
 // 获取进度颜色
 const getProgressColor = (percentage) => {
@@ -605,18 +766,194 @@ const getTypeTagType = (type) => {
 }
 
 // 刷新数据
-const refreshData = () => {
+const refreshData = async () => {
   loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
+  try {
+    // 模拟API调用 - 在实际应用中这里应该调用真实的API
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // 更新进度概览数据
+    reviewProgress.value = Math.floor(Math.random() * 30) + 70 // 70-100之间
+    reviewPending.value = Math.floor(Math.random() * 10) + 5 // 5-15之间
+    reviewProcessing.value = Math.floor(Math.random() * 10) + 5 // 5-15之间
+    reviewCompleted.value = Math.floor(Math.random() * 50) + 50 // 50-100之间
+    
+    disputeProgress.value = Math.floor(Math.random() * 40) + 50 // 50-90之间
+    disputePending.value = Math.floor(Math.random() * 8) + 3 // 3-11之间
+    disputeProcessing.value = Math.floor(Math.random() * 8) + 3 // 3-11之间
+    disputeResolved.value = Math.floor(Math.random() * 20) + 15 // 15-35之间
+    
+    todayProcessed.value = Math.floor(Math.random() * 10) + 15 // 15-25之间
+    todayReviews.value = Math.floor(Math.random() * 8) + 8 // 8-16之间
+    todayDisputes.value = Math.floor(Math.random() * 5) + 4 // 4-9之间
+    todayCompletionRate.value = Math.floor(Math.random() * 20) + 75 // 75-95之间
+    
+    avgProcessTime.value = (Math.random() * 2 + 3).toFixed(1) // 3.0-5.0之间
+    avgReviewTime.value = (Math.random() * 2 + 2.5).toFixed(1) // 2.5-4.5之间
+    avgDisputeTime.value = (Math.random() * 3 + 4).toFixed(1) // 4.0-7.0之间
+    timeTrend.value = (Math.random() * 2 - 1).toFixed(1) // -1.0到1.0之间
+    
+    // 更新处理人员工作量数据
+    workloadData.value = workloadData.value.map(item => {
+      const totalTasks = Math.floor(Math.random() * 20) + 15 // 15-35之间
+      const completedTasks = Math.floor(Math.random() * totalTasks)
+      const pendingTasks = totalTasks - completedTasks
+      const completionRate = Math.floor((completedTasks / totalTasks) * 100)
+      const avgProcessHours = (Math.random() * 3 + 2.5).toFixed(1)
+      
+      return {
+        ...item,
+        totalTasks,
+        completedTasks,
+        pendingTasks,
+        avgProcessTime: `${avgProcessHours}小时`,
+        completionRate
+      }
+    })
+    
+    // 更新当前处理任务的进度
+    currentTasks.value = currentTasks.value.map(task => {
+      // 随机增加一些进度，但不超过100%
+      const progressIncrement = Math.floor(Math.random() * 15) + 1 // 1-15之间
+      const newProgress = Math.min(task.progress + progressIncrement, 100)
+      
+      // 如果进度达到100%，更新完成时间
+      let estimatedTime = task.estimatedTime
+      if (newProgress === 100 && task.progress < 100) {
+        const now = new Date()
+        estimatedTime = now.toLocaleString()
+        
+        // 添加完成记录到历史
+        task.history.push({
+          time: now.toLocaleString(),
+          operator: task.handler,
+          action: '任务完成',
+          progress: 100,
+          comment: '任务已处理完成'
+        })
+      }
+      
+      return {
+        ...task,
+        progress: newProgress,
+        estimatedTime
+      }
+    })
+    
     ElMessage.success('数据刷新成功')
-  }, 1000)
+  } catch (error) {
+    console.error('刷新数据失败:', error)
+    ElMessage.error('数据刷新失败，请重试')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 导出报告
-const exportReport = () => {
-  ElMessage.success('报告导出成功')
+const exportReport = async () => {
+  try {
+    const XLSX = await importXLSX()
+    
+    // 创建工作簿
+    const workbook = XLSX.utils.book_new()
+    
+    // 1. 创建进度概览工作表
+    const overviewData = [
+      ['进度跟踪报告', '', '', '', '', ''],
+      ['生成时间', new Date().toLocaleString(), '', '', '', ''],
+      ['', '', '', '', '', ''],
+      ['审核进度', '', '', '', '', ''],
+      ['待处理', reviewPending.value, '', '', '', ''],
+      ['处理中', reviewProcessing.value, '', '', '', ''],
+      ['已完成', reviewCompleted.value, '', '', '', ''],
+      ['完成率', `${reviewProgress.value}%`, '', '', '', ''],
+      ['', '', '', '', '', ''],
+      ['争议处理进度', '', '', '', ''],
+      ['待处理', disputePending.value, '', '', '', ''],
+      ['处理中', disputeProcessing.value, '', '', '', ''],
+      ['已解决', disputeResolved.value, '', '', '', ''],
+      ['解决率', `${disputeProgress.value}%`, '', '', '', ''],
+      ['', '', '', '', '', ''],
+      ['今日处理情况', '', '', '', ''],
+      ['总处理量', todayProcessed.value, '', '', '', ''],
+      ['审核完成', todayReviews.value, '', '', '', ''],
+      ['争议解决', todayDisputes.value, '', '', '', ''],
+      ['完成率', `${todayCompletionRate.value}%`, '', '', '', ''],
+      ['', '', '', '', '', ''],
+      ['平均处理时长', '', '', '', ''],
+      ['审核时长', `${avgReviewTime.value}小时`, '', '', '', ''],
+      ['争议时长', `${avgDisputeTime.value}小时`, '', '', '', ''],
+      ['总体平均', `${avgProcessTime.value}小时`, '', '', '', ''],
+      ['较上月变化', `${timeTrend.value > 0 ? '+' : ''}${timeTrend.value}小时`, '', '', '', '']
+    ]
+    
+    const overviewSheet = XLSX.utils.aoa_to_sheet(overviewData)
+    XLSX.utils.book_append_sheet(workbook, overviewSheet, '进度概览')
+    
+    // 2. 创建处理人员工作量工作表
+    const workloadHeader = ['处理人', '总任务数', '已完成', '待处理', '平均处理时长', '完成率']
+    const workloadRows = workloadData.value.map(item => [
+      item.name,
+      item.totalTasks,
+      item.completedTasks,
+      item.pendingTasks,
+      item.avgProcessTime,
+      `${item.completionRate}%`
+    ])
+    const workloadDataForSheet = [workloadHeader, ...workloadRows]
+    
+    const workloadSheet = XLSX.utils.aoa_to_sheet(workloadDataForSheet)
+    XLSX.utils.book_append_sheet(workbook, workloadSheet, '处理人员工作量')
+    
+    // 3. 创建当前处理任务工作表
+    const taskHeader = ['ID', '类型', '标题', '处理人', '开始时间', '进度', '预计完成时间', '任务内容', '处理备注']
+    const taskRows = currentTasks.value.map(task => [
+      task.id,
+      getTypeName(task.type),
+      task.title,
+      task.handler,
+      task.startTime,
+      `${task.progress}%`,
+      task.estimatedTime,
+      task.content,
+      task.comment || '暂无'
+    ])
+    const taskDataForSheet = [taskHeader, ...taskRows]
+    
+    const taskSheet = XLSX.utils.aoa_to_sheet(taskDataForSheet)
+    XLSX.utils.book_append_sheet(workbook, taskSheet, '当前处理任务')
+    
+    // 设置列宽
+    const colWidths = [
+      { wch: 8 },  // ID
+      { wch: 12 }, // 类型
+      { wch: 25 }, // 标题
+      { wch: 12 }, // 处理人
+      { wch: 20 }, // 开始时间
+      { wch: 10 }, // 进度
+      { wch: 20 }, // 预计完成时间
+      { wch: 40 }, // 任务内容
+      { wch: 30 }  // 处理备注
+    ]
+    taskSheet['!cols'] = colWidths
+    
+    // 生成文件名
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    const hour = String(now.getHours()).padStart(2, '0')
+    const minute = String(now.getMinutes()).padStart(2, '0')
+    const fileName = `进度跟踪报告_${year}${month}${day}_${hour}${minute}.xlsx`
+    
+    // 导出文件
+    XLSX.writeFile(workbook, fileName)
+    
+    ElMessage.success('报告导出成功')
+  } catch (error) {
+    console.error('导出报告失败:', error)
+    ElMessage.error('导出报告失败，请重试')
+  }
 }
 
 // 更新趋势图
@@ -625,13 +962,254 @@ const updateTrendChart = () => {
 }
 
 // 查看全部工作量
-const viewAllWorkload = () => {
-  ElMessage.info('查看全部工作量功能开发中')
+const viewAllWorkload = async () => {
+  allWorkloadLoading.value = true
+  try {
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 生成更详细的工作量数据
+    const handlers = ['张三', '李四', '王五', '赵六', '陈七', '刘八', '周九', '吴十']
+    const departments = ['财务部', '审核部', '财务部', '审核部', '财务部', '审核部', '财务部', '审核部']
+    const roles = ['审核员', '处理员', '审核员', '处理员', '审核员', '处理员', '审核员', '处理员']
+    
+    allWorkloadData.value = handlers.map((name, index) => {
+      const totalTasks = Math.floor(Math.random() * 30) + 20
+      const completedTasks = Math.floor(Math.random() * totalTasks)
+      const pendingTasks = totalTasks - completedTasks
+      const completionRate = Math.floor((completedTasks / totalTasks) * 100)
+      const efficiency = (Math.random() * 2 + 3).toFixed(1) // 3.0-5.0的评分
+      
+      // 生成最近处理任务
+      const recentTasks = []
+      const taskTypes = ['expense', 'income', 'transfer', 'budget', 'report', 'audit']
+      const taskCount = Math.floor(Math.random() * 5) + 3 // 3-7个任务
+      
+      for (let i = 0; i < taskCount; i++) {
+        const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)]
+        const startTime = new Date()
+        startTime.setDate(startTime.getDate() - Math.floor(Math.random() * 30))
+        
+        const endTime = new Date(startTime)
+        endTime.setHours(endTime.getHours() + Math.floor(Math.random() * 8) + 1)
+        
+        const processTime = `${Math.floor(Math.random() * 8) + 1}小时${Math.floor(Math.random() * 60)}分钟`
+        const isCompleted = Math.random() > 0.3
+        
+        recentTasks.push({
+          id: `T${1000 + index * 100 + i}`,
+          type: taskType,
+          title: `${getTypeName(taskType)}-${index + 1}-${i + 1}`,
+          startTime: formatDateTime(startTime),
+          endTime: isCompleted ? formatDateTime(endTime) : '-',
+          processTime: isCompleted ? processTime : '-',
+          status: isCompleted ? '已完成' : '处理中'
+        })
+      }
+      
+      return {
+        name,
+        department: departments[index],
+        role: roles[index],
+        totalTasks,
+        completedTasks,
+        pendingTasks,
+        avgProcessTime: `${Math.floor(Math.random() * 2) + 1}小时${Math.floor(Math.random() * 60)}分钟`,
+        completionRate,
+        efficiency: parseFloat(efficiency),
+        lastActiveTime: formatDateTime(new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000))),
+        recentTasks
+      }
+    })
+    
+    showAllWorkloadDialog.value = true
+    ElMessage.success('工作量数据加载完成')
+  } catch (error) {
+    console.error('获取工作量数据失败:', error)
+    ElMessage.error('获取工作量数据失败')
+  } finally {
+    allWorkloadLoading.value = false
+  }
+}
+
+// 格式化日期时间
+const formatDateTime = (date) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const seconds = String(d.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 // 查看工作量详情
-const viewWorkloadDetail = (handler) => {
-  ElMessage.info(`查看${handler.name}的工作量详情`)
+const viewWorkloadDetail = (workload) => {
+  // 如果是从全部工作量对话框中点击的详情按钮
+  if (workload && workload.name) {
+    currentWorkload.value = workload
+    showWorkloadDetailDialog.value = true
+    return
+  }
+  
+  // 如果是从处理人员工作量表格中点击的详情按钮
+  if (typeof workload === 'string') {
+    const handlerName = workload
+    const existingData = allWorkloadData.value.find(item => item.name === handlerName)
+    
+    if (existingData) {
+      currentWorkload.value = existingData
+      showWorkloadDetailDialog.value = true
+      return
+    }
+    
+    // 如果没有现成的数据，生成详细数据
+    const totalTasks = Math.floor(Math.random() * 30) + 20
+    const completedTasks = Math.floor(Math.random() * totalTasks)
+    const pendingTasks = totalTasks - completedTasks
+    const completionRate = Math.floor((completedTasks / totalTasks) * 100)
+    const efficiency = (Math.random() * 2 + 3).toFixed(1) // 3.0-5.0的评分
+    
+    // 生成最近处理任务
+    const recentTasks = []
+    const taskTypes = ['expense', 'income', 'transfer', 'budget', 'report', 'audit']
+    const taskCount = Math.floor(Math.random() * 5) + 3 // 3-7个任务
+    
+    for (let i = 0; i < taskCount; i++) {
+      const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)]
+      const startTime = new Date()
+      startTime.setDate(startTime.getDate() - Math.floor(Math.random() * 30))
+      
+      const endTime = new Date(startTime)
+      endTime.setHours(endTime.getHours() + Math.floor(Math.random() * 8) + 1)
+      
+      const processTime = `${Math.floor(Math.random() * 8) + 1}小时${Math.floor(Math.random() * 60)}分钟`
+      const isCompleted = Math.random() > 0.3
+      
+      recentTasks.push({
+        id: `T${1000 + i}`,
+        type: taskType,
+        title: `${getTypeName(taskType)}-${i + 1}`,
+        startTime: formatDateTime(startTime),
+        endTime: isCompleted ? formatDateTime(endTime) : '-',
+        processTime: isCompleted ? processTime : '-',
+        status: isCompleted ? '已完成' : '处理中'
+      })
+    }
+    
+    currentWorkload.value = {
+      name: handlerName,
+      department: handlerName.includes('张') || handlerName.includes('王') || handlerName.includes('陈') || handlerName.includes('周') ? '财务部' : '审核部',
+      role: handlerName.includes('张') || handlerName.includes('王') || handlerName.includes('陈') || handlerName.includes('周') ? '审核员' : '处理员',
+      totalTasks,
+      completedTasks,
+      pendingTasks,
+      avgProcessTime: `${Math.floor(Math.random() * 2) + 1}小时${Math.floor(Math.random() * 60)}分钟`,
+      completionRate,
+      efficiency: parseFloat(efficiency),
+      lastActiveTime: formatDateTime(new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000))),
+      recentTasks
+    }
+    
+    showWorkloadDetailDialog.value = true
+  }
+}
+
+// 导出工作量数据
+const exportWorkloadData = async () => {
+  try {
+    const XLSX = await importXLSX()
+    
+    // 创建工作簿
+    const workbook = XLSX.utils.book_new()
+    
+    // 工作量数据
+    const workloadSheet = XLSX.utils.json_to_sheet(allWorkloadData.value.map(item => ({
+      '处理人': item.name,
+      '部门': item.department,
+      '角色': item.role,
+      '总任务数': item.totalTasks,
+      '已完成': item.completedTasks,
+      '待处理': item.pendingTasks,
+      '平均处理时长': item.avgProcessTime,
+      '完成率': `${item.completionRate}%`,
+      '效率评分': item.efficiency,
+      '最后活跃时间': item.lastActiveTime
+    })))
+    
+    // 添加工作表到工作簿
+    XLSX.utils.book_append_sheet(workbook, workloadSheet, '工作量统计')
+    
+    // 生成文件名
+    const fileName = `工作量统计_${formatDateTime(new Date()).replace(/[\/\s:]/g, '-')}.xlsx`
+    
+    // 导出文件
+    XLSX.writeFile(workbook, fileName)
+    
+    ElMessage.success('工作量数据导出成功')
+  } catch (error) {
+    console.error('导出工作量数据失败:', error)
+    ElMessage.error('导出工作量数据失败')
+  }
+}
+
+// 导出个人工作量数据
+const exportPersonalWorkload = async () => {
+  if (!currentWorkload.value) {
+    ElMessage.warning('没有可导出的数据')
+    return
+  }
+  
+  try {
+    const XLSX = await importXLSX()
+    
+    // 创建工作簿
+    const workbook = XLSX.utils.book_new()
+    
+    // 基本信息工作表
+    const basicInfo = [
+      ['姓名', currentWorkload.value.name],
+      ['部门', currentWorkload.value.department],
+      ['角色', currentWorkload.value.role],
+      ['总任务数', currentWorkload.value.totalTasks],
+      ['已完成', currentWorkload.value.completedTasks],
+      ['待处理', currentWorkload.value.pendingTasks],
+      ['平均处理时长', currentWorkload.value.avgProcessTime],
+      ['完成率', `${currentWorkload.value.completionRate}%`],
+      ['效率评分', currentWorkload.value.efficiency],
+      ['最后活跃时间', currentWorkload.value.lastActiveTime]
+    ]
+    
+    const basicInfoSheet = XLSX.utils.aoa_to_sheet(basicInfo)
+    
+    // 任务列表工作表
+    const taskSheet = XLSX.utils.json_to_sheet(currentWorkload.value.recentTasks.map(item => ({
+      'ID': item.id,
+      '类型': getTypeName(item.type),
+      '标题': item.title,
+      '开始时间': item.startTime,
+      '完成时间': item.endTime,
+      '处理时长': item.processTime,
+      '状态': item.status
+    })))
+    
+    // 添加工作表到工作簿
+    XLSX.utils.book_append_sheet(workbook, basicInfoSheet, '基本信息')
+    XLSX.utils.book_append_sheet(workbook, taskSheet, '任务列表')
+    
+    // 生成文件名
+    const fileName = `${currentWorkload.value.name}工作量详情_${formatDateTime(new Date()).replace(/[\/\s:]/g, '-')}.xlsx`
+    
+    // 导出文件
+    XLSX.writeFile(workbook, fileName)
+    
+    ElMessage.success('个人工作量数据导出成功')
+  } catch (error) {
+    console.error('导出个人工作量数据失败:', error)
+    ElMessage.error('导出个人工作量数据失败')
+  }
 }
 
 // 筛选任务
@@ -694,77 +1272,131 @@ onMounted(() => {
 .progress-tracking {
   height: 100vh;
   overflow: hidden;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
 }
 
 .page-header {
-  background-color: #f5f7fa;
-  border-bottom: 1px solid #e4e7ed;
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  padding: 20px 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .header-content h1 {
   margin: 0 0 5px 0;
-  color: #303133;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .header-content p {
   margin: 0;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
 }
 
+.header-actions .el-button {
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.header-actions .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 .progress-content {
-  padding: 20px;
+  padding: 25px;
   overflow-y: auto;
+  height: calc(100vh - 88px);
 }
 
 .overview-row {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .overview-card {
-  height: 220px;
+  height: 240px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: none;
+  overflow: hidden;
+  position: relative;
+}
+
+.overview-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.overview-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #409eff, #66b1ff);
+}
+
+.overview-card :deep(.el-card__body) {
+  padding: 20px;
+  height: 100%;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .card-header h3 {
   margin: 0;
   color: #303133;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .card-content {
-  height: calc(100% - 100px);
+  height: calc(100% - 110px);
 }
 
 .progress-stats {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .stat-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.stat-item:last-child {
+  border-bottom: none;
 }
 
 .stat-label {
   color: #606266;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .stat-value {
-  font-weight: bold;
+  font-weight: 600;
   color: #303133;
+  font-size: 15px;
 }
 
 .stat-value.up {
@@ -776,24 +1408,36 @@ onMounted(() => {
 }
 
 .chart-card {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   height: 400px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: none;
+}
+
+.chart-card :deep(.el-card__body) {
+  padding: 25px;
+  height: 100%;
 }
 
 .chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .chart-header h3 {
   margin: 0;
   color: #303133;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .chart-container {
-  height: calc(100% - 50px);
+  height: calc(100% - 60px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -805,28 +1449,391 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .chart-placeholder img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .workload-card {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: none;
+}
+
+.workload-card :deep(.el-card__body) {
+  padding: 25px;
 }
 
 .workload-card .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .workload-card .card-header h3 {
   margin: 0;
   color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.progress-text {
+  margin-left: 10px;
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.current-tasks-card {
+  margin-bottom: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: none;
+}
+
+.current-tasks-card :deep(.el-card__body) {
+  padding: 25px;
+}
+
+.current-tasks-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.current-tasks-card .card-header h3 {
+  margin: 0;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-table__header) {
+  background-color: #f8f9fa;
+}
+
+:deep(.el-table th) {
+  background-color: #f8f9fa !important;
+  color: #606266;
+  font-weight: 600;
+}
+
+:deep(.el-table--border .el-table__cell) {
+  border-right: 1px solid #f0f0f0;
+}
+
+:deep(.el-table tbody tr) {
+  transition: all 0.2s ease;
+}
+
+:deep(.el-table tbody tr:hover > td) {
+  background-color: #f5f7ff !important;
+}
+
+:deep(.el-progress-bar__outer) {
+  border-radius: 10px;
+  background-color: #f0f2f5;
+}
+
+:deep(.el-progress-bar__inner) {
+  border-radius: 10px;
+}
+
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary:hover) {
+  background: linear-gradient(135deg, #66b1ff 0%, #409eff 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+:deep(.el-button--success) {
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--success:hover) {
+  background: linear-gradient(135deg, #85ce61 0%, #67c23a 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
+}
+
+:deep(.el-select .el-input__inner) {
+  border-radius: 8px;
+}
+
+:deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  padding: 20px 25px;
+  color: #fff;
+}
+
+:deep(.el-dialog__title) {
+  color: #fff;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__headerbtn .el-dialog__close) {
+  color: #fff;
+}
+
+:deep(.el-dialog__body) {
+  padding: 25px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #606266;
+}
+
+:deep(.el-input__inner) {
+  border-radius: 8px;
+  border: 1px solid #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__inner:focus) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+:deep(.el-textarea__inner) {
+  border-radius: 8px;
+  border: 1px solid #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-textarea__inner:focus) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+:deep(.el-slider__runway) {
+  background-color: #f0f2f5;
+}
+
+:deep(.el-slider__bar) {
+  background: linear-gradient(to right, #409eff, #66b1ff);
+}
+
+:deep(.el-slider__button) {
+  border-color: #409eff;
+}
+
+.task-detail {
+  padding: 15px 0;
+}
+
+:deep(.el-descriptions__title) {
+  color: #303133;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+:deep(.el-descriptions-item__label) {
+  font-weight: 600;
+  color: #606266;
+}
+
+.task-history {
+  margin-top: 25px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.task-history h3 {
+  margin-bottom: 20px;
+  color: #303133;
+  font-weight: 600;
+}
+
+:deep(.el-timeline-item__timestamp) {
+  color: #909399;
+  font-weight: 500;
+}
+
+.history-item {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 10px;
+}
+
+.history-item p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.history-item strong {
+  color: #409eff;
+  font-weight: 600;
+}
+
+:deep(.el-radio-button__inner) {
+  border-radius: 8px;
+  border: 1px solid #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-radio-button__orig-radio:checked + .el-radio-button__inner) {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .progress-content {
+    padding: 15px;
+  }
+  
+  .overview-card {
+    height: 220px;
+  }
+  
+  .chart-card {
+    height: 350px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 15px 20px;
+  }
+  
+  .header-actions {
+    margin-top: 15px;
+    width: 100%;
+  }
+  
+  .header-actions .el-button {
+    flex: 1;
+  }
+  
+  .overview-row .el-col {
+    margin-bottom: 15px;
+  }
+  
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .current-tasks-card .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .header-actions {
+    width: 100%;
+  }
+  
+  .header-actions .el-select {
+    flex: 1;
+  }
+}
+
+/* 工作量详情对话框样式 */
+.workload-detail {
+  padding: 10px 0;
+}
+
+.detail-overview {
+  margin-bottom: 20px;
+}
+
+.detail-overview .el-statistic {
+  text-align: center;
+}
+
+.detail-stats {
+  margin-bottom: 20px;
+}
+
+.chart-container {
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-container h4 {
+  margin: 0 0 15px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chart-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chart-placeholder img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.task-list h4 {
+  margin: 0 0 15px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .progress-text {
@@ -835,42 +1842,14 @@ onMounted(() => {
   color: #606266;
 }
 
-.current-tasks-card {
-  margin-bottom: 20px;
-}
-
-.current-tasks-card .card-header {
-  display: flex;
-  justify-content: space-between;
+:deep(.el-rate) {
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 15px;
 }
 
-.current-tasks-card .card-header h3 {
-  margin: 0;
-  color: #303133;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.task-detail {
-  padding: 10px 0;
-}
-
-.task-history {
-  margin-top: 20px;
-}
-
-.task-history h3 {
-  margin-bottom: 15px;
-  color: #303133;
-}
-
-.history-item p {
-  margin: 5px 0;
+:deep(.el-rate__text) {
+  margin-left: 8px;
   font-size: 14px;
+  color: #606266;
 }
 </style>

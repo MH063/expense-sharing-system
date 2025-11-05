@@ -372,6 +372,81 @@
         </span>
       </template>
     </el-dialog>
+    
+    <!-- 新建争议对话框 -->
+    <el-dialog v-model="showCreateDialog" title="新建争议" width="700px">
+      <el-form :model="createForm" :rules="createFormRules" ref="createFormRef" label-width="100px">
+        <el-form-item label="争议类型" prop="type">
+          <el-select v-model="createForm.type" placeholder="请选择争议类型" style="width: 100%">
+            <el-option label="费用分摊" value="expense_sharing" />
+            <el-option label="费用金额" value="expense_amount" />
+            <el-option label="费用类别" value="expense_category" />
+            <el-option label="用户行为" value="user_behavior" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="争议标题" prop="title">
+          <el-input v-model="createForm.title" placeholder="请输入争议标题" />
+        </el-form-item>
+        
+        <el-form-item label="发起人" prop="initiator">
+          <el-input v-model="createForm.initiator" placeholder="请输入发起人姓名" />
+        </el-form-item>
+        
+        <el-form-item label="优先级" prop="priority">
+          <el-radio-group v-model="createForm.priority">
+            <el-radio label="high">高</el-radio>
+            <el-radio label="medium">中</el-radio>
+            <el-radio label="low">低</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        
+        <el-form-item label="争议内容" prop="content">
+          <el-input
+            v-model="createForm.content"
+            type="textarea"
+            rows="5"
+            placeholder="请详细描述争议内容"
+          />
+        </el-form-item>
+        
+        <el-form-item label="附件">
+          <el-upload
+            action="#"
+            :auto-upload="false"
+            :on-change="handleCreateFileChange"
+            :file-list="createForm.attachments"
+            multiple
+          >
+            <el-button type="primary">点击上传</el-button>
+            <template #tip>
+              <div class="el-upload__tip">
+                支持jpg/png/pdf文件，且不超过500kb
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+        
+        <el-form-item label="截止时间" prop="deadline">
+          <el-date-picker
+            v-model="createForm.deadline"
+            type="datetime"
+            placeholder="请选择截止时间"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showCreateDialog = false">取消</el-button>
+          <el-button type="primary" @click="submitCreate" :loading="createLoading">创建</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -576,10 +651,13 @@ const showDisputeDetailDialog = ref(false)
 const showAssignDialog = ref(false)
 const showHandleDialog = ref(false)
 const showResolveDialog = ref(false)
+const showCreateDialog = ref(false)
 const currentDispute = ref(null)
 const assignFormRef = ref(null)
 const handleFormRef = ref(null)
 const resolveFormRef = ref(null)
+const createFormRef = ref(null)
+const createLoading = ref(false)
 
 // 分配表单
 const assignForm = reactive({
@@ -604,6 +682,17 @@ const resolveForm = reactive({
   followUp: ''
 })
 
+// 新建争议表单
+const createForm = reactive({
+  type: '',
+  title: '',
+  initiator: '',
+  priority: 'medium',
+  content: '',
+  attachments: [],
+  deadline: ''
+})
+
 // 表单验证规则
 const assignFormRules = {
   handlerId: [
@@ -626,6 +715,29 @@ const resolveFormRules = {
   ],
   explanation: [
     { required: true, message: '请输入解决说明', trigger: 'blur' }
+  ]
+}
+
+const createFormRules = {
+  type: [
+    { required: true, message: '请选择争议类型', trigger: 'change' }
+  ],
+  title: [
+    { required: true, message: '请输入争议标题', trigger: 'blur' },
+    { min: 2, max: 50, message: '标题长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  initiator: [
+    { required: true, message: '请输入发起人姓名', trigger: 'blur' }
+  ],
+  priority: [
+    { required: true, message: '请选择优先级', trigger: 'change' }
+  ],
+  content: [
+    { required: true, message: '请输入争议内容', trigger: 'blur' },
+    { min: 10, max: 500, message: '内容长度在 10 到 500 个字符', trigger: 'blur' }
+  ],
+  deadline: [
+    { required: true, message: '请选择截止时间', trigger: 'change' }
   ]
 }
 
@@ -697,12 +809,78 @@ const getStatusTagType = (status) => {
 
 // 创建争议
 const createDispute = () => {
-  ElMessage.info('创建争议功能开发中')
+  // 重置表单
+  createForm.type = ''
+  createForm.title = ''
+  createForm.initiator = ''
+  createForm.priority = 'medium'
+  createForm.content = ''
+  createForm.attachments = []
+  createForm.deadline = ''
+  
+  // 打开对话框
+  showCreateDialog.value = true
 }
 
 // 导出争议报告
-const exportDisputes = () => {
-  ElMessage.success('报告导出成功')
+const exportDisputes = async () => {
+  try {
+    loading.value = true
+    
+    // 动态导入XLSX库
+    const XLSX = await import('xlsx')
+    
+    // 准备导出数据
+    const exportData = disputeList.value.map(item => ({
+      '争议ID': item.id,
+      '争议类型': getTypeName(item.type),
+      '标题': item.title,
+      '发起人': item.initiator,
+      '创建时间': item.createTime,
+      '优先级': getPriorityName(item.priority),
+      '状态': getStatusName(item.status),
+      '处理人': item.handler || '未分配',
+      '截止时间': item.deadline,
+      '争议内容': item.content
+    }))
+    
+    // 创建工作簿
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    
+    // 设置列宽
+    const colWidths = [
+      { wch: 8 },  // 争议ID
+      { wch: 12 }, // 争议类型
+      { wch: 30 }, // 标题
+      { wch: 12 }, // 发起人
+      { wch: 20 }, // 创建时间
+      { wch: 8 },  // 优先级
+      { wch: 10 }, // 状态
+      { wch: 12 }, // 处理人
+      { wch: 20 }, // 截止时间
+      { wch: 50 }  // 争议内容
+    ]
+    ws['!cols'] = colWidths
+    
+    // 添加工作表到工作簿
+    XLSX.utils.book_append_sheet(wb, ws, '争议案件列表')
+    
+    // 生成文件名（带日期）
+    const now = new Date()
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')
+    const fileName = `争议案件报告_${dateStr}.xlsx`
+    
+    // 导出文件
+    XLSX.writeFile(wb, fileName)
+    
+    ElMessage.success('报告导出成功')
+  } catch (error) {
+    console.error('导出报告失败:', error)
+    ElMessage.error('导出报告失败，请重试')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 搜索争议
@@ -871,6 +1049,61 @@ const handleFileChange = (file, fileList) => {
   handleForm.attachments = fileList
 }
 
+// 处理新建争议文件变化
+const handleCreateFileChange = (file, fileList) => {
+  createForm.attachments = fileList
+}
+
+// 提交新建争议
+const submitCreate = () => {
+  createFormRef.value.validate((valid) => {
+    if (valid) {
+      createLoading.value = true
+      
+      // 模拟API调用
+      setTimeout(() => {
+        // 创建新的争议对象
+        const newDispute = {
+          id: disputeList.value.length + 1,
+          type: createForm.type,
+          title: createForm.title,
+          initiator: createForm.initiator,
+          createTime: new Date().toLocaleString(),
+          priority: createForm.priority,
+          status: 'pending',
+          handler: null,
+          deadline: createForm.deadline,
+          content: createForm.content,
+          attachments: createForm.attachments.map(file => ({
+            id: Date.now() + Math.random(),
+            name: file.name,
+            url: `/files/${file.name}`
+          })),
+          comment: '',
+          history: [
+            {
+              time: new Date().toLocaleString(),
+              operator: createForm.initiator,
+              action: '创建争议',
+              comment: '提交争议'
+            }
+          ]
+        }
+        
+        // 添加到争议列表
+        disputeList.value.unshift(newDispute)
+        
+        // 更新统计数据
+        pendingCount.value += 1
+        
+        ElMessage.success('争议创建成功')
+        showCreateDialog.value = false
+        createLoading.value = false
+      }, 1000)
+    }
+  })
+}
+
 // 下载文件
 const downloadFile = (file) => {
   ElMessage.success(`正在下载文件: ${file.name}`)
@@ -901,45 +1134,88 @@ onMounted(() => {
 .dispute-management {
   height: 100vh;
   overflow: hidden;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
 }
 
 .page-header {
-  background-color: #f5f7fa;
-  border-bottom: 1px solid #e4e7ed;
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  padding: 20px 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .header-content h1 {
   margin: 0 0 5px 0;
-  color: #303133;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .header-content p {
   margin: 0;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
 }
 
+.header-actions .el-button {
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.header-actions .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 .disputes-content {
-  padding: 20px;
+  padding: 25px;
   overflow-y: auto;
+  height: calc(100vh - 88px);
 }
 
 .stats-row {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .stats-card {
-  height: 120px;
+  height: 140px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: none;
+  overflow: hidden;
+  position: relative;
+}
+
+.stats-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #409eff, #66b1ff);
+}
+
+.stats-card :deep(.el-card__body) {
+  padding: 20px;
 }
 
 .stats-trend {
   display: flex;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 15px;
   font-size: 14px;
 }
 
@@ -950,6 +1226,7 @@ onMounted(() => {
 
 .trend-value {
   margin-right: 5px;
+  font-weight: 600;
 }
 
 .trend-value.up {
@@ -969,28 +1246,51 @@ onMounted(() => {
 }
 
 .search-card {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: none;
+}
+
+.search-card :deep(.el-card__body) {
+  padding: 25px;
 }
 
 .search-form {
   display: flex;
   flex-wrap: wrap;
+  gap: 15px;
+}
+
+.search-form .el-form-item {
+  margin-bottom: 0;
 }
 
 .disputes-list-card {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: none;
+}
+
+.disputes-list-card :deep(.el-card__body) {
+  padding: 25px;
 }
 
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .list-header h3 {
   margin: 0;
   color: #303133;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .list-actions {
@@ -998,33 +1298,271 @@ onMounted(() => {
   gap: 10px;
 }
 
+.list-actions .el-select {
+  border-radius: 20px;
+}
+
+.list-actions .el-button {
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-table__header) {
+  background-color: #f8f9fa;
+}
+
+:deep(.el-table th) {
+  background-color: #f8f9fa !important;
+  color: #606266;
+  font-weight: 600;
+}
+
+:deep(.el-table--border .el-table__cell) {
+  border-right: 1px solid #f0f0f0;
+}
+
+:deep(.el-table tbody tr) {
+  transition: all 0.2s ease;
+}
+
+:deep(.el-table tbody tr:hover > td) {
+  background-color: #f5f7ff !important;
+}
+
 .pagination-container {
-  margin-top: 20px;
+  margin-top: 25px;
   display: flex;
   justify-content: center;
 }
 
+:deep(.el-pagination) {
+  border-radius: 8px;
+  padding: 10px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  padding: 20px 25px;
+  color: #fff;
+}
+
+:deep(.el-dialog__title) {
+  color: #fff;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__headerbtn .el-dialog__close) {
+  color: #fff;
+}
+
+:deep(.el-dialog__body) {
+  padding: 25px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #606266;
+}
+
+:deep(.el-input__inner) {
+  border-radius: 8px;
+  border: 1px solid #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__inner:focus) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+:deep(.el-textarea__inner) {
+  border-radius: 8px;
+  border: 1px solid #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-textarea__inner:focus) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+:deep(.el-select .el-input__inner) {
+  border-radius: 8px;
+}
+
+:deep(.el-date-editor.el-input) {
+  border-radius: 8px;
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary:hover) {
+  background: linear-gradient(135deg, #66b1ff 0%, #409eff 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+:deep(.el-button--success) {
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--success:hover) {
+  background: linear-gradient(135deg, #85ce61 0%, #67c23a 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
+}
+
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+}
+
+:deep(.el-upload) {
+  border-radius: 8px;
+}
+
+:deep(.el-upload-dragger) {
+  border-radius: 8px;
+  border: 2px dashed #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-upload-dragger:hover) {
+  border-color: #409eff;
+  background-color: rgba(64, 158, 255, 0.05);
+}
+
 .dispute-detail {
-  padding: 10px 0;
+  padding: 15px 0;
+}
+
+:deep(.el-descriptions__title) {
+  color: #303133;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+:deep(.el-descriptions-item__label) {
+  font-weight: 600;
+  color: #606266;
 }
 
 .dispute-history {
-  margin-top: 20px;
+  margin-top: 25px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
 }
 
 .dispute-history h3 {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
   color: #303133;
+  font-weight: 600;
+}
+
+:deep(.el-timeline-item__timestamp) {
+  color: #909399;
+  font-weight: 500;
+}
+
+.history-item {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .history-item p {
-  margin: 5px 0;
+  margin: 8px 0;
   font-size: 14px;
+  line-height: 1.5;
+}
+
+.history-item strong {
+  color: #409eff;
+  font-weight: 600;
 }
 
 .dispute-actions {
-  margin-top: 20px;
+  margin-top: 25px;
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  justify-content: center;
+}
+
+.dispute-actions .el-button {
+  border-radius: 20px;
+  padding: 10px 25px;
+  font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .disputes-content {
+    padding: 15px;
+  }
+  
+  .stats-card {
+    height: 120px;
+  }
+  
+  .search-form {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 15px 20px;
+  }
+  
+  .header-actions {
+    margin-top: 15px;
+    width: 100%;
+  }
+  
+  .header-actions .el-button {
+    flex: 1;
+  }
+  
+  .list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .list-actions {
+    width: 100%;
+  }
+  
+  .list-actions .el-select {
+    flex: 1;
+  }
 }
 </style>

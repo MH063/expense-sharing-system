@@ -279,6 +279,33 @@
         </div>
       </div>
     </el-dialog>
+    
+    <!-- 导出寝室对话框 -->
+    <el-dialog v-model="showExportDialog" title="导出寝室数据" width="500px">
+      <el-form :model="exportForm" label-width="100px">
+        <el-form-item label="导出格式">
+          <el-radio-group v-model="exportForm.format">
+            <el-radio label="excel">Excel</el-radio>
+            <el-radio label="pdf">PDF</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        
+        <el-form-item label="导出内容">
+          <el-checkbox-group v-model="exportForm.content">
+            <el-checkbox label="dorms">寝室信息</el-checkbox>
+            <el-checkbox label="members">成员详情</el-checkbox>
+            <el-checkbox label="expenses">费用统计</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showExportDialog = false">取消</el-button>
+          <el-button type="primary" @click="confirmExport">确认导出</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -286,6 +313,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Download } from '@element-plus/icons-vue'
+import * as XLSX from 'xlsx'
+import { saveAs } from 'file-saver'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 // 搜索表单
 const searchForm = reactive({
@@ -298,7 +329,7 @@ const searchForm = reactive({
 const dormList = ref([
   {
     id: 1,
-    roomNumber: 'A101',
+    roomNumber: '101',
     building: 'A',
     floor: 1,
     capacity: 4,
@@ -318,7 +349,7 @@ const dormList = ref([
   },
   {
     id: 2,
-    roomNumber: 'B201',
+    roomNumber: '201',
     building: 'B',
     floor: 2,
     capacity: 4,
@@ -337,7 +368,7 @@ const dormList = ref([
   },
   {
     id: 3,
-    roomNumber: 'C301',
+    roomNumber: '301',
     building: 'C',
     floor: 3,
     capacity: 4,
@@ -352,7 +383,7 @@ const dormList = ref([
   },
   {
     id: 4,
-    roomNumber: 'D401',
+    roomNumber: '401',
     building: 'D',
     floor: 4,
     capacity: 4,
@@ -389,9 +420,16 @@ const loading = ref(false)
 const showAddDormDialog = ref(false)
 const showDormDetailDialog = ref(false)
 const showMemberManageDialog = ref(false)
+const showExportDialog = ref(false)
 const isEdit = ref(false)
 const currentDorm = ref(null)
 const dormFormRef = ref(null)
+
+// 导出表单
+const exportForm = reactive({
+  format: 'excel',
+  content: ['dorms', 'members', 'expenses']
+})
 
 // 寝室表单
 const dormForm = reactive({
@@ -413,7 +451,7 @@ const addMemberForm = reactive({
 const dormFormRules = {
   roomNumber: [
     { required: true, message: '请输入寝室号', trigger: 'blur' },
-    { pattern: /^[A-D]\d{3}$/, message: '寝室号格式为A-D开头加3位数字', trigger: 'blur' }
+    { pattern: /^\d{3}$/, message: '寝室号格式为3位数字', trigger: 'blur' }
   ],
   building: [
     { required: true, message: '请选择楼栋', trigger: 'change' }
@@ -726,7 +764,222 @@ const removeMember = (member) => {
 
 // 导出寝室
 const exportDorms = () => {
-  ElMessage.success('寝室数据导出成功')
+  showExportDialog.value = true
+}
+
+// 确认导出
+const confirmExport = () => {
+  if (!exportForm.content || exportForm.content.length === 0) {
+    ElMessage.warning('请至少选择一种导出内容')
+    return
+  }
+  
+  // 准备导出数据
+  const exportData = prepareExportData(exportForm.content)
+  
+  if (exportForm.format === 'excel') {
+    exportToExcel(exportData)
+  } else if (exportForm.format === 'pdf') {
+    exportToPDF(exportData)
+  }
+  
+  showExportDialog.value = false
+  ElMessage.success('导出成功')
+}
+
+// 准备导出数据
+const prepareExportData = (content) => {
+  const data = {}
+  
+  if (content.includes('dorms')) {
+    data.dorms = dormList.value.map(dorm => ({
+      '寝室ID': dorm.id,
+      '寝室号': dorm.roomNumber,
+      '楼栋': dorm.building,
+      '楼层': dorm.floor,
+      '容纳人数': dorm.capacity,
+      '当前人数': dorm.currentCount,
+      '状态': getStatusName(dorm.status),
+      '寝室长': dorm.leader || '未指定',
+      '本月费用': dorm.totalExpense,
+      '费用笔数': dorm.expenseCount,
+      '创建时间': dorm.createTime,
+      '备注': dorm.remarks || '无'
+    }))
+  }
+  
+  if (content.includes('members')) {
+    const membersData = []
+    dormList.value.forEach(dorm => {
+      if (dorm.members && dorm.members.length > 0) {
+        dorm.members.forEach(member => {
+          membersData.push({
+            '寝室号': dorm.roomNumber,
+            '楼栋': dorm.building,
+            '用户ID': member.id,
+            '用户名': member.username,
+            '真实姓名': member.realName,
+            '联系电话': member.phone || '未提供',
+            '是否寝室长': member.isLeader ? '是' : '否',
+            '入住时间': member.joinTime
+          })
+        })
+      }
+    })
+    data.members = membersData
+  }
+  
+  if (content.includes('expenses')) {
+    const expensesData = []
+    dormList.value.forEach(dorm => {
+      expensesData.push({
+        '寝室号': dorm.roomNumber,
+        '楼栋': dorm.building,
+        '寝室长': dorm.leader || '未指定',
+        '本月费用': dorm.totalExpense,
+        '费用笔数': dorm.expenseCount,
+        '人均费用': dorm.currentCount > 0 ? (dorm.totalExpense / dorm.currentCount).toFixed(2) : 0
+      })
+    })
+    data.expenses = expensesData
+  }
+  
+  return data
+}
+
+// 导出为Excel
+const exportToExcel = (data) => {
+  const wb = XLSX.utils.book_new()
+  
+  if (data.dorms) {
+    const ws = XLSX.utils.json_to_sheet(data.dorms)
+    XLSX.utils.book_append_sheet(wb, ws, '寝室信息')
+  }
+  
+  if (data.members) {
+    const ws = XLSX.utils.json_to_sheet(data.members)
+    XLSX.utils.book_append_sheet(wb, ws, '成员详情')
+  }
+  
+  if (data.expenses) {
+    const ws = XLSX.utils.json_to_sheet(data.expenses)
+    XLSX.utils.book_append_sheet(wb, ws, '费用统计')
+  }
+  
+  const fileName = `寝室管理_${new Date().toLocaleDateString()}.xlsx`
+  XLSX.writeFile(wb, fileName)
+}
+
+// 导出为PDF
+const exportToPDF = (data) => {
+  const doc = new jsPDF()
+  let yPosition = 20
+  
+  // 添加标题
+  doc.setFontSize(16)
+  doc.text('寝室管理报告', 105, yPosition, { align: 'center' })
+  yPosition += 20
+  
+  // 添加导出时间
+  doc.setFontSize(10)
+  doc.text(`导出时间: ${new Date().toLocaleString()}`, 105, yPosition, { align: 'center' })
+  yPosition += 20
+  
+  if (data.dorms) {
+    // 添加寝室信息
+    doc.setFontSize(14)
+    doc.text('寝室信息', 20, yPosition)
+    yPosition += 10
+    
+    doc.setFontSize(10)
+    data.dorms.forEach((dorm, index) => {
+      if (yPosition > 270) {
+        doc.addPage()
+        yPosition = 20
+      }
+      
+      doc.text(`${index + 1}. ${dorm['寝室号']} (${dorm['楼栋']}栋${dorm['楼层']}层)`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   状态: ${dorm['状态']}`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   容纳人数: ${dorm['容纳人数']}人`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   当前人数: ${dorm['当前人数']}人`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   寝室长: ${dorm['寝室长']}`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   本月费用: ¥${dorm['本月费用']}`, 25, yPosition)
+      yPosition += 10
+    })
+    yPosition += 10
+  }
+  
+  if (data.members) {
+    // 添加成员详情
+    if (yPosition > 250) {
+      doc.addPage()
+      yPosition = 20
+    }
+    
+    doc.setFontSize(14)
+    doc.text('成员详情', 20, yPosition)
+    yPosition += 10
+    
+    doc.setFontSize(10)
+    data.members.forEach((member, index) => {
+      if (yPosition > 270) {
+        doc.addPage()
+        yPosition = 20
+      }
+      
+      doc.text(`${index + 1}. ${member['真实姓名']} (${member['用户名']})`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   寝室: ${member['寝室号']} (${member['楼栋']}栋)`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   联系电话: ${member['联系电话']}`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   是否寝室长: ${member['是否寝室长']}`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   入住时间: ${member['入住时间']}`, 25, yPosition)
+      yPosition += 10
+    })
+    yPosition += 10
+  }
+  
+  if (data.expenses) {
+    // 添加费用统计
+    if (yPosition > 250) {
+      doc.addPage()
+      yPosition = 20
+    }
+    
+    doc.setFontSize(14)
+    doc.text('费用统计', 20, yPosition)
+    yPosition += 10
+    
+    doc.setFontSize(10)
+    data.expenses.forEach((expense, index) => {
+      if (yPosition > 270) {
+        doc.addPage()
+        yPosition = 20
+      }
+      
+      doc.text(`${index + 1}. ${expense['寝室号']} (${expense['楼栋']}栋)`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   寝室长: ${expense['寝室长']}`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   本月费用: ¥${expense['本月费用']}`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   费用笔数: ${expense['费用笔数']}`, 25, yPosition)
+      yPosition += 7
+      doc.text(`   人均费用: ¥${expense['人均费用']}`, 25, yPosition)
+      yPosition += 10
+    })
+  }
+  
+  // 保存PDF
+  const fileName = `寝室管理_${new Date().toLocaleDateString()}.pdf`
+  doc.save(fileName)
 }
 
 // 重置寝室表单

@@ -55,78 +55,90 @@
         <!-- 统计概览 -->
         <el-row :gutter="20" class="stats-overview">
           <el-col :span="6">
-            <el-card class="stat-card">
+            <el-card class="stat-card" shadow="hover">
               <div class="stat-content">
                 <div class="stat-icon user-icon">
                   <el-icon><User /></el-icon>
+                  <div class="icon-pulse"></div>
                 </div>
                 <div class="stat-info">
-                  <div class="stat-value">{{ statisticsData.totalUsers }}</div>
+                  <div class="stat-value" :data-value="statisticsData.totalUsers">{{ statisticsData.totalUsers }}</div>
                   <div class="stat-label">总用户数</div>
                   <div class="stat-change" :class="{ 'positive': statisticsData.userChange >= 0, 'negative': statisticsData.userChange < 0 }">
                     <el-icon v-if="statisticsData.userChange >= 0"><CaretTop /></el-icon>
                     <el-icon v-else><CaretBottom /></el-icon>
-                    {{ Math.abs(statisticsData.userChange) }}%
+                    <span class="change-text">{{ Math.abs(statisticsData.userChange) }}%</span>
+                    <span class="change-desc">较上月{{ statisticsData.userChange >= 0 ? '增长' : '减少' }}</span>
                   </div>
                 </div>
               </div>
+              <div class="stat-glow"></div>
             </el-card>
           </el-col>
           
           <el-col :span="6">
-            <el-card class="stat-card">
+            <el-card class="stat-card" shadow="hover">
               <div class="stat-content">
                 <div class="stat-icon expense-icon">
                   <el-icon><Money /></el-icon>
+                  <div class="icon-pulse"></div>
                 </div>
                 <div class="stat-info">
-                  <div class="stat-value">{{ statisticsData.totalExpenses }}</div>
+                  <div class="stat-value" :data-value="statisticsData.totalExpenses">{{ statisticsData.totalExpenses }}</div>
                   <div class="stat-label">总费用数</div>
                   <div class="stat-change" :class="{ 'positive': statisticsData.expenseChange >= 0, 'negative': statisticsData.expenseChange < 0 }">
                     <el-icon v-if="statisticsData.expenseChange >= 0"><CaretTop /></el-icon>
                     <el-icon v-else><CaretBottom /></el-icon>
-                    {{ Math.abs(statisticsData.expenseChange) }}%
+                    <span class="change-text">{{ Math.abs(statisticsData.expenseChange) }}%</span>
+                    <span class="change-desc">较上月{{ statisticsData.expenseChange >= 0 ? '增长' : '减少' }}</span>
                   </div>
                 </div>
               </div>
+              <div class="stat-glow"></div>
             </el-card>
           </el-col>
           
           <el-col :span="6">
-            <el-card class="stat-card">
+            <el-card class="stat-card" shadow="hover">
               <div class="stat-content">
                 <div class="stat-icon amount-icon">
                   <el-icon><Coin /></el-icon>
+                  <div class="icon-pulse"></div>
                 </div>
                 <div class="stat-info">
-                  <div class="stat-value">¥{{ statisticsData.totalAmount.toLocaleString() }}</div>
+                  <div class="stat-value" :data-value="statisticsData.totalAmount">¥{{ statisticsData.totalAmount.toLocaleString() }}</div>
                   <div class="stat-label">总金额</div>
                   <div class="stat-change" :class="{ 'positive': statisticsData.amountChange >= 0, 'negative': statisticsData.amountChange < 0 }">
                     <el-icon v-if="statisticsData.amountChange >= 0"><CaretTop /></el-icon>
                     <el-icon v-else><CaretBottom /></el-icon>
-                    {{ Math.abs(statisticsData.amountChange) }}%
+                    <span class="change-text">{{ Math.abs(statisticsData.amountChange) }}%</span>
+                    <span class="change-desc">较上月{{ statisticsData.amountChange >= 0 ? '增长' : '减少' }}</span>
                   </div>
                 </div>
               </div>
+              <div class="stat-glow"></div>
             </el-card>
           </el-col>
           
           <el-col :span="6">
-            <el-card class="stat-card">
+            <el-card class="stat-card" shadow="hover">
               <div class="stat-content">
                 <div class="stat-icon dispute-icon">
                   <el-icon><Warning /></el-icon>
+                  <div class="icon-pulse"></div>
                 </div>
                 <div class="stat-info">
-                  <div class="stat-value">{{ statisticsData.totalDisputes }}</div>
+                  <div class="stat-value" :data-value="statisticsData.totalDisputes">{{ statisticsData.totalDisputes }}</div>
                   <div class="stat-label">总争议数</div>
                   <div class="stat-change" :class="{ 'positive': statisticsData.disputeChange >= 0, 'negative': statisticsData.disputeChange < 0 }">
                     <el-icon v-if="statisticsData.disputeChange >= 0"><CaretTop /></el-icon>
                     <el-icon v-else><CaretBottom /></el-icon>
-                    {{ Math.abs(statisticsData.disputeChange) }}%
+                    <span class="change-text">{{ Math.abs(statisticsData.disputeChange) }}%</span>
+                    <span class="change-desc">较上月{{ statisticsData.disputeChange >= 0 ? '增长' : '减少' }}</span>
                   </div>
                 </div>
               </div>
+              <div class="stat-glow"></div>
             </el-card>
           </el-col>
         </el-row>
@@ -134,15 +146,15 @@
         <!-- 图表区域 -->
         <el-row :gutter="20" class="charts-section">
           <el-col :span="12">
-            <el-card class="chart-card">
+            <el-card class="chart-card" shadow="hover">
               <template #header>
                 <div class="card-header">
                   <span>用户活跃度趋势</span>
-                  <el-radio-group v-model="userActivityChartType" size="small">
-                    <el-radio-button label="daily">日</el-radio-button>
-                    <el-radio-button label="weekly">周</el-radio-button>
-                    <el-radio-button label="monthly">月</el-radio-button>
-                  </el-radio-group>
+                  <el-button-group size="small">
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.userActivity === 'week' }" @click="changeChartPeriod('userActivity', 'week')">周</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.userActivity === 'month' }" @click="changeChartPeriod('userActivity', 'month')">月</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.userActivity === 'year' }" @click="changeChartPeriod('userActivity', 'year')">年</el-button>
+                  </el-button-group>
                 </div>
               </template>
               <div class="chart-container">
@@ -150,7 +162,9 @@
                 <div class="mock-chart">
                   <div class="chart-title">用户活跃度</div>
                   <div class="chart-bars">
-                    <div v-for="(item, index) in userActivityData" :key="index" class="chart-bar" :style="{ height: item.value + '%', backgroundColor: item.color }"></div>
+                    <div v-for="(item, index) in userActivityData" :key="index" class="chart-bar" :style="{ height: item.value + '%', backgroundColor: item.color }">
+                      <div class="bar-tooltip">{{ item.value }}</div>
+                    </div>
                   </div>
                   <div class="chart-labels">
                     <span v-for="(item, index) in userActivityData" :key="index" class="chart-label">{{ item.label }}</span>
@@ -161,15 +175,15 @@
           </el-col>
           
           <el-col :span="12">
-            <el-card class="chart-card">
+            <el-card class="chart-card" shadow="hover">
               <template #header>
                 <div class="card-header">
                   <span>费用提交趋势</span>
-                  <el-radio-group v-model="expenseTrendChartType" size="small">
-                    <el-radio-button label="daily">日</el-radio-button>
-                    <el-radio-button label="weekly">周</el-radio-button>
-                    <el-radio-button label="monthly">月</el-radio-button>
-                  </el-radio-group>
+                  <el-button-group size="small">
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.expenseTrend === 'week' }" @click="changeChartPeriod('expenseTrend', 'week')">周</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.expenseTrend === 'month' }" @click="changeChartPeriod('expenseTrend', 'month')">月</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.expenseTrend === 'year' }" @click="changeChartPeriod('expenseTrend', 'year')">年</el-button>
+                  </el-button-group>
                 </div>
               </template>
               <div class="chart-container">
@@ -177,7 +191,9 @@
                 <div class="mock-chart">
                   <div class="chart-title">费用提交数量</div>
                   <div class="chart-bars">
-                    <div v-for="(item, index) in expenseTrendData" :key="index" class="chart-bar" :style="{ height: item.value + '%', backgroundColor: item.color }"></div>
+                    <div v-for="(item, index) in expenseTrendData" :key="index" class="chart-bar" :style="{ height: item.value + '%', backgroundColor: item.color }">
+                      <div class="bar-tooltip">{{ item.value }}</div>
+                    </div>
                   </div>
                   <div class="chart-labels">
                     <span v-for="(item, index) in expenseTrendData" :key="index" class="chart-label">{{ item.label }}</span>
@@ -190,11 +206,15 @@
         
         <el-row :gutter="20" class="charts-section">
           <el-col :span="12">
-            <el-card class="chart-card">
+            <el-card class="chart-card" shadow="hover">
               <template #header>
                 <div class="card-header">
                   <span>费用类型分布</span>
-                  <el-button size="small" @click="refreshExpenseTypeChart">刷新</el-button>
+                  <el-button-group size="small">
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.expenseType === 'week' }" @click="changeChartPeriod('expenseType', 'week')">周</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.expenseType === 'month' }" @click="changeChartPeriod('expenseType', 'month')">月</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.expenseType === 'year' }" @click="changeChartPeriod('expenseType', 'year')">年</el-button>
+                  </el-button-group>
                 </div>
               </template>
               <div class="chart-container">
@@ -219,11 +239,15 @@
           </el-col>
           
           <el-col :span="12">
-            <el-card class="chart-card">
+            <el-card class="chart-card" shadow="hover">
               <template #header>
                 <div class="card-header">
                   <span>争议处理效率</span>
-                  <el-button size="small" @click="refreshDisputeEfficiencyChart">刷新</el-button>
+                  <el-button-group size="small">
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.disputeEfficiency === 'week' }" @click="changeChartPeriod('disputeEfficiency', 'week')">周</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.disputeEfficiency === 'month' }" @click="changeChartPeriod('disputeEfficiency', 'month')">月</el-button>
+                    <el-button type="primary" :class="{ 'is-active': chartPeriods.disputeEfficiency === 'year' }" @click="changeChartPeriod('disputeEfficiency', 'year')">年</el-button>
+                  </el-button-group>
                 </div>
               </template>
               <div class="chart-container">
@@ -245,7 +269,7 @@
         </el-row>
         
         <!-- 详细数据表格 -->
-        <el-card class="data-table-card">
+        <el-card class="data-table-card" shadow="hover">
           <template #header>
             <div class="card-header">
               <span>详细数据</span>
@@ -257,7 +281,7 @@
             </div>
           </template>
           
-          <el-table :data="tableData" style="width: 100%" v-loading="tableLoading">
+          <el-table :data="tableData" style="width: 100%" v-loading="tableLoading" stripe>
             <el-table-column prop="id" label="ID" width="80" />
             
             <!-- 用户数据列 -->
@@ -329,6 +353,7 @@
               :total="tablePagination.total"
               @size-change="handleTableSizeChange"
               @current-change="handleTableCurrentChange"
+              background
             />
           </div>
         </el-card>
@@ -341,6 +366,29 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, Refresh, User, Money, Coin, Warning, CaretTop, CaretBottom } from '@element-plus/icons-vue'
+
+// XLSX动态导入函数
+const importXLSX = async () => {
+  try {
+    const XLSX = await import('xlsx')
+    return XLSX.default || XLSX
+  } catch (error) {
+    console.error('导入XLSX失败:', error)
+    ElMessage.error('导出功能不可用，请稍后再试')
+    return null
+  }
+}
+
+// 格式化日期时间
+const formatDateTime = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
 
 // 加载状态
 const tableLoading = ref(false)
@@ -363,9 +411,19 @@ const statisticsData = reactive({
   disputeChange: -5.6
 })
 
-// 图表类型
-const userActivityChartType = ref('daily')
-const expenseTrendChartType = ref('daily')
+// 图表周期数据
+const chartPeriods = ref({
+  userActivity: 'month',
+  expenseTrend: 'month',
+  expenseType: 'month',
+  disputeEfficiency: 'month'
+})
+
+// 切换图表周期
+const changeChartPeriod = (chartType, period) => {
+  chartPeriods.value[chartType] = period
+  updateChartData()
+}
 const dataTableType = ref('users')
 
 // 用户活跃度数据
@@ -453,7 +511,7 @@ const handleTimeRangeChange = (range) => {
 // 筛选统计数据
 const filterStatistics = () => {
   // 模拟API调用
-  ElMessage.loading('正在加载统计数据...')
+  const loadingMessage = ElMessage({ message: '正在加载统计数据...', type: 'info', duration: 0 })
   
   setTimeout(() => {
     // 根据时间范围更新数据
@@ -461,6 +519,7 @@ const filterStatistics = () => {
     updateChartData()
     updateTableData()
     
+    loadingMessage.close()
     ElMessage.success('统计数据加载完成')
   }, 1000)
 }
@@ -478,12 +537,165 @@ const refreshData = () => {
 }
 
 // 导出报告
-const exportReport = () => {
-  ElMessage.loading('正在生成报告...')
+const exportReport = async () => {
+  const loadingMessage = ElMessage({ message: '正在生成报告...', type: 'info', duration: 0 })
   
-  setTimeout(() => {
+  try {
+    const XLSX = await importXLSX()
+    if (!XLSX) {
+      loadingMessage.close()
+      return
+    }
+    
+    // 创建工作簿
+    const workbook = XLSX.utils.book_new()
+    
+    // 概览数据工作表
+    const overviewData = [
+      ['统计时间范围', getTimeRangeText()],
+      ['生成时间', formatDateTime(new Date())],
+      [''],
+      ['总用户数', statisticsData.totalUsers],
+      ['用户增长率', `${statisticsData.userChange}%`],
+      ['总费用数', statisticsData.totalExpenses],
+      ['费用增长率', `${statisticsData.expenseChange}%`],
+      ['总金额', statisticsData.totalAmount],
+      ['金额增长率', `${statisticsData.amountChange}%`],
+      ['总争议数', statisticsData.totalDisputes],
+      ['争议变化率', `${statisticsData.disputeChange}%`]
+    ]
+    
+    const overviewSheet = XLSX.utils.aoa_to_sheet(overviewData)
+    XLSX.utils.book_append_sheet(workbook, overviewSheet, '统计概览')
+    
+    // 用户活跃度数据工作表
+    const userActivitySheetData = [
+      ['时间', '活跃度']
+    ]
+    userActivityData.value.forEach(item => {
+      userActivitySheetData.push([item.label, item.value])
+    })
+    const userActivitySheet = XLSX.utils.aoa_to_sheet(userActivitySheetData)
+    XLSX.utils.book_append_sheet(workbook, userActivitySheet, '用户活跃度')
+    
+    // 费用趋势数据工作表
+    const expenseTrendSheetData = [
+      ['时间', '费用数量']
+    ]
+    expenseTrendData.value.forEach(item => {
+      expenseTrendSheetData.push([item.label, item.value])
+    })
+    const expenseTrendSheet = XLSX.utils.aoa_to_sheet(expenseTrendSheetData)
+    XLSX.utils.book_append_sheet(workbook, expenseTrendSheet, '费用趋势')
+    
+    // 费用类型分布工作表
+    const expenseTypeSheetData = [
+      ['费用类型', '数量', '占比(%)']
+    ]
+    expenseTypeData.value.forEach(item => {
+      expenseTypeSheetData.push([item.name, item.value, item.percentage])
+    })
+    const expenseTypeSheet = XLSX.utils.aoa_to_sheet(expenseTypeSheetData)
+    XLSX.utils.book_append_sheet(workbook, expenseTypeSheet, '费用类型分布')
+    
+    // 争议处理效率工作表
+    const disputeEfficiencySheetData = [
+      ['时间', '处理效率']
+    ]
+    disputeEfficiencyData.value.forEach(item => {
+      disputeEfficiencySheetData.push([item.label, item.value])
+    })
+    const disputeEfficiencySheet = XLSX.utils.aoa_to_sheet(disputeEfficiencySheetData)
+    XLSX.utils.book_append_sheet(workbook, disputeEfficiencySheet, '争议处理效率')
+    
+    // 根据当前表格类型添加详细数据
+    let detailSheetName = ''
+    let detailSheetData = []
+    
+    if (dataTableType.value === 'users') {
+      detailSheetName = '用户详情'
+      detailSheetData = [
+        ['用户ID', '用户名', '真实姓名', '登录次数', '提交次数', '总金额', '最后登录时间']
+      ]
+      usersData.value.forEach(user => {
+        detailSheetData.push([
+          user.id,
+          user.username,
+          user.realName,
+          user.loginCount,
+          user.submitCount,
+          user.totalAmount,
+          user.lastLoginTime
+        ])
+      })
+    } else if (dataTableType.value === 'expenses') {
+      detailSheetName = '费用详情'
+      detailSheetData = [
+        ['ID', '费用类型', '数量', '总金额', '平均金额', '通过率(%)']
+      ]
+      expensesData.value.forEach(expense => {
+        detailSheetData.push([
+          expense.id,
+          expense.type,
+          expense.count,
+          expense.totalAmount,
+          expense.averageAmount,
+          expense.approvedRate
+        ])
+      })
+    } else if (dataTableType.value === 'disputes') {
+      detailSheetName = '争议详情'
+      detailSheetData = [
+        ['ID', '争议类型', '数量', '已解决', '解决率(%)', '平均处理时间(小时)']
+      ]
+      disputesData.value.forEach(dispute => {
+        detailSheetData.push([
+          dispute.id,
+          dispute.type,
+          dispute.count,
+          dispute.resolvedCount,
+          dispute.resolutionRate,
+          dispute.avgProcessTime
+        ])
+      })
+    }
+    
+    if (detailSheetData.length > 1) {
+      const detailSheet = XLSX.utils.aoa_to_sheet(detailSheetData)
+      XLSX.utils.book_append_sheet(workbook, detailSheet, detailSheetName)
+    }
+    
+    // 生成文件名
+    const fileName = `系统统计报告_${getTimeRangeText()}_${formatDateTime(new Date()).replace(/[\/\s:]/g, '-')}.xlsx`
+    
+    // 导出文件
+    XLSX.writeFile(workbook, fileName)
+    
+    loadingMessage.close()
     ElMessage.success('报告导出成功')
-  }, 2000)
+  } catch (error) {
+    console.error('导出报告失败:', error)
+    loadingMessage.close()
+    ElMessage.error('导出报告失败')
+  }
+}
+
+// 获取时间范围文本
+const getTimeRangeText = () => {
+  const timeRange = filterForm.timeRange
+  switch (timeRange) {
+    case 'today': return '今日'
+    case 'week': return '本周'
+    case 'month': return '本月'
+    case 'quarter': return '本季度'
+    case 'year': return '本年'
+    case 'custom': 
+      if (filterForm.dateRange && filterForm.dateRange.length === 2) {
+        return `${filterForm.dateRange[0]}至${filterForm.dateRange[1]}`
+      }
+      return '自定义'
+    default: return '本月'
+  }
 }
 
 // 更新统计数据
@@ -661,7 +873,7 @@ const updateTableData = () => {
 
 // 刷新费用类型图表
 const refreshExpenseTypeChart = () => {
-  ElMessage.loading('正在刷新费用类型图表...')
+  const loadingMessage = ElMessage({ message: '正在刷新费用类型图表...', type: 'info', duration: 0 })
   
   setTimeout(() => {
     // 模拟数据更新
@@ -670,13 +882,14 @@ const refreshExpenseTypeChart = () => {
       value: Math.floor(Math.random() * 100) + 50
     }))
     
+    loadingMessage.close()
     ElMessage.success('费用类型图表已刷新')
   }, 500)
 }
 
 // 刷新争议效率图表
 const refreshDisputeEfficiencyChart = () => {
-  ElMessage.loading('正在刷新争议处理效率图表...')
+  const loadingMessage = ElMessage({ message: '正在刷新争议处理效率图表...', type: 'info', duration: 0 })
   
   setTimeout(() => {
     // 模拟数据更新
@@ -685,6 +898,7 @@ const refreshDisputeEfficiencyChart = () => {
       value: Math.floor(Math.random() * 50) + 20
     }))
     
+    loadingMessage.close()
     ElMessage.success('争议处理效率图表已刷新')
   }, 500)
 }
@@ -722,77 +936,180 @@ onMounted(() => {
 .system-statistics {
   height: 100vh;
   overflow: hidden;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
 }
 
 .page-header {
-  background-color: #f5f7fa;
-  border-bottom: 1px solid #e4e7ed;
+  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .header-content h1 {
   margin: 0 0 5px 0;
-  color: #303133;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 24px;
 }
 
 .header-content p {
   margin: 0;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
 }
 
+.header-actions .el-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.header-actions .el-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
 .statistics-content {
-  padding: 20px;
+  padding: 24px;
   overflow-y: auto;
+  height: calc(100vh - 80px);
 }
 
 .filter-card {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: none;
+  overflow: hidden;
+}
+
+.filter-card :deep(.el-card__body) {
+  padding: 20px;
 }
 
 .stats-overview {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
-  height: 120px;
+  height: 140px;
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+}
+
+.stat-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stat-card:hover .stat-glow {
+  opacity: 1;
 }
 
 .stat-content {
   display: flex;
   align-items: center;
   height: 100%;
+  padding: 0 10px;
 }
 
 .stat-icon {
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-right: 15px;
+  margin-right: 20px;
   color: white;
-  font-size: 24px;
+  font-size: 28px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-icon::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent);
+}
+
+.icon-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
 }
 
 .user-icon {
-  background-color: #409EFF;
+  background: linear-gradient(135deg, #409EFF, #66b1ff);
 }
 
 .expense-icon {
-  background-color: #67C23A;
+  background: linear-gradient(135deg, #67C23A, #85ce61);
 }
 
 .amount-icon {
-  background-color: #E6A23C;
+  background: linear-gradient(135deg, #E6A23C, #ebb563);
 }
 
 .dispute-icon {
-  background-color: #F56C6C;
+  background: linear-gradient(135deg, #F56C6C, #f78989);
 }
 
 .stat-info {
@@ -800,22 +1117,25 @@ onMounted(() => {
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: bold;
   color: #303133;
   margin-bottom: 5px;
+  line-height: 1.2;
 }
 
 .stat-label {
   font-size: 14px;
   color: #606266;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .stat-change {
-  font-size: 12px;
+  font-size: 13px;
   display: flex;
   align-items: center;
+  font-weight: 500;
 }
 
 .stat-change.positive {
@@ -827,11 +1147,25 @@ onMounted(() => {
 }
 
 .charts-section {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .chart-card {
-  height: 400px;
+  height: 420px;
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.chart-card :deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .card-header {
@@ -841,8 +1175,9 @@ onMounted(() => {
 }
 
 .chart-container {
-  height: 320px;
+  height: 340px;
   position: relative;
+  padding: 10px;
 }
 
 /* 模拟图表样式 */
@@ -855,34 +1190,63 @@ onMounted(() => {
 
 .chart-title {
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
   font-weight: bold;
   color: #303133;
+  font-size: 16px;
 }
 
 .chart-bars {
   display: flex;
   justify-content: space-around;
   align-items: flex-end;
-  height: 200px;
+  height: 220px;
   padding: 0 10px;
 }
 
 .chart-bar {
-  width: 30px;
+  width: 35px;
   min-height: 10px;
-  border-radius: 3px 3px 0 0;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.chart-bar:hover {
+  opacity: 0.8;
+  transform: scaleY(1.05);
+}
+
+.bar-tooltip {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.chart-bar:hover .bar-tooltip {
+  opacity: 1;
 }
 
 .chart-labels {
   display: flex;
   justify-content: space-around;
-  margin-top: 10px;
+  margin-top: 15px;
 }
 
 .chart-label {
   font-size: 12px;
   color: #606266;
+  font-weight: 500;
 }
 
 /* 模拟饼图样式 */
@@ -898,11 +1262,11 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 .pie-value {
-  font-size: 24px;
+  font-size: 32px;
   font-weight: bold;
   color: #303133;
 }
@@ -910,42 +1274,59 @@ onMounted(() => {
 .pie-label {
   font-size: 14px;
   color: #606266;
+  margin-top: 5px;
 }
 
 .pie-segments {
   width: 100%;
-  height: 20px;
+  height: 24px;
   display: flex;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .pie-segment {
   height: 100%;
-  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.pie-segment:hover {
+  opacity: 0.8;
 }
 
 .pie-legend {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 15px;
+  gap: 20px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background-color: #f5f7fa;
+  transition: all 0.3s ease;
+}
+
+.legend-item:hover {
+  background-color: #e4e7ed;
 }
 
 .legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  margin-right: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 8px;
 }
 
 .legend-label {
-  font-size: 12px;
+  font-size: 13px;
   color: #606266;
+  font-weight: 500;
 }
 
 /* 模拟折线图样式 */
@@ -958,36 +1339,215 @@ onMounted(() => {
 
 .chart-line {
   position: relative;
-  height: 200px;
+  height: 220px;
   border-bottom: 1px solid #DCDFE6;
   border-left: 1px solid #DCDFE6;
+  border-radius: 0 0 0 4px;
 }
 
 .line-point {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background-color: #409EFF;
+  box-shadow: 0 0 0 4px rgba(64, 158, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.line-point:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 6px rgba(64, 158, 255, 0.3);
 }
 
 .point-value {
   position: absolute;
-  top: -20px;
+  top: -25px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 11px;
   color: #606266;
   white-space: nowrap;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 2px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .data-table-card {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.data-table-card :deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.data-table-card :deep(.el-table) {
+  border-radius: 0;
+}
+
+.data-table-card :deep(.el-table th) {
+  background-color: #f5f7fa;
+  color: #303133;
+  font-weight: 600;
+}
+
+.data-table-card :deep(.el-table--border) {
+  border-radius: 0;
+}
+
+.data-table-card :deep(.el-table--enable-row-hover .el-table__body tr:hover > td) {
+  background-color: #f5f7fa;
+}
+
+.data-table-card :deep(.el-table__body tr) {
+  transition: all 0.2s ease;
+}
+
+.data-table-card :deep(.el-table__body tr > td) {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.data-table-card :deep(.el-table__body tr > td .cell) {
+  padding: 12px 0;
+}
+
+.data-table-card :deep(.el-tag) {
+  border-radius: 12px;
+  padding: 0 10px;
+  height: 24px;
+  line-height: 24px;
+  font-weight: 500;
+  font-size: 12px;
 }
 
 .pagination-container {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  margin-top: 24px;
+  padding: 0 20px 20px;
+}
+
+.pagination-container :deep(.el-pagination) {
+  padding: 10px 0;
+}
+
+.pagination-container :deep(.el-pagination .el-pager li) {
+  border-radius: 4px;
+  margin: 0 2px;
+  transition: all 0.3s ease;
+}
+
+.pagination-container :deep(.el-pagination .el-pager li:hover) {
+  transform: translateY(-2px);
+}
+
+.pagination-container :deep(.el-pagination .el-pager li.is-active) {
+  background-color: #409EFF;
+  color: white;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.pagination-container :deep(.el-pagination .btn-prev),
+.pagination-container :deep(.el-pagination .btn-next) {
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.pagination-container :deep(.el-pagination .btn-prev:hover),
+.pagination-container :deep(.el-pagination .btn-next:hover) {
+  transform: translateY(-2px);
+}
+
+.pagination-container :deep(.el-pagination .el-select .el-input) {
+  border-radius: 4px;
+}
+
+.pagination-container :deep(.el-pagination .el-select .el-input:hover) {
+  transform: translateY(-2px);
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .stat-card {
+    height: 130px;
+  }
+  
+  .stat-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+  
+  .stat-value {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    padding: 16px;
+    text-align: center;
+  }
+  
+  .header-actions {
+    margin-top: 12px;
+  }
+  
+  .statistics-content {
+    padding: 16px;
+  }
+  
+  .stat-card {
+    height: 120px;
+    margin-bottom: 16px;
+  }
+  
+  .chart-card {
+    height: 380px;
+    margin-bottom: 16px;
+  }
+  
+  .chart-container {
+    height: 300px;
+  }
+}
+
+/* 按钮组样式 */
+.el-button-group .el-button {
+  background-color: #f0f0f0;
+  border-color: #d0d0d0;
+  color: #666;
+  transition: all 0.3s ease;
+}
+
+.el-button-group .el-button:hover {
+  background-color: #e0e0e0;
+  border-color: #c0c0c0;
+  color: #333;
+}
+
+.el-button-group .el-button.is-active {
+  background-color: #409EFF;
+  border-color: #409EFF;
+  color: white;
+}
+
+/* 统计变化文本样式 */
+.change-text {
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.change-desc {
+  margin-left: 5px;
+  font-size: 12px;
+  opacity: 0.8;
 }
 </style>

@@ -498,18 +498,280 @@ const getStatusTagType = (status) => {
 }
 
 // 运行检测
-const runDetection = () => {
+const runDetection = async () => {
   loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
+  try {
+    // 调用异常检测API
+    const response = await fetch('/api/abnormal-expenses/detect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      ElMessage.success(result.message || '检测完成')
+      // 刷新数据
+      fetchAbnormalExpenses()
+      fetchStatistics()
+    } else {
+      ElMessage.error(result.message || '检测失败')
+    }
+  } catch (error) {
+    console.error('运行检测失败:', error)
+    ElMessage.error('检测失败，请重试')
+  } finally {
     loading.value = false
-    ElMessage.success('检测完成，发现3个新的异常费用')
-  }, 2000)
+  }
 }
 
 // 导出报告
 const exportReport = () => {
-  ElMessage.success('报告导出成功')
+  ElMessageBox.confirm(
+    '请选择导出格式',
+    '导出报告',
+    {
+      confirmButtonText: '导出Excel',
+      cancelButtonText: '导出PDF',
+      type: 'info'
+    }
+  )
+    .then(() => {
+      // 导出Excel
+      exportToExcel()
+    })
+    .catch(() => {
+      // 导出PDF
+      exportToPDF()
+    })
+}
+
+// 导出Excel格式报告
+const exportToExcel = () => {
+  loading.value = true
+  
+  // 动态导入所需库
+  import('xlsx').then(XLSX => {
+    import('file-saver').then(FileSaver => {
+      try {
+        // 准备导出数据
+        const exportData = abnormalExpenses.value.map(item => ({
+          '异常ID': item.id,
+          '费用ID': item.expenseId,
+          '费用类型': getCategoryName(item.category),
+          '金额(元)': item.amount,
+          '支付人': item.payer,
+          '寝室': item.dorm,
+          '支付日期': item.date,
+          '严重程度': getSeverityName(item.severity),
+          '处理状态': getStatusName(item.status),
+          '检测时间': item.detectTime,
+          '触发规则': item.ruleName,
+          '异常原因': item.reason,
+          '处理备注': item.handleRemark || '无'
+        }))
+        
+        // 创建工作簿
+        const wb = XLSX.utils.book_new()
+        
+        // 创建工作表
+        const ws = XLSX.utils.json_to_sheet(exportData)
+        
+        // 设置列宽
+        const colWidths = [
+          { wch: 8 },  // 异常ID
+          { wch: 8 },  // 费用ID
+          { wch: 10 }, // 费用类型
+          { wch: 10 }, // 金额
+          { wch: 10 }, // 支付人
+          { wch: 8 },  // 寝室
+          { wch: 12 }, // 支付日期
+          { wch: 10 }, // 严重程度
+          { wch: 10 }, // 处理状态
+          { wch: 20 }, // 检测时间
+          { wch: 15 }, // 触发规则
+          { wch: 30 }, // 异常原因
+          { wch: 30 }  // 处理备注
+        ]
+        ws['!cols'] = colWidths
+        
+        // 将工作表添加到工作簿
+        XLSX.utils.book_append_sheet(wb, ws, '异常费用报告')
+        
+        // 生成Excel文件并下载
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+        
+        // 生成文件名（包含日期）
+        const today = new Date()
+        const year = today.getFullYear()
+        const month = (today.getMonth() + 1).toString().padStart(2, '0')
+        const day = today.getDate().toString().padStart(2, '0')
+        const dateStr = `${year}${month}${day}`
+        const fileName = `异常费用报告_${dateStr}.xlsx`
+        
+        // 保存文件
+        FileSaver.saveAs(blob, fileName)
+        
+        ElMessage.success('Excel报告导出成功')
+      } catch (error) {
+        console.error('导出Excel失败:', error)
+        ElMessage.error('导出Excel失败，请重试')
+      } finally {
+        loading.value = false
+      }
+    })
+  })
+}
+
+// 导出PDF格式报告
+const exportToPDF = () => {
+  loading.value = true
+  
+  // 动态导入所需库
+  import('jspdf').then(jsPDF => {
+    import('html2canvas').then(html2canvas => {
+      try {
+        // 创建PDF文档
+        const pdf = new jsPDF.jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        })
+        
+        // 添加自定义字体支持中文（如果需要）
+        pdf.setFont('helvetica')
+        
+        // 添加标题
+        pdf.setFontSize(18)
+        pdf.text('Abnormal Expense Report', 105, 15, { align: 'center' })
+        
+        // 添加生成日期
+        pdf.setFontSize(10)
+        const today = new Date()
+        const dateStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`
+        pdf.text(`Generated on: ${dateStr}`, 105, 22, { align: 'center' })
+        
+        // 添加统计信息
+        pdf.setFontSize(12)
+        pdf.text('Summary Statistics:', 14, 35)
+        
+        pdf.setFontSize(10)
+        const totalExpenses = abnormalExpenses.value.length
+        const pendingExpenses = abnormalExpenses.value.filter(item => item.status === 'pending').length
+        const confirmedExpenses = abnormalExpenses.value.filter(item => item.status === 'confirmed').length
+        const ignoredExpenses = abnormalExpenses.value.filter(item => item.status === 'ignored').length
+        const highSeverityExpenses = abnormalExpenses.value.filter(item => item.severity === 'high').length
+        
+        pdf.text(`Total Abnormal Expenses: ${totalExpenses}`, 14, 42)
+        pdf.text(`Pending: ${pendingExpenses}`, 14, 48)
+        pdf.text(`Confirmed: ${confirmedExpenses}`, 14, 54)
+        pdf.text(`Ignored: ${ignoredExpenses}`, 14, 60)
+        pdf.text(`High Severity: ${highSeverityExpenses}`, 14, 66)
+        
+        // 准备表格数据
+        const tableData = abnormalExpenses.value.map(item => [
+          item.id.toString(),
+          item.expenseId.toString(),
+          getCategoryName(item.category),
+          `¥${item.amount.toFixed(2)}`,
+          item.payer,
+          item.dorm,
+          item.date,
+          getSeverityName(item.severity),
+          getStatusName(item.status),
+          item.ruleName,
+          item.reason.substring(0, 30) + (item.reason.length > 30 ? '...' : ''),
+          item.handleRemark ? (item.handleRemark.substring(0, 20) + (item.handleRemark.length > 20 ? '...' : '')) : 'None'
+        ])
+        
+        // 添加表格标题
+        pdf.setFontSize(12)
+        pdf.text('Abnormal Expenses Details:', 14, 78)
+        
+        // 添加表格
+        pdf.setFontSize(9)
+        const headers = ['ID', 'Expense ID', 'Category', 'Amount', 'Payer', 'Dorm', 'Date', 'Severity', 'Status', 'Rule', 'Reason', 'Remark']
+        let yPosition = 85
+        
+        // 添加表头
+        headers.forEach((header, index) => {
+          const xPosition = 14 + (index * 15)
+          if (xPosition < 190) { // 确保不超出页面宽度
+            pdf.text(header, xPosition, yPosition)
+          }
+        })
+        
+        yPosition += 5
+        
+        // 添加表格数据（每页最多25行）
+        let rowCount = 0
+        tableData.forEach((row, rowIndex) => {
+          if (rowCount >= 25) {
+            // 添加新页面
+            pdf.addPage()
+            yPosition = 20
+            rowCount = 0
+            
+            // 在新页面重新添加表头
+            pdf.setFontSize(9)
+            headers.forEach((header, index) => {
+              const xPosition = 14 + (index * 15)
+              if (xPosition < 190) {
+                pdf.text(header, xPosition, yPosition)
+              }
+            })
+            yPosition += 5
+          }
+          
+          // 添加数据行
+          row.forEach((cell, cellIndex) => {
+            const xPosition = 14 + (cellIndex * 15)
+            if (xPosition < 190) {
+              pdf.text(cell.toString(), xPosition, yPosition)
+            }
+          })
+          
+          yPosition += 5
+          rowCount++
+          
+          // 如果接近页面底部，添加新页面
+          if (yPosition > 270) {
+            pdf.addPage()
+            yPosition = 20
+            rowCount = 0
+            
+            // 在新页面重新添加表头
+            pdf.setFontSize(9)
+            headers.forEach((header, index) => {
+              const xPosition = 14 + (index * 15)
+              if (xPosition < 190) {
+                pdf.text(header, xPosition, yPosition)
+              }
+            })
+            yPosition += 5
+          }
+        })
+        
+        // 生成文件名（包含日期）
+        const dateStrForFile = `${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, '0')}${today.getDate().toString().padStart(2, '0')}`
+        const fileName = `Abnormal_Expense_Report_${dateStrForFile}.pdf`
+        
+        // 保存PDF
+        pdf.save(fileName)
+        
+        ElMessage.success('PDF报告导出成功')
+      } catch (error) {
+        console.error('导出PDF失败:', error)
+        ElMessage.error('导出PDF失败，请重试')
+      } finally {
+        loading.value = false
+      }
+    })
+  })
 }
 
 // 切换规则状态
@@ -572,16 +834,6 @@ const saveRule = () => {
       resetRuleForm()
     }
   })
-}
-
-// 筛选异常费用
-const filterAbnormalExpenses = () => {
-  loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('筛选完成')
-  }, 500)
 }
 
 // 查看异常费用详情
@@ -677,9 +929,92 @@ const handleCurrentChange = (page) => {
   filterAbnormalExpenses()
 }
 
+// 获取异常费用数据
+const fetchAbnormalExpenses = async () => {
+  loading.value = true
+  try {
+    const params = new URLSearchParams({
+      page: currentPage.value,
+      limit: pageSize.value
+    })
+    
+    if (filterStatus.value) {
+      params.append('status', filterStatus.value)
+    }
+    
+    if (filterSeverity.value) {
+      params.append('severity', filterSeverity.value)
+    }
+    
+    const response = await fetch(`/api/abnormal-expenses?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      abnormalExpenses.value = result.data.items.map(item => ({
+        id: item.id,
+        expenseId: item.expense_id,
+        category: item.type_name.toLowerCase(),
+        amount: item.amount,
+        payer: item.paid_by_name,
+        dorm: 'A101', // 模拟数据，实际应从后端获取
+        date: new Date(item.expense_date).toLocaleDateString(),
+        severity: item.rule_type === 'amount_threshold' ? 'high' : 'medium', // 根据规则类型设置严重程度
+        status: item.status,
+        detectTime: new Date(item.created_at).toLocaleString(),
+        ruleName: item.rule_name,
+        reason: item.reason,
+        handleRemark: item.note || ''
+      }))
+      totalAbnormalExpenses.value = result.data.pagination.totalItems
+    } else {
+      ElMessage.error(result.message || '获取异常费用数据失败')
+    }
+  } catch (error) {
+    console.error('获取异常费用数据失败:', error)
+    ElMessage.error('获取异常费用数据失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取统计数据
+const fetchStatistics = async () => {
+  try {
+    const response = await fetch('/api/abnormal-expenses/stats', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      // 更新统计数据
+      // 这里可以根据实际返回的数据结构更新统计图表
+      console.log('统计数据:', result.data)
+    } else {
+      ElMessage.error(result.message || '获取统计数据失败')
+    }
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+  }
+}
+
+// 筛选异常费用
+const filterAbnormalExpenses = () => {
+  currentPage.value = 1
+  fetchAbnormalExpenses()
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
-  filterAbnormalExpenses()
+  fetchAbnormalExpenses()
+  fetchStatistics()
 })
 </script>
 
@@ -687,101 +1022,289 @@ onMounted(() => {
 .abnormal-expense {
   height: 100vh;
   overflow: hidden;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
 }
 
 .page-header {
-  background-color: #f5f7fa;
-  border-bottom: 1px solid #e4e7ed;
+  background: linear-gradient(135deg, #409eff 0%, #3a8ee6 100%);
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .header-content h1 {
   margin: 0 0 5px 0;
-  color: #303133;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 24px;
 }
 
 .header-content p {
   margin: 0;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.header-actions .el-button {
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.header-actions .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
 .abnormal-content {
-  padding: 20px;
+  padding: 25px;
   overflow-y: auto;
+  height: calc(100vh - 80px);
 }
 
 .rules-card {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: none;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.rules-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .card-header h3 {
   margin: 0;
   color: #303133;
+  font-weight: 600;
+  font-size: 18px;
+  position: relative;
+  padding-left: 12px;
+}
+
+.card-header h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background-color: #409eff;
+  border-radius: 2px;
 }
 
 .abnormal-list-card {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: none;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.abnormal-list-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
 }
 
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .list-header h3 {
   margin: 0;
   color: #303133;
+  font-weight: 600;
+  font-size: 18px;
+  position: relative;
+  padding-left: 12px;
+}
+
+.list-header h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background-color: #409eff;
+  border-radius: 2px;
 }
 
 .list-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  align-items: center;
+}
+
+.list-actions .el-select {
+  border-radius: 20px;
+}
+
+.list-actions .el-button {
+  border-radius: 20px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.list-actions .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 表格样式美化 */
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-table th) {
+  background-color: #f5f7fa;
+  color: #606266;
+  font-weight: 600;
+}
+
+:deep(.el-table tr) {
+  transition: all 0.2s ease;
+}
+
+:deep(.el-table tr:hover > td) {
+  background-color: #f0f9ff !important;
+}
+
+:deep(.el-table td) {
+  padding: 12px 0;
+}
+
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+  padding: 0 10px;
+  height: 24px;
+  line-height: 22px;
+}
+
+:deep(.el-button--small) {
+  border-radius: 16px;
+  font-weight: 500;
+  padding: 6px 15px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--small:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12);
+}
+
+:deep(.el-button--danger) {
+  background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%);
+  border: none;
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border: none;
 }
 
 .pagination-container {
-  margin-top: 20px;
+  margin-top: 25px;
   display: flex;
   justify-content: center;
+  padding: 15px 0;
+}
+
+:deep(.el-pagination) {
+  border-radius: 20px;
+  padding: 10px 20px;
+  background-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
 }
 
 .chart-row {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .chart-card {
-  height: 350px;
+  height: 380px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: none;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.chart-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
 }
 
 .chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .chart-header h3 {
   margin: 0;
   color: #303133;
+  font-weight: 600;
+  font-size: 18px;
+  position: relative;
+  padding-left: 12px;
+}
+
+.chart-header h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background-color: #409eff;
+  border-radius: 2px;
 }
 
 .chart-container {
-  height: calc(100% - 50px);
+  height: calc(100% - 60px);
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .chart-placeholder {
@@ -793,18 +1316,165 @@ onMounted(() => {
 }
 
 .chart-placeholder img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.chart-placeholder img:hover {
+  transform: scale(1.02);
+}
+
+/* 对话框美化 */
+:deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #409eff 0%, #3a8ee6 100%);
+  padding: 20px 25px;
+  color: #ffffff;
+}
+
+:deep(.el-dialog__title) {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+:deep(.el-dialog__headerbtn .el-dialog__close) {
+  color: #ffffff;
+  font-size: 18px;
+}
+
+:deep(.el-dialog__body) {
+  padding: 25px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #606266;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.5);
+}
+
+:deep(.el-select .el-input__wrapper) {
+  border-radius: 8px;
+}
+
+:deep(.el-switch) {
+  --el-switch-on-color: #409eff;
+}
+
+:deep(.el-switch__core) {
+  border-radius: 10px;
 }
 
 .abnormal-detail {
-  padding: 10px 0;
+  padding: 15px 0;
+}
+
+:deep(.el-descriptions) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-descriptions__header) {
+  background-color: #f5f7fa;
+  margin-bottom: 0;
+}
+
+:deep(.el-descriptions__body) {
+  background-color: #ffffff;
+}
+
+:deep(.el-descriptions__table .el-descriptions__cell.is-bordered-label) {
+  background-color: #f5f7fa;
+  font-weight: 600;
+  color: #606266;
 }
 
 .abnormal-actions {
-  margin-top: 20px;
+  margin-top: 25px;
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  justify-content: center;
+}
+
+.abnormal-actions .el-button {
+  border-radius: 20px;
+  font-weight: 500;
+  padding: 10px 25px;
+  transition: all 0.3s ease;
+}
+
+.abnormal-actions .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 加载状态美化 */
+:deep(.el-loading-mask) {
+  background-color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(3px);
+}
+
+:deep(.el-loading-spinner) {
+  margin-top: -30px;
+}
+
+/* 消息提示美化 */
+:deep(.el-message) {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .chart-row .el-col {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    padding: 20px;
+    text-align: center;
+  }
+  
+  .header-actions {
+    margin-top: 15px;
+  }
+  
+  .list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .list-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .abnormal-content {
+    padding: 15px;
+  }
 }
 </style>

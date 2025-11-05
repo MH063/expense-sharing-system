@@ -3,7 +3,7 @@
     <el-container>
       <el-header class="page-header">
         <div class="header-content">
-          <h1>文档搜索与浏览</h1>
+          <h1>{{ pageTitle }}</h1>
           <p>快速搜索和浏览所有项目文档</p>
         </div>
       </el-header>
@@ -183,11 +183,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Document, Files, DataAnalysis, Setting, User } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // 搜索表单
 const searchForm = ref({
@@ -214,6 +215,9 @@ const pagination = ref({
   pageSize: 10,
   total: 0
 })
+
+// 页面标题
+const pageTitle = ref('文档搜索与浏览')
 
 // 热门文档
 const popularDocs = ref([
@@ -413,9 +417,108 @@ const getDocTypeColor = (type) => {
 
 // 组件挂载时加载数据
 onMounted(() => {
-  // 这里可以添加API调用来获取热门文档等数据
+  // 检查是否有从其他页面传递的参数
+  const { filter, title } = route.query
+  
+  if (filter) {
+    // 根据筛选类型设置页面标题和执行相应搜索
+    if (title) {
+      pageTitle.value = title
+    }
+    
+    // 根据筛选类型执行相应的搜索
+    switch (filter) {
+      case 'recent':
+        searchRecentDocuments()
+        break
+      case 'popular':
+        searchPopularDocuments()
+        break
+      default:
+        break
+    }
+  }
+  
   console.log('文档搜索与浏览页面已加载')
 })
+
+// 搜索最近编辑的文档
+const searchRecentDocuments = () => {
+  hasSearched.value = true
+  
+  // 模拟最近编辑的文档数据
+  searchResults.value = [
+    {
+      id: '1',
+      name: '需求文档 - 11.3 管理端需求',
+      type: 'requirements',
+      author: '张三',
+      updateTime: '2023-12-01 14:30',
+      version: 'v1.2.1',
+      matchedContent: '添加了文档管理系统和系统管理功能的详细需求说明'
+    },
+    {
+      id: '2',
+      name: '数据库设计文档 - 用户表结构',
+      type: 'database',
+      author: '李四',
+      updateTime: '2023-11-28 10:15',
+      version: 'v1.1.2',
+      matchedContent: '更新了用户表的角色字段，添加了系统管理员角色'
+    },
+    {
+      id: '3',
+      name: '需求文档 - 4.3.1 收款码管理功能',
+      type: 'requirements',
+      author: '王五',
+      updateTime: '2023-11-25 16:45',
+      version: 'v1.2.0',
+      matchedContent: '完善了收款码上传与维护的功能需求'
+    }
+  ]
+  
+  pagination.value.total = searchResults.value.length
+  ElMessage.success(`找到 ${searchResults.value.length} 个最近编辑的文档`)
+}
+
+// 搜索热门文档
+const searchPopularDocuments = () => {
+  hasSearched.value = true
+  
+  // 模拟热门文档数据
+  searchResults.value = [
+    {
+      id: '1',
+      name: '需求文档 - 11.3 管理端需求',
+      type: 'requirements',
+      author: '张三',
+      updateTime: '2023-12-01 14:30',
+      version: 'v1.2.1',
+      matchedContent: '浏览次数: 128 | 最近浏览: 2023-12-01 15:20'
+    },
+    {
+      id: '2',
+      name: '数据库设计文档 - 用户表结构',
+      type: 'database',
+      author: '李四',
+      updateTime: '2023-11-28 10:15',
+      version: 'v1.1.2',
+      matchedContent: '浏览次数: 96 | 最近浏览: 2023-12-01 12:10'
+    },
+    {
+      id: '3',
+      name: '需求文档 - 4.3.1 收款码管理功能',
+      type: 'requirements',
+      author: '王五',
+      updateTime: '2023-11-25 16:45',
+      version: 'v1.2.0',
+      matchedContent: '浏览次数: 87 | 最近浏览: 2023-11-30 18:45'
+    }
+  ]
+  
+  pagination.value.total = searchResults.value.length
+  ElMessage.success(`找到 ${searchResults.value.length} 个热门文档`)
+}
 </script>
 
 <style scoped>

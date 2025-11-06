@@ -104,6 +104,11 @@ const notificationSettingsRoutes = require('./routes/notification-settings-route
 const mfaRoutes = require('./routes/mfa-routes');
 const userPreferencesRoutes = require('./routes/user-preferences-routes');
 const abnormalExpenseRoutes = require('./routes/abnormal-expense-routes');
+const disputeRoutes = require('./routes/dispute-routes');
+const reviewRoutes = require('./routes/review-routes');
+const systemConfigRoutes = require('./routes/system-config-routes');
+const fileRoutes = require('./routes/file-routes');
+const websocketManagementRoutes = require('./routes/websocket-management-routes');
 
 // 导入错误处理中间件
 const { errorHandler, notFoundHandler } = require('./middleware/error-handler');
@@ -169,6 +174,13 @@ app.use(httpLogger);
 
 // 静态文件服务 - 用于部署前端应用
 app.use(express.static('public'));
+
+// API 路由挂载（阶段五新增）
+app.use('/api/disputes', disputeRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/system', systemConfigRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/ws', websocketManagementRoutes);
 
 // 前端应用路由（使用绝对路径，兼容空格路径；目录不存在则跳过挂载并记录日志）
 const clientDistPath = path.resolve(__dirname, '..', 'Client application', 'dist');

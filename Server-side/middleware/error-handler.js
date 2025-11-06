@@ -68,6 +68,7 @@ function errorHandler(err, req, res, next) {
   res.status(statusCode).json({
     success: false,
     message: message,
+    code: err && err.name ? err.name : (statusCode === 500 ? 'INTERNAL_ERROR' : 'ERROR'),
     error: errorDetails,
     timestamp: new Date().toISOString()
   });

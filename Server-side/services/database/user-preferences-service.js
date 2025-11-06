@@ -44,9 +44,69 @@ class UserPreferencesService extends BaseService {
   }
 
   /**
-   * 获取用户所有偏好设置（按类别分组）
+   * 从 user_settings 获取缺省值并进行已知键映射
+   * @param {string} userId
+   * @returns {Promise<Object>} 映射后的缺省值，按类别组织
+   */
+  async getUserSettingsDefaults(userId) {
+    const sql = `SELECT setting_key, setting_value FROM user_settings WHERE user_id = $1`;
+    const result = await this.query(sql, [userId]);
+
+    const defaults = {
+      personal: {},
+      notification: {},
+      privacy: {},
+      system: {}
+    };
+
+    const coerceValue = (key, value) => {
+      if (value === null || value === undefined) return value;
+      // 尝试识别布尔、JSON、数字
+      const trimmed = String(value).trim();
+      if (trimmed === 'true') return true;
+      if (trimmed === 'false') return false;
+      try {
+        // 如果是 JSON，返回解析后的对象/数组/值
+        const parsed = JSON.parse(trimmed);
+        // 仅当解析结果为对象/数组/原始类型都可接受
+        return parsed;
+      } catch (_) {
+        // 非 JSON，尝试数字
+        const num = Number(trimmed);
+        if (!Number.isNaN(num) && trimmed !== '') return num;
+      }
+      return value;
+    };
+
+    // 已知键映射规则
+    for (const row of result.rows) {
+      const key = row.setting_key;
+      const value = coerceValue(key, row.setting_value);
+      switch (key) {
+        case 'theme':
+          defaults.personal.theme = value; // e.g. 'light' | 'dark'
+          break;
+        case 'language':
+          defaults.system.language = value; // e.g. 'zh-CN'
+          break;
+        case 'notifications':
+          defaults.notification.enabled = value; // e.g. true | false
+          break;
+        default:
+          // 未知键：归入 system 下的 misc 字段，避免丢失
+          if (!defaults.system.misc) defaults.system.misc = {};
+          defaults.system.misc[key] = value;
+          break;
+      }
+    }
+
+    return defaults;
+  }
+
+  /**
+   * 获取用户所有偏好设置（按类别分组），并与 user_settings 缺省值合并
    * @param {string} userId - 用户ID
-   * @returns {Promise<Object>} 按类别分组的用户偏好设置
+   * @returns {Promise<Object>} 按类别分组的用户偏好设置（含缺省值补齐）
    */
   async getUserPreferencesGrouped(userId) {
     const preferences = await this.getUserPreferences(userId);
@@ -58,8 +118,25 @@ class UserPreferencesService extends BaseService {
     };
     
     preferences.forEach(pref => {
-      grouped[pref.preference_category][pref.preference_key] = pref.preference_value;
+      // preference_value 存储为 JSON 字符串，需解析
+      let value = pref.preference_value;
+      try {
+        value = typeof value === 'string' ? JSON.parse(value) : value;
+      } catch (_) {
+        // 解析失败则原样返回
+      }
+      grouped[pref.preference_category][pref.preference_key] = value;
     });
+
+    // 合并缺省值（仅当该键不存在时补齐）
+    const defaults = await this.getUserSettingsDefaults(userId);
+    for (const category of Object.keys(defaults)) {
+      for (const [key, value] of Object.entries(defaults[category])) {
+        if (grouped[category][key] === undefined) {
+          grouped[category][key] = value;
+        }
+      }
+    }
     
     return grouped;
   }

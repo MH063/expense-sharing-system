@@ -11,11 +11,11 @@ const {
   notificationValidationRules, 
   handleValidationErrors 
 } = require('../middleware/validation-middleware');
-const { strictRateLimiter, looseRateLimiter } = require('../middleware/rateLimiter');
+const { roleAwareRateLimiter } = require('../middleware/rateLimiter');
 const { logger } = require('../config/logger');
 
 // 获取通知列表 - 需要认证（读接口：宽松限流）
-router.get('/', authenticateToken, looseRateLimiter, async (req, res) => {
+router.get('/', authenticateToken, roleAwareRateLimiter('loose'), async (req, res) => {
   const { page = 1, limit = 20, unreadOnly, type } = req.query;
   try {
     const result = await NotificationController.getUserNotifications(req.user.sub, {
@@ -33,7 +33,7 @@ router.get('/', authenticateToken, looseRateLimiter, async (req, res) => {
 });
 
 // 获取未读通知数量 - 需要认证（读接口：宽松限流）
-router.get('/unread-count', authenticateToken, looseRateLimiter, async (req, res) => {
+router.get('/unread-count', authenticateToken, roleAwareRateLimiter('loose'), async (req, res) => {
   try {
     const count = await NotificationController.getUnreadNotificationsCount(req.user.sub);
     logger.info('audit:notifications:unread_count', { userId: req.user.sub, count });
@@ -48,7 +48,7 @@ router.get('/unread-count', authenticateToken, looseRateLimiter, async (req, res
 router.put(
   '/:id/read',
   authenticateToken,
-  strictRateLimiter,
+  roleAwareRateLimiter('strict'),
   async (req, res) => {
     try {
       const success = await NotificationController.markNotificationAsRead(req.params.id, req.user.sub);
@@ -65,7 +65,7 @@ router.put(
 router.put(
   '/mark-all-read',
   authenticateToken,
-  strictRateLimiter,
+  roleAwareRateLimiter('strict'),
   notificationValidationRules.markAllRead,
   handleValidationErrors,
   async (req, res) => {
@@ -81,7 +81,7 @@ router.put(
 );
 
 // 删除通知 - 需要认证（写接口：严格限流）
-router.delete('/:id', authenticateToken, strictRateLimiter, async (req, res) => {
+router.delete('/:id', authenticateToken, roleAwareRateLimiter('strict'), async (req, res) => {
   try {
     const success = await NotificationController.deleteNotification(req.params.id, req.user.sub);
     logger.info('audit:notifications:delete', { userId: req.user.sub, notificationId: req.params.id, success });
@@ -96,7 +96,7 @@ router.delete('/:id', authenticateToken, strictRateLimiter, async (req, res) => 
 router.post(
   '/',
   authenticateToken,
-  strictRateLimiter,
+  roleAwareRateLimiter('strict'),
   notificationValidationRules.create,
   handleValidationErrors,
   async (req, res) => {
@@ -118,7 +118,7 @@ router.post(
 );
 
 // 获取账单到期提醒 - 需要认证（读接口：宽松限流）
-router.get('/bill-due-reminders', authenticateToken, looseRateLimiter, async (req, res) => {
+router.get('/bill-due-reminders', authenticateToken, roleAwareRateLimiter('loose'), async (req, res) => {
   try {
     const reminders = await NotificationController.getBillDueReminders(req.user.sub);
     logger.info('audit:notifications:bill_due_reminders', { userId: req.user.sub, count: Array.isArray(reminders) ? reminders.length : undefined });
@@ -130,7 +130,7 @@ router.get('/bill-due-reminders', authenticateToken, looseRateLimiter, async (re
 });
 
 // 获取支付状态变更通知 - 需要认证（读接口：宽松限流）
-router.get('/payment-status-changes', authenticateToken, looseRateLimiter, async (req, res) => {
+router.get('/payment-status-changes', authenticateToken, roleAwareRateLimiter('loose'), async (req, res) => {
   try {
     const notifications = await NotificationController.getPaymentStatusNotifications(req.user.sub);
     logger.info('audit:notifications:payment_status_changes', { userId: req.user.sub, count: Array.isArray(notifications) ? notifications.length : undefined });
@@ -142,7 +142,7 @@ router.get('/payment-status-changes', authenticateToken, looseRateLimiter, async
 });
 
 // WebSocket 订阅管理占位端点（HTTP占位，实际订阅通过WS消息）
-router.post('/subscriptions/subscribe', authenticateToken, strictRateLimiter, async (req, res) => {
+router.post('/subscriptions/subscribe', authenticateToken, roleAwareRateLimiter('strict'), async (req, res) => {
   try {
     const { events = [] } = req.body || {};
     logger.info('audit:websocket:subscribe', { userId: req.user.sub, events });
@@ -154,7 +154,7 @@ router.post('/subscriptions/subscribe', authenticateToken, strictRateLimiter, as
   }
 });
 
-router.post('/subscriptions/unsubscribe', authenticateToken, strictRateLimiter, async (req, res) => {
+router.post('/subscriptions/unsubscribe', authenticateToken, roleAwareRateLimiter('strict'), async (req, res) => {
   try {
     const { events = [] } = req.body || {};
     logger.info('audit:websocket:unsubscribe', { userId: req.user.sub, events });

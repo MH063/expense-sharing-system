@@ -8,6 +8,8 @@
     "dev": "set NODE_ENV=development && nodemon server.js",
     "prod": "set NODE_ENV=production && node server.js",
     "test": "set NODE_ENV=test && jest",
+    "test:integration": "set NODE_ENV=test && jest --testPathPattern=integration",
+    "docs:check": "node scripts/docs-consistency-check.js",
     "test:watch": "set NODE_ENV=test && jest --watch",
     "test:coverage": "set NODE_ENV=test && jest --coverage",
     "test:db": "set NODE_ENV=test && jest --testPathPattern=database",

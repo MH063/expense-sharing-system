@@ -275,14 +275,16 @@ export const useAuthStore = defineStore('auth', () => {
       // 使用http客户端调用后端登录接口
       const response = await http.post('/auth/login', credentials)
       
-      // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+      // 处理后端返回的数据结构 {success: true, data: {token, refreshToken, user}}
+      // 从response.data.data获取实际数据
       if (response.data.success && response.data.data) {
         const { token, refreshToken: refreshTkn, user: userData } = response.data.data
         
         console.log('登录成功，收到Token:', {
           hasToken: !!token,
           hasRefreshToken: !!refreshTkn,
-          userData
+          userData,
+          fullResponse: response.data
         })
         
         // 存储Token到Token管理器，支持多用户
@@ -326,7 +328,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // 通知服务器登出
       if (accessToken.value) {
-        await http.post('/users/logout')
+        await http.post('/auth/logout')
       }
     } catch (error) {
       console.error('服务器登出失败:', error)

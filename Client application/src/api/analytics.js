@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import http from './config';
 
 /**
  * 数据分析API
@@ -13,11 +13,7 @@ export const analyticsApi = {
    */
   getOverviewData(params) {
     console.log('获取概览数据，参数:', params)
-    return request({
-      url: '/api/analytics/overview',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/overview', { params });
   },
 
   /**
@@ -31,11 +27,7 @@ export const analyticsApi = {
    */
   getExpenseTrendsData(params) {
     console.log('获取支出趋势数据，参数:', params)
-    return request({
-      url: '/api/analytics/expense-trend',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/expense-trend', { params });
   },
 
   /**
@@ -48,11 +40,7 @@ export const analyticsApi = {
    */
   getUserGrowthData(params) {
     console.log('获取用户增长数据，参数:', params)
-    return request({
-      url: '/api/analytics/user-growth',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/user-growth', { params });
   },
 
   /**
@@ -65,11 +53,7 @@ export const analyticsApi = {
    */
   getExpenseCategoryData(params) {
     console.log('获取支出分类数据，参数:', params)
-    return request({
-      url: '/api/analytics/expense-category',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/expense-category', { params });
   },
 
   /**
@@ -82,11 +66,7 @@ export const analyticsApi = {
    */
   getRoomActivityData(params) {
     console.log('获取房间活跃度数据，参数:', params)
-    return request({
-      url: '/api/analytics/room-activity',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/room-activity', { params });
   },
 
   /**
@@ -101,11 +81,7 @@ export const analyticsApi = {
    */
   getUserExpenseData(params) {
     console.log('获取用户消费数据，参数:', params)
-    return request({
-      url: '/api/analytics/user-expense',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/user-expense', { params });
   },
 
   /**
@@ -118,11 +94,7 @@ export const analyticsApi = {
    */
   getRoomDetailData(params) {
     console.log('获取房间详细数据，参数:', params)
-    return request({
-      url: '/api/analytics/room-detail',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/room-detail', { params });
   },
 
   /**
@@ -134,11 +106,7 @@ export const analyticsApi = {
    */
   getRecentActivities(params) {
     console.log('获取最近活动，参数:', params)
-    return request({
-      url: '/api/analytics/recent-activities',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/recent-activities', { params });
   },
 
   /**
@@ -151,11 +119,7 @@ export const analyticsApi = {
    */
   getUserActivityData(params) {
     console.log('获取用户活跃度数据，参数:', params)
-    return request({
-      url: '/api/analytics/user-activity',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/user-activity', { params });
   },
 
   /**
@@ -168,11 +132,7 @@ export const analyticsApi = {
    */
   getPaymentStatsData(params) {
     console.log('获取支付统计数据，参数:', params)
-    return request({
-      url: '/api/analytics/payment-stats',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/payment-stats', { params });
   },
 
   /**
@@ -185,11 +145,7 @@ export const analyticsApi = {
    */
   getDisputeStatsData(params) {
     console.log('获取争议统计数据，参数:', params)
-    return request({
-      url: '/api/analytics/dispute-stats',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/dispute-stats', { params });
   },
 
   /**
@@ -202,11 +158,7 @@ export const analyticsApi = {
    */
   getReviewStatsData(params) {
     console.log('获取评论统计数据，参数:', params)
-    return request({
-      url: '/api/analytics/review-stats',
-      method: 'get',
-      params
-    })
+    return http.get('/analytics/review-stats', { params });
   },
 
   /**
@@ -221,11 +173,26 @@ export const analyticsApi = {
    */
   exportReport(params) {
     console.log('导出数据报表，参数:', params)
-    return request({
-      url: '/api/analytics/export',
-      method: 'get',
+    return http.get('/analytics/export', { 
       params,
       responseType: 'blob'
-    })
+    });
   }
-}
+};
+
+// 导出单独的函数以保持向后兼容
+export const getOverviewData = analyticsApi.getOverviewData;
+export const getExpenseTrendsData = analyticsApi.getExpenseTrendsData;
+export const getUserGrowthData = analyticsApi.getUserGrowthData;
+export const getExpenseCategoryData = analyticsApi.getExpenseCategoryData;
+export const getRoomActivityData = analyticsApi.getRoomActivityData;
+export const getUserExpenseData = analyticsApi.getUserExpenseData;
+export const getRoomDetailData = analyticsApi.getRoomDetailData;
+export const getRecentActivities = analyticsApi.getRecentActivities;
+export const getUserActivityData = analyticsApi.getUserActivityData;
+export const getPaymentStatsData = analyticsApi.getPaymentStatsData;
+export const getDisputeStatsData = analyticsApi.getDisputeStatsData;
+export const getReviewStatsData = analyticsApi.getReviewStatsData;
+export const exportReport = analyticsApi.exportReport;
+
+export default analyticsApi;

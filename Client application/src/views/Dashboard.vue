@@ -177,6 +177,9 @@ import {
   CircleCheck, Bell, Clock, View
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import { statsApi } from '@/api/stats'
+import { notificationApi } from '@/api/notifications'
+import { billApi } from '@/api/bills'
 
 // 路由和状态管理
 const router = useRouter()
@@ -201,50 +204,10 @@ const stats = reactive({
 })
 
 // 最近活动数据
-const recentActivities = ref([
-  {
-    type: 'expense',
-    title: '添加了一笔餐饮费用',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30) // 30分钟前
-  },
-  {
-    type: 'payment',
-    title: '完成了一笔账单支付',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2) // 2小时前
-  },
-  {
-    type: 'notification',
-    title: '收到一条新的账单通知',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5) // 5小时前
-  },
-  {
-    type: 'expense',
-    title: '添加了一笔日用品费用',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24) // 1天前
-  }
-])
+const recentActivities = ref([])
 
 // 待办事项数据
-const todoList = ref([
-  {
-    type: 'payment',
-    title: '待支付账单',
-    description: '您有2笔账单待支付，总金额¥128.50',
-    action: 'view-bills'
-  },
-  {
-    type: 'review',
-    title: '费用审核',
-    description: '您有1笔费用待审核',
-    action: 'review-expenses'
-  },
-  {
-    type: 'notification',
-    title: '新通知',
-    description: '您有3条未读通知',
-    action: 'view-notifications'
-  }
-])
+const todoList = ref([])
 
 // 待办事项数量
 const todoCount = computed(() => {
@@ -259,19 +222,19 @@ const initTrendChart = () => {
   
   chartLoading.value = true
   
-  // 模拟图表数据
+  // 空的图表数据
   const chartData = {
     week: {
       categories: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      values: [120, 132, 101, 134, 90, 230, 210]
+      values: [0, 0, 0, 0, 0, 0, 0]
     },
     month: {
       categories: ['第1周', '第2周', '第3周', '第4周'],
-      values: [820, 932, 901, 934]
+      values: [0, 0, 0, 0]
     },
     year: {
       categories: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-      values: [820, 932, 901, 934, 1290, 1330, 1320, 820, 932, 901, 934, 1290]
+      values: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     }
   }
   
@@ -333,18 +296,230 @@ const initTrendChart = () => {
  */
 const loadStats = async () => {
   try {
-    // 模拟API调用
-    // const response = await dashboardApi.getStats()
+    console.log('开始加载用户统计数据')
+    const response = await statsApi.getUserStats()
+    console.log('用户统计数据响应:', response)
     
-    // 模拟数据
-    stats.totalExpense = '5280.50'
-    stats.myExpense = '1320.50'
-    stats.owedAmount = '450.00'
-    stats.owingAmount = '1850.00'
+    // 处理后端返回的数据结构 {success: true, data: {...}}
+    if (response.success && response.data) {
+      const data = response.data
+      stats.totalExpense = data.totalExpense || '0.00'
+      stats.myExpense = data.myExpense || '0.00'
+      stats.owedAmount = data.owedAmount || '0.00'
+      stats.owingAmount = data.owingAmount || '0.00'
+      console.log('统计数据已更新:', stats)
+    } else {
+      console.error('统计数据响应格式错误:', response)
+      ElMessage.error('统计数据格式错误')
+    }
   } catch (error) {
     console.error('加载统计数据失败:', error)
     ElMessage.error('加载统计数据失败')
   }
+}
+
+/**
+ * 加载最近活动数据
+ */
+const loadRecentActivities = async () => {
+  try {
+    console.log('开始加载最近活动数据')
+    const response = await notificationApi.getNotifications({ limit: 5 })
+    console.log('最近活动数据响应:', response)
+    
+    // 处理后端返回的数据结构 {success: true, data: {...}}
+    if (response.success && response.data) {
+      // 将通知数据转换为活动数据格式
+      recentActivities.value = response.data.map(notification => {
+        return {
+          type: 'notification',
+          title: notification.title || '新通知',
+          timestamp: notification.createdAt || new Date().toISOString()
+        }
+      })
+      console.log('最近活动数据已更新:', recentActivities.value)
+    } else {
+      console.error('最近活动数据响应格式错误:', response)
+    }
+  } catch (error) {
+    console.error('加载最近活动数据失败:', error)
+  }
+}
+
+/**
+ * 加载待办事项数据
+ */
+const loadTodoList = async () => {
+  try {
+    console.log('开始加载待办事项数据')
+    const response = await billApi.getBills({ status: 'pending', limit: 5 })
+    console.log('待办事项数据响应:', response)
+    
+    // 处理后端返回的数据结构 {success: true, data: {...}}
+    if (response.success && response.data) {
+      // 将账单数据转换为待办事项数据格式
+      todoList.value = response.data.map(bill => {
+        return {
+          type: 'payment',
+          title: bill.title || '待支付账单',
+          description: `金额: ¥${bill.amount || '0.00'}`,
+          action: 'view-bills',
+          id: bill.id
+        }
+      })
+      console.log('待办事项数据已更新:', todoList.value)
+    } else {
+      console.error('待办事项数据响应格式错误:', response)
+    }
+  } catch (error) {
+    console.error('加载待办事项数据失败:', error)
+  }
+}
+
+/**
+ * 加载图表数据
+ */
+const loadChartData = async () => {
+  if (!trendPeriod.value) return
+  
+  try {
+    chartLoading.value = true
+    console.log('开始加载图表数据，周期:', trendPeriod.value)
+    
+    // 获取房间统计数据，用于图表展示
+    const response = await statsApi.getRoomStats({
+      startDate: getDateRange(trendPeriod.value).start,
+      endDate: getDateRange(trendPeriod.value).end
+    })
+    console.log('图表数据响应:', response)
+    
+    // 处理后端返回的数据结构 {success: true, data: {...}}
+    if (response.success && response.data) {
+      // 根据周期更新图表数据
+      updateChartData(response.data)
+    } else {
+      console.error('图表数据响应格式错误:', response)
+    }
+    
+    chartLoading.value = false
+  } catch (error) {
+    console.error('加载图表数据失败:', error)
+    chartLoading.value = false
+  }
+}
+
+/**
+ * 根据周期获取日期范围
+ */
+const getDateRange = (period) => {
+  const now = new Date()
+  let start, end
+  
+  switch (period) {
+    case 'week':
+      // 本周
+      const dayOfWeek = now.getDay()
+      start = new Date(now)
+      start.setDate(now.getDate() - dayOfWeek)
+      end = new Date(now)
+      end.setDate(now.getDate() + (6 - dayOfWeek))
+      break
+    case 'month':
+      // 本月
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      break
+    case 'year':
+      // 本年
+      start = new Date(now.getFullYear(), 0, 1)
+      end = new Date(now.getFullYear(), 11, 31)
+      break
+    default:
+      // 默认本月
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  }
+  
+  // 格式化为 YYYY-MM-DD
+  const formatDate = (date) => {
+    return date.toISOString().split('T')[0]
+  }
+  
+  return {
+    start: formatDate(start),
+    end: formatDate(end)
+  }
+}
+
+/**
+ * 更新图表数据
+ */
+const updateChartData = (data) => {
+  if (!trendChart || !data) return
+  
+  let categories, values
+  
+  switch (trendPeriod.value) {
+    case 'week':
+      categories = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+      // 如果后端提供了周数据，使用后端数据，否则使用默认0
+      values = data.weeklyData || [0, 0, 0, 0, 0, 0, 0]
+      break
+    case 'month':
+      categories = ['第1周', '第2周', '第3周', '第4周']
+      // 如果后端提供了月数据，使用后端数据，否则使用默认0
+      values = data.monthlyData || [0, 0, 0, 0]
+      break
+    case 'year':
+      categories = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+      // 如果后端提供了年数据，使用后端数据，否则使用默认0
+      values = data.yearlyData || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      break
+    default:
+      return
+  }
+  
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: categories,
+      axisTick: {
+        alignWithLabel: true
+      }
+    },
+    yAxis: {
+      type: 'value'
+    },
+    series: [
+      {
+        name: '费用',
+        type: 'bar',
+        barWidth: '60%',
+        data: values,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#83bff6' },
+            { offset: 0.5, color: '#188df0' },
+            { offset: 1, color: '#188df0' }
+          ])
+        }
+      }
+    ]
+  }
+  
+  trendChart.setOption(option)
 }
 
 /**
@@ -423,12 +598,16 @@ const handleTodoClick = (todo) => {
 // 监听趋势周期变化
 watch(trendPeriod, () => {
   initTrendChart()
+  loadChartData()
 })
 
 // 组件挂载时初始化
 onMounted(() => {
   loadStats()
+  loadRecentActivities()
+  loadTodoList()
   initTrendChart()
+  loadChartData()
   
   // 监听窗口大小变化，调整图表大小
   window.addEventListener('resize', () => {

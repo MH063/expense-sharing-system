@@ -31,7 +31,7 @@ class StatsController {
    * @param {Object} res - 响应对象
    */
   async getUserStats(req, res) {
-    const client = await this.pool.connect();
+    const client = await pool.connect();
     try {
       const user_id = req.user.sub;
       const { room_id, period = 'month' } = req.query; // period: week, month, quarter, year
@@ -200,22 +200,49 @@ class StatsController {
    * @param {Object} res - 响应对象
    */
   async getRoomStats(req, res) {
-    const client = await this.pool.connect();
+    const client = await pool.connect();
     try {
       const user_id = req.user.sub;
       const { room_id, period = 'month' } = req.query;
       
       // 验证用户是否为寝室成员
-      const memberCheck = await client.query(
-        'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
-        [room_id, user_id]
-      );
+      let roomFilter = '';
+      const params = [];
+      let paramIndex = 1;
       
-      if (memberCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+      if (room_id) {
+        const memberCheck = await client.query(
+          'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
+          [room_id, user_id]
+        );
+        
+        if (memberCheck.rows.length === 0) {
+          return res.status(403).json({
+            success: false,
+            message: '您不是该寝室的成员'
+          });
+        }
+        
+        roomFilter = `AND e.room_id = $${paramIndex++}`;
+        params.push(room_id);
+      } else {
+        // 如果没有指定房间，获取用户所在的所有房间
+        const userRoomsQuery = `
+          SELECT room_id FROM user_room_relations 
+          WHERE user_id = $1 AND is_active = TRUE
+        `;
+        const userRoomsResult = await client.query(userRoomsQuery, [user_id]);
+        
+        if (userRoomsResult.rows.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: '您尚未加入任何寝室'
+          });
+        }
+        
+        const roomIds = userRoomsResult.rows.map(row => row.room_id);
+        roomFilter = `AND e.room_id = ANY($${paramIndex++})`;
+        params.push(roomIds);
       }
       
       // 根据周期设置时间范围
@@ -235,38 +262,56 @@ class StatsController {
           break;
       }
       
-      // 获取寝室总费用统计
-      const totalExpenseQuery = `
+      // 获取寝室费用统计
+      const expenseStatsQuery = `
         SELECT 
           COUNT(*) as expense_count,
-          COALESCE(SUM(e.amount), 0) as total_amount,
-          COALESCE(AVG(e.amount), 0) as avg_amount
+          COALESCE(SUM(e.amount), 0) as total_expense,
+          COALESCE(AVG(e.amount), 0) as avg_expense,
+          COUNT(DISTINCT e.payer_id) as unique_payers
         FROM expenses e
-        WHERE e.room_id = $1 ${timeFilter}
+        WHERE 1=1 ${roomFilter} ${timeFilter}
       `;
       
-      const totalExpenseResult = await client.query(totalExpenseQuery, [room_id]);
-      const totalExpense = totalExpenseResult.rows[0];
+      const expenseStatsResult = await client.query(expenseStatsQuery, params);
+      const expenseStats = expenseStatsResult.rows[0];
       
-      // 获取寝室成员费用贡献
+      // 获取寝室账单统计
+      const billStatsQuery = `
+        SELECT 
+          COUNT(*) as bill_count,
+          COALESCE(SUM(b.total_amount), 0) as total_bill_amount,
+          COALESCE(SUM(CASE WHEN b.status = 'COMPLETED' THEN b.total_amount ELSE 0 END), 0) as paid_amount,
+          COALESCE(SUM(CASE WHEN b.status = 'PENDING' THEN b.total_amount ELSE 0 END), 0) as pending_amount
+        FROM bills b
+        WHERE 1=1 ${roomFilter} ${timeFilter}
+      `;
+      
+      const billStatsResult = await client.query(billStatsQuery, params);
+      const billStats = billStatsResult.rows[0];
+      
+      // 获取成员费用贡献
       const memberContributionQuery = `
         SELECT 
           u.id,
           u.username,
+          u.avatar,
           COUNT(e.id) as expense_count,
           COALESCE(SUM(e.amount), 0) as total_paid,
-          COALESCE(SUM(es.amount), 0) as total_owed,
-          COALESCE(SUM(CASE WHEN es.status = 'PAID' THEN es.amount ELSE 0 END), 0) as total_paid_split
+          COALESCE(SUM(es.amount), 0) as total_owed
         FROM users u
-        JOIN user_room_relations urr ON u.id = urr.user_id AND urr.room_id = $1 AND urr.is_active = TRUE
-        LEFT JOIN expenses e ON u.id = e.payer_id AND e.room_id = $1 ${timeFilter.replace('AND', 'AND')}
-        LEFT JOIN expense_splits es ON u.id = es.user_id
-        LEFT JOIN expenses e2 ON es.expense_id = e2.id AND e2.room_id = $1 ${timeFilter.replace('AND', 'AND')}
-        GROUP BY u.id, u.username
+        LEFT JOIN expenses e ON u.id = e.payer_id ${roomFilter.replace('AND e.room_id', 'AND e.room_id')} ${timeFilter}
+        LEFT JOIN expense_splits es ON u.id = es.user_id 
+        LEFT JOIN expenses e2 ON es.expense_id = e2.id ${roomFilter.replace('AND e.room_id', 'AND e2.room_id')} ${timeFilter}
+        WHERE u.id IN (
+          SELECT user_id FROM user_room_relations urr 
+          ${room_id ? 'WHERE urr.room_id = $1 AND urr.is_active = TRUE' : 'WHERE urr.room_id = ANY($1) AND urr.is_active = TRUE'}
+        )
+        GROUP BY u.id, u.username, u.avatar
         ORDER BY total_paid DESC
       `;
       
-      const memberContributionResult = await client.query(memberContributionQuery, [room_id]);
+      const memberContributionResult = await client.query(memberContributionQuery, params);
       const memberContributions = memberContributionResult.rows;
       
       // 获取费用类型分布
@@ -277,78 +322,62 @@ class StatsController {
           COALESCE(SUM(e.amount), 0) as total_amount
         FROM expenses e
         JOIN expense_types et ON e.type_id = et.id
-        WHERE e.room_id = $1 ${timeFilter}
+        WHERE 1=1 ${roomFilter} ${timeFilter}
         GROUP BY et.id, et.name
         ORDER BY total_amount DESC
       `;
       
-      const expenseTypeResult = await client.query(expenseTypeQuery, [room_id]);
+      const expenseTypeResult = await client.query(expenseTypeQuery, params);
       const expenseTypes = expenseTypeResult.rows;
       
-      // 获取每月费用趋势
-      const monthlyTrendQuery = `
+      // 获取每日费用趋势
+      const dailyTrendQuery = `
         SELECT 
-          DATE_TRUNC('month', e.created_at) as month,
+          DATE_TRUNC('day', e.created_at) as date,
           COALESCE(SUM(e.amount), 0) as total_amount,
           COUNT(*) as count
         FROM expenses e
-        WHERE e.room_id = $1 AND e.created_at >= CURRENT_DATE - INTERVAL '12 months'
-        GROUP BY DATE_TRUNC('month', e.created_at)
-        ORDER BY month
+        WHERE 1=1 ${roomFilter} ${timeFilter}
+        GROUP BY DATE_TRUNC('day', e.created_at)
+        ORDER BY date
       `;
       
-      const monthlyTrendResult = await client.query(monthlyTrendQuery, [room_id]);
-      const monthlyTrend = monthlyTrendResult.rows;
-      
-      // 获取账单统计
-      const billStatsQuery = `
-        SELECT 
-          COUNT(*) as bill_count,
-          COALESCE(SUM(b.total_amount), 0) as total_bill_amount,
-          COUNT(CASE WHEN b.status = 'COMPLETED' THEN 1 END) as completed_bills,
-          COUNT(CASE WHEN b.status = 'PENDING' THEN 1 END) as pending_bills,
-          COUNT(CASE WHEN b.status = 'APPROVED' THEN 1 END) as approved_bills
-        FROM bills b
-        WHERE b.room_id = $1 ${timeFilter}
-      `;
-      
-      const billStatsResult = await client.query(billStatsQuery, [room_id]);
-      const billStats = billStatsResult.rows[0];
+      const dailyTrendResult = await client.query(dailyTrendQuery, params);
+      const dailyTrend = dailyTrendResult.rows;
       
       res.status(200).json({
         success: true,
         data: {
-          total_expense: {
-            count: parseInt(totalExpense.expense_count),
-            total_amount: parseFloat(totalExpense.total_amount),
-            avg_amount: parseFloat(totalExpense.avg_amount)
+          expense_stats: {
+            count: parseInt(expenseStats.expense_count),
+            total_expense: parseFloat(expenseStats.total_expense),
+            avg_expense: parseFloat(expenseStats.avg_expense),
+            unique_payers: parseInt(expenseStats.unique_payers)
+          },
+          bill_stats: {
+            count: parseInt(billStats.bill_count),
+            total_amount: parseFloat(billStats.total_bill_amount),
+            paid_amount: parseFloat(billStats.paid_amount),
+            pending_amount: parseFloat(billStats.pending_amount)
           },
           member_contributions: memberContributions.map(member => ({
             id: member.id,
             username: member.username,
+            avatar: member.avatar,
             expense_count: parseInt(member.expense_count),
             total_paid: parseFloat(member.total_paid),
-            total_owed: parseFloat(member.total_owed),
-            total_paid_split: parseFloat(member.total_paid_split),
-            balance: parseFloat(member.total_paid) - parseFloat(member.total_paid_split)
+            total_owed: parseFloat(member.total_owed)
           })),
           expense_types: expenseTypes.map(type => ({
             type_name: type.type_name,
             count: parseInt(type.count),
             total_amount: parseFloat(type.total_amount)
           })),
-          monthly_trend: monthlyTrend.map(trend => ({
-            month: trend.month,
+          daily_trend: dailyTrend.map(trend => ({
+            date: trend.date,
             total_amount: parseFloat(trend.total_amount),
             count: parseInt(trend.count)
-          })),
-          bill_stats: {
-            count: parseInt(billStats.bill_count),
-            total_amount: parseFloat(billStats.total_bill_amount),
-            completed_bills: parseInt(billStats.completed_bills),
-            pending_bills: parseInt(billStats.pending_bills),
-            approved_bills: parseInt(billStats.approved_bills)
-          }
+          }))
         }
       });
     } catch (error) {
@@ -428,8 +457,7 @@ class StatsController {
       const billStatsQuery = `
         SELECT 
           COUNT(*) as total_bills,
-          COALESCE(SUM(total_amount), 0) as total_bill_amount,
-          COUNT(CASE ${timeFilter.replace('WHERE', 'AND')} THEN 1 END) as new_bills,
+          COALESCE(SUM(total_amount), 0) as total_amount,
           COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed_bills,
           COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending_bills
         FROM bills
@@ -545,7 +573,7 @@ class StatsController {
     const client = await this.pool.connect();
     try {
       const user_id = req.user.sub;
-      const { room_id, period = 'month' } = req.query;
+      const { room_id } = req.query;
       
       // 验证用户是否为寝室成员
       if (room_id) {

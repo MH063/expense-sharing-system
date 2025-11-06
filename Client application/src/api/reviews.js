@@ -1,7 +1,7 @@
-import request from '@/utils/request'
+import http from './config';
 
 /**
- * 评论API
+ * 评论管理API
  */
 export const reviewApi = {
   /**
@@ -15,12 +15,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   getReviews(params) {
-    console.log('获取评论列表，参数:', params)
-    return request({
-      url: '/api/reviews',
-      method: 'get',
-      params
-    })
+    console.log('获取评论列表，参数:', params);
+    return http.get('/reviews', { params });
   },
 
   /**
@@ -29,11 +25,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   getReviewById(id) {
-    console.log('获取评论详情，ID:', id)
-    return request({
-      url: `/api/reviews/${id}`,
-      method: 'get'
-    })
+    console.log('获取评论详情，ID:', id);
+    return http.get(`/reviews/${id}`);
   },
 
   /**
@@ -46,12 +39,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   createReview(data) {
-    console.log('创建评论，数据:', data)
-    return request({
-      url: '/api/reviews',
-      method: 'post',
-      data
-    })
+    console.log('创建评论，数据:', data);
+    return http.post('/reviews', data);
   },
 
   /**
@@ -64,12 +53,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   updateReview(id, data) {
-    console.log('更新评论，ID:', id, '数据:', data)
-    return request({
-      url: `/api/reviews/${id}`,
-      method: 'put',
-      data
-    })
+    console.log('更新评论，ID:', id, '数据:', data);
+    return http.put(`/reviews/${id}`, data);
   },
 
   /**
@@ -78,11 +63,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   deleteReview(id) {
-    console.log('删除评论，ID:', id)
-    return request({
-      url: `/api/reviews/${id}`,
-      method: 'delete'
-    })
+    console.log('删除评论，ID:', id);
+    return http.delete(`/reviews/${id}`);
   },
 
   /**
@@ -91,11 +73,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   approveReview(id) {
-    console.log('审核通过评论，ID:', id)
-    return request({
-      url: `/api/reviews/${id}/approve`,
-      method: 'post'
-    })
+    console.log('审核通过评论，ID:', id);
+    return http.post(`/reviews/${id}/approve`);
   },
 
   /**
@@ -106,12 +85,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   rejectReview(id, data) {
-    console.log('拒绝评论，ID:', id, '数据:', data)
-    return request({
-      url: `/api/reviews/${id}/reject`,
-      method: 'post',
-      data
-    })
+    console.log('拒绝评论，ID:', id, '数据:', data);
+    return http.post(`/reviews/${id}/reject`, data);
   },
 
   /**
@@ -122,12 +97,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   getStats(params = {}) {
-    console.log('获取评论统计数据，参数:', params)
-    return request({
-      url: '/api/reviews/stats',
-      method: 'get',
-      params
-    })
+    console.log('获取评论统计数据，参数:', params);
+    return http.get('/reviews/stats', { params });
   },
 
   /**
@@ -140,12 +111,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   getRoomReviews(roomId, params = {}) {
-    console.log('获取房间评论，房间ID:', roomId, '参数:', params)
-    return request({
-      url: `/api/rooms/${roomId}/reviews`,
-      method: 'get',
-      params
-    })
+    console.log('获取房间评论，房间ID:', roomId, '参数:', params);
+    return http.get(`/rooms/${roomId}/reviews`, { params });
   },
 
   /**
@@ -158,12 +125,8 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   getUserReviews(userId, params = {}) {
-    console.log('获取用户评论，用户ID:', userId, '参数:', params)
-    return request({
-      url: `/api/users/${userId}/reviews`,
-      method: 'get',
-      params
-    })
+    console.log('获取用户评论，用户ID:', userId, '参数:', params);
+    return http.get(`/users/${userId}/reviews`, { params });
   },
 
   /**
@@ -172,17 +135,28 @@ export const reviewApi = {
    * @returns {Promise} API响应
    */
   uploadReviewImage(formData) {
-    console.log('上传评论图片')
-    return request({
-      url: '/api/reviews/upload-image',
-      method: 'post',
-      data: formData,
+    console.log('上传评论图片');
+    return http.post('/reviews/upload-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
-    })
+    });
   }
-}
+};
+
+// 导出单独的函数以保持向后兼容
+export const getReviews = reviewApi.getReviews;
+export const getReviewById = reviewApi.getReviewById;
+export const createReview = reviewApi.createReview;
+export const updateReview = reviewApi.updateReview;
+export const deleteReview = reviewApi.deleteReview;
+export const approveReview = reviewApi.approveReview;
+export const rejectReview = reviewApi.rejectReview;
+export const getStats = reviewApi.getStats;
+export const getRoomReviews = reviewApi.getRoomReviews;
+export const getUserReviews = reviewApi.getUserReviews;
+export const uploadReviewImage = reviewApi.uploadReviewImage;
 
 // 导出reviewsApi对象
 export const reviewsApi = reviewApi;
+export default reviewApi;

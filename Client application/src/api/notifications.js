@@ -1,10 +1,9 @@
+import http from './config';
+
 /**
- * 通知相关API接口
+ * 通知管理API
  */
-
-import request from './request';
-
-const notificationApi = {
+export const notificationApi = {
   /**
    * 获取用户通知列表
    * @param {Object} params - 查询参数
@@ -16,11 +15,7 @@ const notificationApi = {
    */
   getNotifications(params = {}) {
     console.log('获取通知列表，参数:', params);
-    return request({
-        url: '/api/notifications',
-        method: 'get',
-        params
-      });
+    return http.get('/notifications', { params });
   },
 
   /**
@@ -29,10 +24,7 @@ const notificationApi = {
    */
   getUnreadCount() {
     console.log('获取未读通知数量');
-    return request({
-      url: '/api/notifications/unread-count',
-      method: 'get'
-    });
+    return http.get('/notifications/unread-count');
   },
 
   /**
@@ -42,10 +34,7 @@ const notificationApi = {
    */
   markAsRead(id) {
     console.log('标记通知为已读，ID:', id);
-    return request({
-      url: `/api/notifications/${id}/read`,
-      method: 'patch'
-    });
+    return http.patch(`/notifications/${id}/read`);
   },
 
   /**
@@ -54,10 +43,7 @@ const notificationApi = {
    */
   markAllAsRead() {
     console.log('批量标记通知为已读');
-    return request({
-      url: '/api/notifications/mark-all-read',
-      method: 'patch'
-    });
+    return http.patch('/notifications/mark-all-read');
   },
 
   /**
@@ -67,10 +53,7 @@ const notificationApi = {
    */
   deleteNotification(id) {
     console.log('删除通知，ID:', id);
-    return request({
-      url: `/api/notifications/${id}`,
-      method: 'delete'
-    });
+    return http.delete(`/notifications/${id}`);
   },
 
   /**
@@ -80,11 +63,7 @@ const notificationApi = {
    */
   createNotification(data) {
     console.log('创建通知，数据:', data);
-    return request({
-      url: '/api/notifications',
-      method: 'post',
-      data
-    });
+    return http.post('/notifications', data);
   },
 
   /**
@@ -94,11 +73,7 @@ const notificationApi = {
    */
   getBillDueReminders(params = {}) {
     console.log('获取账单到期提醒，参数:', params);
-    return request({
-      url: '/api/notifications/bill-due-reminders',
-      method: 'get',
-      params
-    });
+    return http.get('/notifications/bill-due-reminders', { params });
   },
 
   /**
@@ -108,11 +83,7 @@ const notificationApi = {
    */
   getPaymentStatusNotifications(params = {}) {
     console.log('获取支付状态变更通知，参数:', params);
-    return request({
-      url: '/api/notifications/payment-status-notifications',
-      method: 'get',
-      params
-    });
+    return http.get('/notifications/payment-status-notifications', { params });
   }
 };
 

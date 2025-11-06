@@ -1,7 +1,7 @@
-import request from '@/utils/request'
+import http from './config';
 
 /**
- * 争议API
+ * 争议管理API
  */
 export const disputeApi = {
   /**
@@ -17,12 +17,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   getDisputes(params) {
-    console.log('获取争议列表，参数:', params)
-    return request({
-      url: '/api/disputes',
-      method: 'get',
-      params
-    })
+    console.log('获取争议列表，参数:', params);
+    return http.get('/disputes', { params });
   },
 
   /**
@@ -31,11 +27,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   getDisputeById(id) {
-    console.log('获取争议详情，ID:', id)
-    return request({
-      url: `/api/disputes/${id}`,
-      method: 'get'
-    })
+    console.log('获取争议详情，ID:', id);
+    return http.get(`/disputes/${id}`);
   },
 
   /**
@@ -51,12 +44,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   createDispute(data) {
-    console.log('创建争议，数据:', data)
-    return request({
-      url: '/api/disputes',
-      method: 'post',
-      data
-    })
+    console.log('创建争议，数据:', data);
+    return http.post('/disputes', data);
   },
 
   /**
@@ -72,12 +61,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   updateDispute(id, data) {
-    console.log('更新争议，ID:', id, '数据:', data)
-    return request({
-      url: `/api/disputes/${id}`,
-      method: 'put',
-      data
-    })
+    console.log('更新争议，ID:', id, '数据:', data);
+    return http.put(`/disputes/${id}`, data);
   },
 
   /**
@@ -86,11 +71,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   deleteDispute(id) {
-    console.log('删除争议，ID:', id)
-    return request({
-      url: `/api/disputes/${id}`,
-      method: 'delete'
-    })
+    console.log('删除争议，ID:', id);
+    return http.delete(`/disputes/${id}`);
   },
 
   /**
@@ -102,12 +84,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   resolveDispute(id, data) {
-    console.log('解决争议，ID:', id, '数据:', data)
-    return request({
-      url: `/api/disputes/${id}/resolve`,
-      method: 'post',
-      data
-    })
+    console.log('解决争议，ID:', id, '数据:', data);
+    return http.post(`/disputes/${id}/resolve`, data);
   },
 
   /**
@@ -116,11 +94,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   escalateDispute(id) {
-    console.log('上报争议，ID:', id)
-    return request({
-      url: `/api/disputes/${id}/escalate`,
-      method: 'post'
-    })
+    console.log('上报争议，ID:', id);
+    return http.post(`/disputes/${id}/escalate`);
   },
 
   /**
@@ -129,11 +104,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   reopenDispute(id) {
-    console.log('重新开启争议，ID:', id)
-    return request({
-      url: `/api/disputes/${id}/reopen`,
-      method: 'post'
-    })
+    console.log('重新开启争议，ID:', id);
+    return http.post(`/disputes/${id}/reopen`);
   },
 
   /**
@@ -144,12 +116,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   getStats(params = {}) {
-    console.log('获取争议统计数据，参数:', params)
-    return request({
-      url: '/api/disputes/stats',
-      method: 'get',
-      params
-    })
+    console.log('获取争议统计数据，参数:', params);
+    return http.get('/disputes/stats', { params });
   },
 
   /**
@@ -162,12 +130,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   getRoomDisputes(roomId, params = {}) {
-    console.log('获取房间争议，房间ID:', roomId, '参数:', params)
-    return request({
-      url: `/api/rooms/${roomId}/disputes`,
-      method: 'get',
-      params
-    })
+    console.log('获取房间争议，房间ID:', roomId, '参数:', params);
+    return http.get(`/rooms/${roomId}/disputes`, { params });
   },
 
   /**
@@ -180,12 +144,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   getUserDisputes(userId, params = {}) {
-    console.log('获取用户争议，用户ID:', userId, '参数:', params)
-    return request({
-      url: `/api/users/${userId}/disputes`,
-      method: 'get',
-      params
-    })
+    console.log('获取用户争议，用户ID:', userId, '参数:', params);
+    return http.get(`/users/${userId}/disputes`, { params });
   },
 
   /**
@@ -194,15 +154,12 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   uploadDisputeEvidence(formData) {
-    console.log('上传争议证据')
-    return request({
-      url: '/api/disputes/upload-evidence',
-      method: 'post',
-      data: formData,
+    console.log('上传争议证据');
+    return http.post('/disputes/upload-evidence', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
-    })
+    });
   },
 
   /**
@@ -214,12 +171,8 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   addDisputeParticipant(id, data) {
-    console.log('添加争议参与者，争议ID:', id, '数据:', data)
-    return request({
-      url: `/api/disputes/${id}/participants`,
-      method: 'post',
-      data
-    })
+    console.log('添加争议参与者，争议ID:', id, '数据:', data);
+    return http.post(`/disputes/${id}/participants`, data);
   },
 
   /**
@@ -229,13 +182,10 @@ export const disputeApi = {
    * @returns {Promise} API响应
    */
   removeDisputeParticipant(id, userId) {
-    console.log('移除争议参与者，争议ID:', id, '用户ID:', userId)
-    return request({
-      url: `/api/disputes/${id}/participants/${userId}`,
-      method: 'delete'
-    })
+    console.log('移除争议参与者，争议ID:', id, '用户ID:', userId);
+    return http.delete(`/disputes/${id}/participants/${userId}`);
   }
-}
+};
 
 // 导出disputesApi对象
 export const disputesApi = disputeApi;

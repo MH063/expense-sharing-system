@@ -359,6 +359,13 @@ const handleLogin = async () => {
       password: loginForm.password
     }, loginForm.username)
     
+    // 检查登录响应
+    if (!response || !response.success) {
+      throw new Error(response?.message || '登录失败')
+    }
+    
+    console.log('登录响应:', response)
+    
     // 处理记住我功能：如果用户勾选了记住我，保存用户名到本地存储
     if (loginForm.remember) {
       // 添加用户到记住列表

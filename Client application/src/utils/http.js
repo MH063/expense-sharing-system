@@ -8,7 +8,7 @@ import { ElMessage } from 'element-plus'
 
 // 创建axios实例
 const http = axios.create({
-  baseURL: 'http://localhost:4000', // 后端API基础URL
+  baseURL: 'http://localhost:4000/api', // 统一后端API基础URL
   timeout: 10000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json'
@@ -41,33 +41,50 @@ http.interceptors.response.use(
     // 打印响应日志
     console.log(`[HTTP响应] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data)
     
-    // 处理后端返回的双层嵌套结构 {success: true, data: {xxx: []}}
-    const res = response.data
-    
-    // 如果返回的数据结构是 {success: true, data: {...}}，则返回res.data
-    if (res && typeof res === 'object' && 'success' in res && 'data' in res) {
-      return res.data
-    }
-    
-    // 否则返回原始响应数据
-    return res
+    // 直接返回原始响应，让各个模块自己处理数据结构
+    return response
   },
   error => {
     console.error('[HTTP响应错误]', error)
     
-    // 处理401未授权错误
-    if (error.response && error.response.status === 401) {
-      // 尝试刷新token
-      tokenManager.refreshToken().catch(() => {
-        // 刷新失败，清除token并跳转到登录页
-        tokenManager.removeToken()
-        window.location.href = '/login'
-      })
+    // 处理错误响应
+    if (error.response) {
+      const { status, data } = error.response
+      
+      switch (status) {
+        case 401:
+          // 检查是否是登录请求，如果是登录请求，不要尝试刷新token
+          if (error.config.url === '/auth/login') {
+            // 登录请求失败，直接传递错误
+            break
+          }
+          // 未授权，尝试刷新token
+          tokenManager.refreshToken().catch(() => {
+            // 刷新失败，清除token并跳转到登录页
+            tokenManager.removeToken()
+            window.location.href = '/login'
+          })
+          break
+        case 403:
+          // 权限不足
+          ElMessage.error('您没有权限执行此操作')
+          break
+        case 404:
+          // 请求的资源不存在
+          ElMessage.error('请求的资源不存在')
+          break
+        case 500:
+          // 服务器内部错误
+          ElMessage.error('服务器内部错误')
+          break
+        default:
+          // 其他错误
+          ElMessage.error(data?.message || error.message || '请求失败')
+      }
+    } else {
+      // 网络错误
+      ElMessage.error('网络错误，请检查网络连接')
     }
-    
-    // 显示错误消息
-    const message = error.response?.data?.message || error.message || '请求失败'
-    ElMessage.error(message)
     
     return Promise.reject(error)
   }

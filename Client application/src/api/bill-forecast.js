@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import http from './config';
 
 /**
  * 账单预测分析API
@@ -14,11 +14,7 @@ export const billForecastApi = {
    */
   getBillForecast(params) {
     console.log('获取账单预测数据，参数:', params)
-    return request({
-      url: '/api/stats/forecast',
-      method: 'get',
-      params
-    })
+    return http.get('/stats/forecast', { params });
   },
 
   /**
@@ -31,11 +27,7 @@ export const billForecastApi = {
    */
   getBillStatusDistribution(params) {
     console.log('获取账单状态分布，参数:', params)
-    return request({
-      url: '/api/stats/bill-status',
-      method: 'get',
-      params
-    })
+    return http.get('/stats/bill-status', { params });
   },
 
   /**
@@ -47,11 +39,7 @@ export const billForecastApi = {
    */
   getUpcomingBills(params) {
     console.log('获取即将到期账单，参数:', params)
-    return request({
-      url: '/api/stats/upcoming-bills',
-      method: 'get',
-      params
-    })
+    return http.get('/stats/upcoming-bills', { params });
   },
 
   /**
@@ -65,10 +53,14 @@ export const billForecastApi = {
    */
   getBillTrendAnalysis(params) {
     console.log('获取账单趋势分析，参数:', params)
-    return request({
-      url: '/api/stats/bill-trend',
-      method: 'get',
-      params
-    })
+    return http.get('/stats/bill-trend', { params });
   }
-}
+};
+
+// 导出单独的函数以保持向后兼容
+export const getBillForecast = billForecastApi.getBillForecast;
+export const getBillStatusDistribution = billForecastApi.getBillStatusDistribution;
+export const getUpcomingBills = billForecastApi.getUpcomingBills;
+export const getBillTrendAnalysis = billForecastApi.getBillTrendAnalysis;
+
+export default billForecastApi;

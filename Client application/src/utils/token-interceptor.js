@@ -82,7 +82,7 @@ export const createTokenInterceptor = (
       // 处理Token相关错误
       if (status === 401) {
         // 如果是刷新Token的请求失败，直接登出
-        if (originalRequest.url === '/api/auth/refresh') {
+        if (originalRequest.url === '/api/auth/refresh-token') {
           console.error('刷新Token请求失败')
           processQueue(error)
           isRefreshing = false

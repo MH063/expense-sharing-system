@@ -1,52 +1,5 @@
-import axios from 'axios';
+import http from './config';
 import { tokenManager } from '@/utils/token-manager';
-
-// 创建axios实例
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// 请求拦截器 - 添加认证token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = tokenManager.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// 响应拦截器 - 处理认证错误
-apiClient.interceptors.response.use(
-  (response) => {
-    // 处理后端返回的双层嵌套结构 {success: true, data: {xxx: []}}
-    const res = response.data
-    
-    // 如果返回的数据结构是 {success: true, data: {...}}，则返回res.data
-    if (res && typeof res === 'object' && 'success' in res && 'data' in res) {
-      return res.data
-    }
-    
-    // 否则返回原始响应数据
-    return response;
-  },
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      // Token过期或无效，移除本地token并跳转到登录页
-      tokenManager.removeToken();
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
 
 /**
  * 邀请码管理API
@@ -55,52 +8,66 @@ const inviteCodeApi = {
   /**
    * 生成新的邀请码
    * @param {Object} data - 邀请码数据
-   * @param {string} data.roomId - 房间ID
-   * @param {number} data.maxUses - 最大使用次数
-   * @param {string} data.expiresAt - 过期时间
-   * @returns {Promise} API响应
+   * @returns {Promise} 生成的邀请码
    */
-  generateInviteCode: (data) => {
-    return apiClient.post('/invite-codes', data);
+  generateInviteCode(data) {
+    return http.post('/invite-codes', data);
+  },
+
+  /**
+   * 获取邀请码列表
+   * @param {Object} params - 查询参数
+   * @returns {Promise} 邀请码列表
+   */
+  getInviteCodes(params = {}) {
+    return http.get('/invite-codes', { params });
+  },
+
+  /**
+   * 获取邀请码详情
+   * @param {string} id - 邀请码ID
+   * @returns {Promise} 邀请码详情
+   */
+  getInviteCode(id) {
+    return http.get(`/invite-codes/${id}`);
+  },
+
+  /**
+   * 更新邀请码
+   * @param {string} id - 邀请码ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise} 更新后的邀请码
+   */
+  updateInviteCode(id, data) {
+    return http.put(`/invite-codes/${id}`, data);
+  },
+
+  /**
+   * 删除邀请码
+   * @param {string} id - 邀请码ID
+   * @returns {Promise} 删除结果
+   */
+  deleteInviteCode(id) {
+    return http.delete(`/invite-codes/${id}`);
   },
 
   /**
    * 验证邀请码
-   * @param {Object} data - 验证数据
-   * @param {string} data.code - 邀请码
-   * @returns {Promise} API响应
+   * @param {string} code - 邀请码
+   * @returns {Promise} 验证结果
    */
-  verifyInviteCode: (data) => {
-    return apiClient.post('/invite-codes/verify', data);
+  verifyInviteCode(code) {
+    return http.post('/invite-codes/verify', { code });
   },
 
   /**
-   * 使用邀请码加入房间
-   * @param {Object} data - 使用数据
-   * @param {string} data.code - 邀请码
-   * @returns {Promise} API响应
+   * 使用邀请码
+   * @param {string} code - 邀请码
+   * @returns {Promise} 使用结果
    */
-  useInviteCode: (data) => {
-    return apiClient.post('/invite-codes/use', data);
-  },
-
-  /**
-   * 获取房间的邀请码列表
-   * @param {string} roomId - 房间ID
-   * @returns {Promise} API响应
-   */
-  getRoomInviteCodes: (roomId) => {
-    return apiClient.get(`/invite-codes/room/${roomId}`);
-  },
-
-  /**
-   * 撤销邀请码
-   * @param {string} id - 邀请码ID
-   * @returns {Promise} API响应
-   */
-  revokeInviteCode: (id) => {
-    return apiClient.delete(`/invite-codes/${id}`);
-  },
+  useInviteCode(code) {
+    return http.post('/invite-codes/use', { code });
+  }
 };
 
 export default inviteCodeApi;

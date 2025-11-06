@@ -10,14 +10,7 @@ export default defineConfig({
     }
   },
   server: {
-    port: 8000,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-        secure: false
-      }
-    }
+    port: 8000
   },
   build: {
     outDir: 'dist',

@@ -1,99 +1,93 @@
-import axios from 'axios';
-
-// 创建axios实例
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// 请求拦截器 - 添加认证token
-api.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  error => {
-    return Promise.reject(error);
-  }
-);
-
-// 响应拦截器 - 处理错误
-api.interceptors.response.use(
-  response => {
-    // 处理后端返回的双层嵌套结构 {success: true, data: {xxx: []}}
-    const res = response.data
-    
-    // 如果返回的数据结构是 {success: true, data: {...}}，则返回res.data
-    if (res && typeof res === 'object' && 'success' in res && 'data' in res) {
-      return res.data
-    }
-    
-    // 否则返回原始响应数据
-    return response;
-  },
-  error => {
-    if (error.response && error.response.status === 401) {
-      // Token过期或无效，清除本地存储并重定向到登录页
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+import http from './config';
 
 /**
  * 支付管理API
  */
 export const paymentApi = {
   /**
-   * 获取账单收款码
-   * @param {string} billId - 账单ID
-   * @param {string} qrType - 收款码类型 (wechat 或 alipay)
-   * @returns {Promise} - API响应
+   * 获取支付记录列表
+   * @param {Object} params - 查询参数
+   * @returns {Promise} 支付记录列表
    */
-  getBillQrCode(billId, qrType) {
-    return api.get(`/payments/bills/${billId}/qr-code`, {
-      params: { qr_type: qrType }
-    });
+  getPayments(params = {}) {
+    return http.get('/payments', { params });
+  },
+
+  /**
+   * 获取支付记录详情
+   * @param {string} id - 支付记录ID
+   * @returns {Promise} 支付记录详情
+   */
+  getPayment(id) {
+    return http.get(`/payments/${id}`);
+  },
+
+  /**
+   * 创建支付记录
+   * @param {Object} data - 支付数据
+   * @returns {Promise} 创建的支付记录
+   */
+  createPayment(data) {
+    return http.post('/payments', data);
+  },
+
+  /**
+   * 更新支付记录
+   * @param {string} id - 支付记录ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise} 更新后的支付记录
+   */
+  updatePayment(id, data) {
+    return http.put(`/payments/${id}`, data);
+  },
+
+  /**
+   * 删除支付记录
+   * @param {string} id - 支付记录ID
+   * @returns {Promise} 删除结果
+   */
+  deletePayment(id) {
+    return http.delete(`/payments/${id}`);
   },
 
   /**
    * 确认支付
-   * @param {string} billId - 账单ID
-   * @param {Object} paymentData - 支付数据
-   * @returns {Promise} - API响应
+   * @param {string} id - 支付记录ID
+   * @returns {Promise} 确认结果
    */
-  confirmPayment(billId, paymentData) {
-    return api.post(`/payments/bills/${billId}/confirm`, paymentData);
+  confirmPayment(id) {
+    return http.post(`/payments/${id}/confirm`);
   },
 
   /**
-   * 获取账单支付状态
-   * @param {string} billId - 账单ID
-   * @returns {Promise} - API响应
+   * 取消支付
+   * @param {string} id - 支付记录ID
+   * @returns {Promise} 取消结果
    */
-  getBillPaymentStatus(billId) {
-    return api.get(`/payments/bills/${billId}/status`);
+  cancelPayment(id) {
+    return http.post(`/payments/${id}/cancel`);
   },
 
   /**
-   * 获取用户支付记录
+   * 获取支付统计
    * @param {Object} params - 查询参数
-   * @returns {Promise} - API响应
+   * @returns {Promise} 支付统计数据
    */
-  getUserPayments(params = {}) {
-    return api.get('/payments/user', { params });
+  getPaymentStats(params = {}) {
+    return http.get('/payments/stats', { params });
   }
 };
 
-// 导出paymentsApi对象
-export const paymentsApi = paymentApi;
+// 导出单独的函数以保持向后兼容
+export const getPayments = paymentApi.getPayments;
+export const getPayment = paymentApi.getPayment;
+export const createPayment = paymentApi.createPayment;
+export const updatePayment = paymentApi.updatePayment;
+export const deletePayment = paymentApi.deletePayment;
+export const confirmPayment = paymentApi.confirmPayment;
+export const cancelPayment = paymentApi.cancelPayment;
+export const getPaymentStats = paymentApi.getPaymentStats;
 
+// 导出paymentsApi对象以保持向后兼容
+export const paymentsApi = paymentApi;
 export default paymentApi;

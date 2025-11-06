@@ -69,20 +69,20 @@ const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
 
-// 导入数据库配置 - 临时禁用以排查问题
+// 导入数据库配置
 console.log('即将加载数据库配置...');
-// const { pool, testConnection, ensureMfaColumns } = require('./config/db');
-console.log('数据库配置已临时禁用，用于排查启动问题');
+const { pool, testConnection, ensureMfaColumns } = require('./config/db');
+console.log('数据库配置加载完成');
 
 // 导入WebSocket管理器
 console.log('即将加载WebSocket管理器...');
 const wsManager = require('./config/websocket');
 console.log('WebSocket管理器加载完成');
 
-// 导入定时任务服务 - 临时禁用以排查问题
+// 导入定时任务服务
 console.log('即将加载定时任务服务...');
-// const scheduler = require('./utils/scheduler');
-console.log('定时任务服务已临时禁用，用于排查启动问题');
+const scheduler = require('./utils/scheduler');
+console.log('定时任务服务加载完成');
 
 // 导入路由
 const authRoutes = require('./routes/auth-routes');
@@ -2176,9 +2176,8 @@ async function startServer() {
   try {
     console.log('进入startServer函数...');
     console.log('开始测试数据库连接...');
-    // 测试数据库连接 - 临时禁用以排查问题
-    // const dbConnected = await testConnection();
-    const dbConnected = true; // 临时设置为true，用于排查问题
+    // 测试数据库连接
+    const dbConnected = await testConnection();
     console.log('数据库连接结果:', dbConnected);
     
     if (!dbConnected) {
@@ -2191,8 +2190,7 @@ async function startServer() {
     }
     
     console.log('准备启动HTTP服务器...');
-    // 确保数据库MFA列 - 临时禁用以排查问题
-    /*
+    // 确保数据库MFA列
     try {
       console.log('正在检查/创建MFA列...');
       await ensureMfaColumns();
@@ -2204,8 +2202,6 @@ async function startServer() {
         throw error;
       }
     }
-    */
-    console.log('MFA列检查/创建已临时禁用，用于排查启动问题');
 
     // 启动服务器
     console.log('即将调用server.listen...');
@@ -2217,9 +2213,7 @@ async function startServer() {
       console.log('初始化WebSocket...');
       wsManager.init(server);
       
-      // 启动定时任务 - 临时禁用以排查问题
-      console.log('定时任务已临时禁用，用于排查启动问题');
-      /*
+      // 启动定时任务
       console.log('启动定时任务...');
       try {
         scheduler.startAllTasks();
@@ -2231,7 +2225,6 @@ async function startServer() {
           throw error;
         }
       }
-      */
     });
     console.log('server.listen调用完成');
   } catch (error) {
@@ -2285,10 +2278,10 @@ module.exports = app;
 process.on('SIGINT', async () => {
   logger.info('正在关闭服务器...');
   
-  // 停止定时任务 - 临时禁用以排查问题
-  // scheduler.stopAllTasks();
+  // 停止定时任务
+  scheduler.stopAllTasks();
   
-  // await pool.end(); // 临时禁用以排查问题
-  console.log('数据库连接关闭已临时禁用，用于排查启动问题');
+  await pool.end();
+  console.log('数据库连接已关闭');
   process.exit(0);
 });

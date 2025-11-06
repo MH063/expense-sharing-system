@@ -346,34 +346,18 @@ const handleLogin = async () => {
   errorMessage.value = ''
   
   try {
-    // 模拟登录API调用
-    console.log('模拟登录API调用:', {
+    // 调用真实的登录API
+    console.log('调用登录API:', {
       username: loginForm.username,
       password: loginForm.password,
       remember: loginForm.remember
     })
     
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 模拟登录成功响应
-    const mockResponse = {
-      success: true,
-      data: {
-        token: 'mock-jwt-token-' + Date.now(),
-        refreshToken: 'mock-refresh-token-' + Date.now(),
-        user: {
-          id: 1,
-          username: loginForm.username,
-          name: loginForm.username === 'admin' ? '管理员' : '管理员',
-          email: loginForm.username + '@example.com',
-          avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
-          roles: ['admin'], // 所有模拟登录用户都是管理员
-          permissions: ['all'], // 所有模拟登录用户拥有所有权限
-          roomId: 1
-        }
-      }
-    }
+    // 使用auth store的登录方法
+    const response = await authStore.login({
+      username: loginForm.username,
+      password: loginForm.password
+    }, loginForm.username)
     
     // 处理记住我功能：如果用户勾选了记住我，保存用户名到本地存储
     if (loginForm.remember) {
@@ -390,24 +374,6 @@ const handleLogin = async () => {
     
     // 设置当前用户（用于Token管理）
     tokenManager.setCurrentUser(loginForm.username)
-    
-    // 保存Token到本地存储
-    tokenManager.setTokens(
-      mockResponse.data.token,
-      mockResponse.data.refreshToken,
-      null, // 没有过期时间
-      loginForm.username
-    )
-    
-    // 更新认证状态
-    authStore.accessToken = mockResponse.data.token
-    authStore.refreshToken = mockResponse.data.refreshToken
-    authStore.currentUser = mockResponse.data.user
-    authStore.roles = mockResponse.data.user.roles || []
-    authStore.permissions = mockResponse.data.user.permissions || []
-    
-    // 设置Token管理器的刷新回调
-    tokenManager.setRefreshCallback(authStore.refreshTokens)
     
     // 添加登录成功反馈
     console.log(`用户 ${loginForm.username} 登录成功`)

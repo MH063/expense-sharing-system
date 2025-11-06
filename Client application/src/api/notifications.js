@@ -17,7 +17,7 @@ const notificationApi = {
   getNotifications(params = {}) {
     console.log('获取通知列表，参数:', params);
     return request({
-        url: '/notifications',
+        url: '/api/notifications',
         method: 'get',
         params
       });
@@ -30,7 +30,7 @@ const notificationApi = {
   getUnreadCount() {
     console.log('获取未读通知数量');
     return request({
-      url: '/notifications/unread-count',
+      url: '/api/notifications/unread-count',
       method: 'get'
     });
   },
@@ -43,7 +43,7 @@ const notificationApi = {
   markAsRead(id) {
     console.log('标记通知为已读，ID:', id);
     return request({
-      url: `/notifications/${id}/read`,
+      url: `/api/notifications/${id}/read`,
       method: 'patch'
     });
   },
@@ -55,7 +55,7 @@ const notificationApi = {
   markAllAsRead() {
     console.log('批量标记通知为已读');
     return request({
-      url: '/notifications/mark-all-read',
+      url: '/api/notifications/mark-all-read',
       method: 'patch'
     });
   },
@@ -68,7 +68,7 @@ const notificationApi = {
   deleteNotification(id) {
     console.log('删除通知，ID:', id);
     return request({
-      url: `/notifications/${id}`,
+      url: `/api/notifications/${id}`,
       method: 'delete'
     });
   },
@@ -81,7 +81,7 @@ const notificationApi = {
   createNotification(data) {
     console.log('创建通知，数据:', data);
     return request({
-      url: '/notifications',
+      url: '/api/notifications',
       method: 'post',
       data
     });
@@ -95,7 +95,7 @@ const notificationApi = {
   getBillDueReminders(params = {}) {
     console.log('获取账单到期提醒，参数:', params);
     return request({
-      url: '/notifications/bill-due-reminders',
+      url: '/api/notifications/bill-due-reminders',
       method: 'get',
       params
     });
@@ -109,7 +109,7 @@ const notificationApi = {
   getPaymentStatusNotifications(params = {}) {
     console.log('获取支付状态变更通知，参数:', params);
     return request({
-      url: '/notifications/payment-status-notifications',
+      url: '/api/notifications/payment-status-notifications',
       method: 'get',
       params
     });

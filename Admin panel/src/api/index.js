@@ -1,6 +1,20 @@
 import request from '../request'
 
 /**
+ * 管理员认证相关API
+ */
+export const adminAuthApi = {
+  // 管理员登录
+  login: (data) => {
+    return request({
+      url: '/api/admin/auth/login',
+      method: 'post',
+      data
+    })
+  }
+}
+
+/**
  * 角色管理相关API
  */
 export const roleApi = {
@@ -46,45 +60,10 @@ export const roleApi = {
     })
   },
   
-  // 获取用户角色列表
-  getUserRoleList: (params) => {
+  // 获取权限列表
+  getPermissionList: () => {
     return request({
-      url: '/api/admin/user-roles',
-      method: 'get',
-      params
-    })
-  },
-  
-  // 分配角色
-  assignRole: (data) => {
-    return request({
-      url: '/api/admin/user-roles/assign',
-      method: 'post',
-      data
-    })
-  },
-  
-  // 更改用户角色
-  changeUserRole: (userId, roleId) => {
-    return request({
-      url: `/api/admin/user-roles/${userId}/change`,
-      method: 'put',
-      data: { roleId }
-    })
-  },
-  
-  // 移除用户角色
-  removeUserRole: (userId) => {
-    return request({
-      url: `/api/admin/user-roles/${userId}`,
-      method: 'delete'
-    })
-  },
-  
-  // 获取可分配用户列表
-  getAvailableUsers: () => {
-    return request({
-      url: '/api/admin/users/available',
+      url: '/api/admin/permissions',
       method: 'get'
     })
   }
@@ -137,20 +116,59 @@ export const userApi = {
     })
   },
   
-  // 重置用户密码
-  resetUserPassword: (id) => {
+  // 分配角色
+  assignRole: (userId, data) => {
     return request({
-      url: `/api/admin/users/${id}/reset-password`,
-      method: 'post'
+      url: `/api/admin/users/${userId}/roles`,
+      method: 'post',
+      data
     })
   },
   
-  // 更新用户状态
-  updateUserStatus: (id, status) => {
+  // 获取用户角色
+  getUserRoles: (userId) => {
     return request({
-      url: `/api/admin/users/${id}/status`,
+      url: `/api/admin/users/${userId}/roles`,
+      method: 'get'
+    })
+  }
+}
+
+/**
+ * 账单管理相关API
+ */
+export const billApi = {
+  // 获取账单列表
+  getBillList: (params) => {
+    return request({
+      url: '/api/admin/bills',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 获取账单详情
+  getBillDetail: (id) => {
+    return request({
+      url: `/api/admin/bills/${id}`,
+      method: 'get'
+    })
+  },
+  
+  // 更新账单
+  updateBill: (id, data) => {
+    return request({
+      url: `/api/admin/bills/${id}`,
       method: 'put',
-      data: { status }
+      data
+    })
+  },
+  
+  // 删除账单
+  deleteBill: (id) => {
+    return request({
+      url: `/api/admin/bills/${id}`,
+      method: 'delete'
     })
   }
 }
@@ -162,18 +180,17 @@ export const expenseApi = {
   // 获取待审核费用列表
   getPendingExpenses: (params) => {
     return request({
-      url: '/api/admin/expenses/pending',
+      url: '/api/admin/expenses',
       method: 'get',
       params
     })
   },
   
-  // 获取费用审核历史
-  getExpenseReviewHistory: (params) => {
+  // 获取费用详情
+  getExpenseDetail: (id) => {
     return request({
-      url: '/api/admin/expenses/review-history',
-      method: 'get',
-      params
+      url: `/api/admin/expenses/${id}`,
+      method: 'get'
     })
   },
   
@@ -186,19 +203,28 @@ export const expenseApi = {
     })
   },
   
-  // 批量审核费用
-  batchReviewExpenses: (data) => {
+  // 获取异常支出列表
+  getAbnormalExpenses: (params) => {
     return request({
-      url: '/api/admin/expenses/batch-review',
-      method: 'post',
+      url: '/api/abnormal-expenses',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 更新异常支出状态
+  updateAbnormalExpenseStatus: (id, data) => {
+    return request({
+      url: `/api/abnormal-expenses/${id}/status`,
+      method: 'put',
       data
     })
   },
   
-  // 获取异常费用列表
-  getAbnormalExpenses: (params) => {
+  // 获取异常支出统计
+  getAbnormalExpenseStats: (params) => {
     return request({
-      url: '/api/admin/expenses/abnormal',
+      url: '/api/abnormal-expenses/stats',
       method: 'get',
       params
     })
@@ -212,7 +238,7 @@ export const statisticsApi = {
   // 获取系统概览数据
   getSystemOverview: () => {
     return request({
-      url: '/api/admin/statistics/overview',
+      url: '/api/stats/system',
       method: 'get'
     })
   },
@@ -220,16 +246,7 @@ export const statisticsApi = {
   // 获取用户统计数据
   getUserStatistics: (params) => {
     return request({
-      url: '/api/admin/statistics/users',
-      method: 'get',
-      params
-    })
-  },
-  
-  // 获取费用统计数据
-  getExpenseStatistics: (params) => {
-    return request({
-      url: '/api/admin/statistics/expenses',
+      url: '/api/stats/user',
       method: 'get',
       params
     })
@@ -238,16 +255,16 @@ export const statisticsApi = {
   // 获取寝室统计数据
   getDormStatistics: (params) => {
     return request({
-      url: '/api/admin/statistics/dorms',
+      url: '/api/stats/room',
       method: 'get',
       params
     })
   },
   
-  // 获取系统使用趋势
-  getSystemTrends: (params) => {
+  // 获取预测数据
+  getForecastData: (params) => {
     return request({
-      url: '/api/admin/statistics/trends',
+      url: '/api/stats/forecast',
       method: 'get',
       params
     })
@@ -275,54 +292,247 @@ export const systemApi = {
     })
   },
   
-  // 获取分摊规则
-  getSharingRules: () => {
+  // 获取功能开关
+  getFeatureFlags: () => {
     return request({
-      url: '/api/admin/system/sharing-rules',
+      url: '/api/admin/feature-flags',
       method: 'get'
     })
   },
   
-  // 更新分摊规则
-  updateSharingRules: (data) => {
+  // 更新功能开关
+  updateFeatureFlag: (id, data) => {
     return request({
-      url: '/api/admin/system/sharing-rules',
+      url: `/api/admin/feature-flags/${id}`,
       method: 'put',
       data
     })
   },
   
-  // 获取通知模板
-  getNotificationTemplates: () => {
+  // 获取维护窗口
+  getMaintenanceWindows: () => {
     return request({
-      url: '/api/admin/system/notification-templates',
+      url: '/api/admin/maintenance-windows',
       method: 'get'
     })
   },
   
-  // 更新通知模板
-  updateNotificationTemplates: (data) => {
+  // 创建维护窗口
+  createMaintenanceWindow: (data) => {
     return request({
-      url: '/api/admin/system/notification-templates',
-      method: 'put',
+      url: '/api/admin/maintenance-windows',
+      method: 'post',
       data
     })
   },
   
-  // 备份系统数据
-  backupSystem: () => {
+  // 获取公告列表
+  getAnnouncements: () => {
     return request({
-      url: '/api/admin/system/backup',
+      url: '/api/admin/announcements',
+      method: 'get'
+    })
+  },
+  
+  // 创建公告
+  createAnnouncement: (data) => {
+    return request({
+      url: '/api/admin/announcements',
+      method: 'post',
+      data
+    })
+  }
+}
+
+/**
+ * 操作日志相关API
+ */
+export const auditLogApi = {
+  // 获取操作日志
+  getOperationLogs: (params) => {
+    return request({
+      url: '/api/admin/operation-logs',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 获取数据变更审计日志
+  getDataChangeAudits: (params) => {
+    return request({
+      url: '/api/admin/data-change-audits',
+      method: 'get',
+      params
+    })
+  }
+}
+
+/**
+ * 批量任务与报表相关API
+ */
+export const batchJobApi = {
+  // 获取批量任务列表
+  getBatchJobs: (params) => {
+    return request({
+      url: '/api/admin/batch-jobs',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 创建批量任务
+  createBatchJob: (data) => {
+    return request({
+      url: '/api/admin/batch-jobs',
+      method: 'post',
+      data
+    })
+  },
+  
+  // 获取任务详情
+  getBatchJobDetail: (id) => {
+    return request({
+      url: `/api/admin/batch-jobs/${id}`,
+      method: 'get'
+    })
+  },
+  
+  // 获取报表定义列表
+  getReportDefinitions: () => {
+    return request({
+      url: '/api/admin/reports',
+      method: 'get'
+    })
+  },
+  
+  // 创建报表定义
+  createReportDefinition: (data) => {
+    return request({
+      url: '/api/admin/reports',
+      method: 'post',
+      data
+    })
+  },
+  
+  // 获取报表快照
+  getReportSnapshots: (id) => {
+    return request({
+      url: `/api/admin/reports/${id}/snapshots`,
+      method: 'get'
+    })
+  },
+  
+  // 生成报表
+  generateReport: (id) => {
+    return request({
+      url: `/api/admin/reports/${id}/generate`,
       method: 'post'
     })
   },
   
-  // 恢复系统数据
-  restoreSystem: (data) => {
+  // 获取导出任务列表
+  getExportTasks: (params) => {
     return request({
-      url: '/api/admin/system/restore',
+      url: '/api/admin/exports',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 创建导出任务
+  createExportTask: (data) => {
+    return request({
+      url: '/api/admin/exports',
       method: 'post',
       data
+    })
+  }
+}
+
+/**
+ * 内容审核与工单相关API
+ */
+export const moderationApi = {
+  // 获取审核队列
+  getModerationQueue: (params) => {
+    return request({
+      url: '/api/admin/moderation-queue',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 处理审核
+  processModeration: (id, data) => {
+    return request({
+      url: `/api/admin/moderation/${id}/process`,
+      method: 'post',
+      data
+    })
+  },
+  
+  // 获取工单列表
+  getTickets: (params) => {
+    return request({
+      url: '/api/admin/tickets',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 获取工单详情
+  getTicketDetail: (id) => {
+    return request({
+      url: `/api/admin/tickets/${id}`,
+      method: 'get'
+    })
+  },
+  
+  // 更新工单状态
+  updateTicketStatus: (id, data) => {
+    return request({
+      url: `/api/admin/tickets/${id}/status`,
+      method: 'put',
+      data
+    })
+  },
+  
+  // 添加工单备注
+  addTicketComment: (id, data) => {
+    return request({
+      url: `/api/admin/tickets/${id}/comments`,
+      method: 'post',
+      data
+    })
+  }
+}
+
+/**
+ * 集成与回调相关API
+ */
+export const webhookApi = {
+  // 获取Webhook列表
+  getWebhooks: () => {
+    return request({
+      url: '/api/admin/webhooks',
+      method: 'get'
+    })
+  },
+  
+  // 创建Webhook
+  createWebhook: (data) => {
+    return request({
+      url: '/api/admin/webhooks',
+      method: 'post',
+      data
+    })
+  },
+  
+  // 获取Webhook事件
+  getWebhookEvents: (id) => {
+    return request({
+      url: `/api/admin/webhooks/${id}/events`,
+      method: 'get'
     })
   }
 }

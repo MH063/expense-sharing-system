@@ -74,10 +74,10 @@ console.log('即将加载数据库配置...');
 // const { pool, testConnection, ensureMfaColumns } = require('./config/db');
 console.log('数据库配置已临时禁用，用于排查启动问题');
 
-// 导入WebSocket管理器 - 临时禁用以排查问题
+// 导入WebSocket管理器
 console.log('即将加载WebSocket管理器...');
-// const wsManager = require('./config/websocket');
-console.log('WebSocket管理器已临时禁用，用于排查启动问题');
+const wsManager = require('./config/websocket');
+console.log('WebSocket管理器加载完成');
 
 // 导入定时任务服务 - 临时禁用以排查问题
 console.log('即将加载定时任务服务...');
@@ -175,12 +175,31 @@ app.use(httpLogger);
 // 静态文件服务 - 用于部署前端应用
 app.use(express.static('public'));
 
-// API 路由挂载（阶段五新增）
+// API路由
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/system', systemConfigRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/ws', websocketManagementRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/expense-types', expenseTypeRoutes);
+app.use('/api/bills', billRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/qr-codes', qrCodeRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/invite-codes', inviteCodeRoutes);
+app.use('/api/special-payments', specialPaymentRoutes);
+app.use('/api/payment-transfers', paymentTransferRoutes);
+app.use('/api/payment-optimization', paymentOptimizationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/notification-settings', notificationSettingsRoutes);
+app.use('/api/mfa', mfaRoutes);
+app.use('/api/user-preferences', userPreferencesRoutes);
+app.use('/api/abnormal-expenses', abnormalExpenseRoutes);
 
 // 前端应用路由（使用绝对路径，兼容空格路径；目录不存在则跳过挂载并记录日志）
 const clientDistPath = path.resolve(__dirname, '..', 'Client application', 'dist');
@@ -1827,9 +1846,9 @@ app.get('/api/health', async (req, res) => {
     };
     
     try {
-      const websocketManager = require('./services/websocketManager');
-      if (websocketManager) {
-        wsStats = websocketManager.getStats();
+      const wsManager = require('./config/websocket');
+      if (wsManager) {
+        wsStats = wsManager.getStats();
       }
     } catch (error) {
       console.log('WebSocket状态检查失败:', error.message);
@@ -1901,27 +1920,6 @@ app.get('/api/health', async (req, res) => {
     });
   }
 });
-
-// API路由
-app.use('/api/auth', authRoutes);
-app.use('/api/admin/auth', adminAuthRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/rooms', roomRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/expense-types', expenseTypeRoutes);
-app.use('/api/bills', billRoutes);
-app.use('/api/stats', statsRoutes);
-app.use('/api/qr-codes', qrCodeRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/invite-codes', inviteCodeRoutes);
-app.use('/api/special-payments', specialPaymentRoutes);
-app.use('/api/payment-transfers', paymentTransferRoutes);
-app.use('/api/payment-optimization', paymentOptimizationRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/notification-settings', notificationSettingsRoutes);
-app.use('/api/mfa', mfaRoutes);
-app.use('/api/user-preferences', userPreferencesRoutes);
-app.use('/api/abnormal-expenses', abnormalExpenseRoutes);
 
 // 404处理中间件
 app.use(notFoundHandler);
@@ -2215,12 +2213,9 @@ async function startServer() {
       logger.info(`服务器在 ${config.nodeEnv} 环境中启动，监听端口 ${PORT}`);
       logger.info(`使用数据库: ${config.db.name}`);
       
-      // 初始化WebSocket - 临时禁用以排查问题
-      console.log('WebSocket已临时禁用，用于排查启动问题');
-      /*
+      // 初始化WebSocket
       console.log('初始化WebSocket...');
-      websocketManager.init(server);
-      */
+      wsManager.init(server);
       
       // 启动定时任务 - 临时禁用以排查问题
       console.log('定时任务已临时禁用，用于排查启动问题');

@@ -7,14 +7,14 @@ const createTestUser = async () => {
     const password = '123456';
     const username = 'testuser';
     const email = 'test@example.com';
-    const name = '测试用户';
+    const displayName = '测试用户';
     
     // 哈希密码
     const hash = await bcrypt.hash(password, saltRounds);
     
-    // 插入用户
-    const query = 'INSERT INTO users (username, email, name, password) VALUES ($1, $2, $3, $4) RETURNING id';
-    const values = [username, email, name, hash];
+    // 插入用户 - 使用正确的表结构
+    const query = 'INSERT INTO users (username, email, display_name, password_hash, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id';
+    const values = [username, email, displayName, hash];
     
     const result = await pool.query(query, values);
     console.log('测试用户创建成功, ID:', result.rows[0].id);

@@ -160,6 +160,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { logout as authLogout } from '../utils/auth'
 import {
   House,
   Document,
@@ -184,9 +185,11 @@ const logout = () => {
     cancelButtonText: '取消',
     type: 'warning'
   }).then(() => {
+    // 清除登录状态
+    authLogout()
     ElMessage.success('退出成功')
-    // 实际项目中应该清除登录状态并跳转到登录页
-    // router.push('/login')
+    // 跳转到登录页
+    router.push('/login')
   }).catch(() => {
     // 取消操作
   })

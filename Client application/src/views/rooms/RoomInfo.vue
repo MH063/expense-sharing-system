@@ -462,86 +462,20 @@ const loadRoomData = async () => {
     // 这里应该调用API获取寝室信息
     // room.value = await api.getCurrentRoom()
     
-    // 模拟数据
-    room.value = {
-      id: 'room-1',
-      name: '东区3号楼201室',
-      description: '我们是一个充满活力的寝室，欢迎大家加入！',
-      location: '东区3号楼201室',
-      avatar: '',
-      inviteCode: 'ABC123',
-      createdAt: new Date('2023-09-01').toISOString()
-    }
+    // 获取用户当前寝室信息
+    room.value = await api.getCurrentRoom()
     
     // 获取寝室成员
-    // members.value = await api.getRoomMembers(room.value.id)
-    
-    // 模拟成员数据
-    members.value = [
-      {
-        id: 'user-1',
-        username: 'zhangsan',
-        displayName: '张三',
-        email: 'zhangsan@example.com',
-        avatar: '',
-        role: 'room_leader'
-      },
-      {
-        id: 'user-2',
-        username: 'lisi',
-        displayName: '李四',
-        email: 'lisi@example.com',
-        avatar: '',
-        role: 'member'
-      },
-      {
-        id: 'user-3',
-        username: 'wangwu',
-        displayName: '王五',
-        email: 'wangwu@example.com',
-        avatar: '',
-        role: 'member'
-      }
-    ]
+    members.value = await api.getRoomMembers(room.value.id)
     
     // 获取费用统计
-    // const stats = await api.getRoomStatistics(room.value.id)
-    // totalExpense.value = stats.totalExpense
-    // averageExpense.value = stats.averageExpense
-    // pendingAmount.value = stats.pendingAmount
-    
-    // 模拟统计数据
-    totalExpense.value = 3580.50
-    averageExpense.value = 1193.50
-    pendingAmount.value = 450.00
+    const stats = await api.getRoomStatistics(room.value.id)
+    totalExpense.value = stats.totalExpense
+    averageExpense.value = stats.averageExpense
+    pendingAmount.value = stats.pendingAmount
     
     // 获取最近支出
-    // recentExpenses.value = await api.getRecentExpenses(room.value.id)
-    
-    // 模拟最近支出数据
-    recentExpenses.value = [
-      {
-        id: 'expense-1',
-        description: '水电费',
-        amount: 180.50,
-        date: new Date('2023-10-15').toISOString(),
-        payer: '张三'
-      },
-      {
-        id: 'expense-2',
-        description: '寝室聚餐',
-        amount: 320.00,
-        date: new Date('2023-10-10').toISOString(),
-        payer: '李四'
-      },
-      {
-        id: 'expense-3',
-        description: '网费',
-        amount: 50.00,
-        date: new Date('2023-10-05').toISOString(),
-        payer: '王五'
-      }
-    ]
+    recentExpenses.value = await api.getRecentExpenses(room.value.id)
     
     // 初始化设置表单
     if (room.value) {

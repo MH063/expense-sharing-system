@@ -170,14 +170,6 @@ const fetchRoomStats = async () => {
     
     // 模拟API调用，实际项目中应该调用真实的API
     // const response = await roomsApi.getRoomStats(params)
-    
-    // 模拟数据
-    stats.value = {
-      totalRooms: 12,
-      activeRooms: 10,
-      avgMembers: 4,
-      avgRoomExpense: 5250
-    }
   } catch (error) {
     console.error('获取寝室统计数据失败:', error)
   } finally {
@@ -191,54 +183,12 @@ const fetchRoomStats = async () => {
 const fetchRoomList = async () => {
   loading.value = true
   try {
-    // 模拟API调用，实际项目中应该调用真实的API
-    // const response = await roomsApi.getRoomList()
-    
-    // 模拟数据
-    roomList.value = [
-      { 
-        name: '101', 
-        members: ['张三', '王五', '孙七', '周九'], 
-        totalExpense: 5300, 
-        expenseCount: 18, 
-        lastActive: '2023-06-15', 
-        status: '活跃' 
-      },
-      { 
-        name: '102', 
-        members: ['李四', '钱七', '吴十'], 
-        totalExpense: 5000, 
-        expenseCount: 15, 
-        lastActive: '2023-06-14', 
-        status: '活跃' 
-      },
-      { 
-        name: '103', 
-        members: ['赵六', '郑十一', '冯十二', '陈十三'], 
-        totalExpense: 4600, 
-        expenseCount: 12, 
-        lastActive: '2023-06-10', 
-        status: '一般' 
-      },
-      { 
-        name: '104', 
-        members: ['褚十四', '卫十五'], 
-        totalExpense: 2800, 
-        expenseCount: 8, 
-        lastActive: '2023-06-08', 
-        status: '一般' 
-      },
-      { 
-        name: '105', 
-        members: ['蒋十六', '沈十七', '韩十八', '杨十九'], 
-        totalExpense: 6200, 
-        expenseCount: 20, 
-        lastActive: '2023-06-15', 
-        status: '活跃' 
-      }
-    ]
+    // 实际项目中应该调用真实的API
+    const response = await roomsApi.getRoomList()
+    roomList.value = response.data
   } catch (error) {
     console.error('获取寝室列表失败:', error)
+    ElMessage.error('获取寝室列表失败')
   } finally {
     loading.value = false
   }
@@ -255,77 +205,86 @@ const initExpenseChart = () => {
 }
 
 /**
- * 更新寝室消费分布图表
- */
-const updateExpenseChart = () => {
-  if (!expenseChartInstance) return
-  
-  // 模拟数据
-  const option = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow'
-      }
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'value',
-      axisLine: {
-        lineStyle: {
-          color: '#999'
-        }
-      },
-      splitLine: {
-        lineStyle: {
-          type: 'dashed'
-        }
-      },
-      axisLabel: {
-        formatter: '¥{value}'
-      }
-    },
-    yAxis: {
-      type: 'category',
-      data: ['105', '101', '102', '103', '104'],
-      axisLine: {
-        lineStyle: {
-          color: '#999'
-        }
-      }
-    },
-    series: [
-      {
-        name: '寝室消费',
-        type: 'bar',
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: '#83bff6' },
-            { offset: 0.5, color: '#188df0' },
-            { offset: 1, color: '#188df0' }
-          ])
-        },
-        emphasis: {
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-              { offset: 0, color: '#2378f7' },
-              { offset: 0.7, color: '#2378f7' },
-              { offset: 1, color: '#83bff6' }
-            ])
+   * 更新寝室消费分布图表
+   */
+  const updateExpenseChart = async () => {
+    if (!expenseChartInstance) return
+    
+    try {
+      // 实际项目中应该调用真实的API获取数据
+      // const response = await roomsApi.getRoomExpenseStats()
+      // const data = response.data
+      
+      // 暂时使用模拟数据
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'shadow'
           }
         },
-        data: [6200, 5300, 5000, 4600, 2800]
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'value',
+          axisLine: {
+            lineStyle: {
+              color: '#999'
+            }
+          },
+          splitLine: {
+            lineStyle: {
+              type: 'dashed'
+            }
+          },
+          axisLabel: {
+            formatter: '¥{value}'
+          }
+        },
+        yAxis: {
+          type: 'category',
+          data: ['105', '101', '102', '103', '104'],
+          axisLine: {
+            lineStyle: {
+              color: '#999'
+            }
+          }
+        },
+        series: [
+          {
+            name: '寝室消费',
+            type: 'bar',
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: '#83bff6' },
+                { offset: 0.5, color: '#188df0' },
+                { offset: 1, color: '#188df0' }
+              ])
+            },
+            emphasis: {
+              itemStyle: {
+                color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                  { offset: 0, color: '#2378f7' },
+                  { offset: 0.7, color: '#2378f7' },
+                  { offset: 1, color: '#83bff6' }
+                ])
+              }
+            },
+            data: [6200, 5300, 5000, 4600, 2800]
+          }
+        ]
       }
-    ]
+      
+      expenseChartInstance.setOption(option)
+    } catch (error) {
+      console.error('更新寝室消费分布图表失败:', error)
+      ElMessage.error('更新寝室消费分布图表失败')
+    }
   }
-  
-  expenseChartInstance.setOption(option)
-}
 
 /**
  * 调整图表大小

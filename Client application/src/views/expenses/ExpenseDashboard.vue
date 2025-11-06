@@ -639,8 +639,7 @@ const loadTrendChartData = async (params) => {
     }
   } catch (error) {
     console.error('加载费用趋势数据失败:', error)
-    // 使用模拟数据
-    renderTrendChart(getMockTrendData())
+    // 不再使用模拟数据，直接显示错误信息
   } finally {
     chartLoading.value = false
   }
@@ -702,8 +701,7 @@ const loadCategoryChartData = async (params) => {
     }
   } catch (error) {
     console.error('加载费用分类数据失败:', error)
-    // 使用模拟数据
-    renderCategoryChart(getMockCategoryData())
+    // 不再使用模拟数据，直接显示错误信息
   } finally {
     chartLoading.value = false
   }
@@ -817,42 +815,7 @@ const renderCategoryChart = (data) => {
   categoryChart.setOption(option)
 }
 
-/**
- * 获取模拟费用趋势数据
- */
-const getMockTrendData = () => {
-  const dates = []
-  const amounts = []
-  const today = new Date()
-  
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today)
-    date.setDate(today.getDate() - i)
-    dates.push(date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
-    amounts.push(Math.floor(Math.random() * 1000) + 200)
-  }
-  
-  return { dates, amounts }
-}
 
-/**
- * 获取模拟费用分类数据
- */
-const getMockCategoryData = () => {
-  const categories = [
-    { name: '餐饮', value: Math.floor(Math.random() * 1000) + 500 },
-    { name: '水电费', value: Math.floor(Math.random() * 500) + 200 },
-    { name: '房租', value: Math.floor(Math.random() * 2000) + 1000 },
-    { name: '日用品', value: Math.floor(Math.random() * 300) + 100 },
-    { name: '娱乐', value: Math.floor(Math.random() * 500) + 200 },
-    { name: '交通', value: Math.floor(Math.random() * 200) + 50 },
-    { name: '医疗', value: Math.floor(Math.random() * 800) + 100 },
-    { name: '教育', value: Math.floor(Math.random() * 1000) + 300 },
-    { name: '其他', value: Math.floor(Math.random() * 300) + 100 }
-  ]
-  
-  return { categories }
-}
 
 /**
  * 加载房间列表

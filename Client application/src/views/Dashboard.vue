@@ -337,10 +337,10 @@ const loadStats = async () => {
     // const response = await dashboardApi.getStats()
     
     // 模拟数据
-    stats.totalExpense = '1258.60'
-    stats.myExpense = '425.30'
-    stats.owedAmount = '320.50'
-    stats.owingAmount = '128.80'
+    stats.totalExpense = '5280.50'
+    stats.myExpense = '1320.50'
+    stats.owedAmount = '450.00'
+    stats.owingAmount = '1850.00'
   } catch (error) {
     console.error('加载统计数据失败:', error)
     ElMessage.error('加载统计数据失败')

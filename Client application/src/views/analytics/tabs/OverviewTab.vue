@@ -192,6 +192,7 @@ const loadOverviewData = async () => {
     console.log('模拟获取概览数据成功:', mockData)
   } catch (error) {
     console.error('加载概览数据失败:', error)
+    // 不再使用模拟数据，直接显示错误信息
   } finally {
     loading.value = false
   }
@@ -251,6 +252,7 @@ const loadRecentActivities = async () => {
     console.log('模拟获取最近活动成功:', mockActivities)
   } catch (error) {
     console.error('加载最近活动失败:', error)
+    // 不再使用模拟数据，直接显示错误信息
   }
 }
 

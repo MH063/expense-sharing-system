@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 
 // 创建axios实例
 const request = axios.create({
-  baseURL: 'http://localhost:3000', // 后端API地址
+  baseURL: 'http://localhost:4000', // 后端API地址
   timeout: 5000,
   headers: {
     'Content-Type': 'application/json'
@@ -14,7 +14,7 @@ const request = axios.create({
 request.interceptors.request.use(
   config => {
     // 在发送请求之前做些什么，例如加入token
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('admin-token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -33,6 +33,11 @@ request.interceptors.response.use(
     // 对响应数据做点什么
     const res = response.data
     
+    // 处理后端返回的双层嵌套结构 {success:true，data:{xxx：[]}}
+    if (res.success) {
+      return res
+    }
+    
     // 如果返回的状态码为200，说明接口请求成功，可以正常拿到数据
     if (res.code === 200) {
       return res
@@ -49,7 +54,10 @@ request.interceptors.response.use(
       switch (error.response.status) {
         case 401:
           ElMessage.error('未授权，请登录')
-          // 可以跳转到登录页
+          // 清除token并跳转到登录页
+          localStorage.removeItem('admin-token')
+          localStorage.removeItem('admin-user')
+          window.location.href = '/login'
           break
         case 403:
           ElMessage.error('拒绝访问')

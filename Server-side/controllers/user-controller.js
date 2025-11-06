@@ -111,9 +111,9 @@ class UserController {
     try {
       const { username, password } = req.body;
       
-      // 查询用户信息
+      // 查询管理员用户信息 - 修改为查询admin_users表
       const userResult = await pool.query(
-        'SELECT id, username, password_hash, is_active FROM users WHERE username = $1',
+        'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
         [username]
       );
       
@@ -125,14 +125,6 @@ class UserController {
       }
       
       const user = userResult.rows[0];
-      
-      // 检查用户是否激活
-      if (!user.is_active) {
-        return res.status(401).json({
-          success: false,
-          message: '账户已被禁用'
-        });
-      }
       
       // 验证密码
       const isPasswordValid = await bcrypt.compare(password, user.password_hash);
@@ -147,17 +139,22 @@ class UserController {
       const payload = {
         userId: user.id,
         username: user.username,
-        role: 'admin' // 由于数据库中没有role字段，暂时硬编码为admin
+        role: 'admin' // 管理员角色
       };
       
       const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
       const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
       
-      // 更新最后登录时间
-      await pool.query(
-        'UPDATE users SET updated_at = NOW() WHERE id = $1',
-        [user.id]
-      );
+      // 更新最后登录时间 - 如果admin_users表有updated_at字段
+      try {
+        await pool.query(
+          'UPDATE admin_users SET updated_at = NOW() WHERE id = $1',
+          [user.id]
+        );
+      } catch (error) {
+        // 如果updated_at字段不存在，忽略错误
+        logger.warn('无法更新admin_users表的updated_at字段:', error.message);
+      }
       
       logger.info(`管理员登录成功: ${user.username}`);
       
@@ -194,9 +191,9 @@ class UserController {
         return res.status(400).json({ success: false, message: '登录信息不完整' });
       }
 
-      // 查找用户 - 支持用户名或邮箱登录
+      // 查找用户 - 支持用户名或邮箱登录，不依赖user_roles表
       const usersResult = await pool.query(
-        'SELECT u.*, r.name as role_name FROM users u LEFT JOIN user_roles ur ON u.id = ur.user_id LEFT JOIN roles r ON ur.role_id = r.id WHERE u.username = $1 OR u.email = $1',
+        'SELECT * FROM users WHERE username = $1 OR email = $1',
         [username]
       );
       const users = usersResult.rows;
@@ -239,7 +236,7 @@ class UserController {
       const accessToken = TokenManager.generateAccessToken({
         sub: user.id.toString(),
         username: user.username,
-        roles: [user.role_name || 'user'],
+        roles: ['user'], // 默认角色为user
         permissions: ['read', 'write']
       });
       

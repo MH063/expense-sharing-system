@@ -168,10 +168,10 @@ const fetchUserStats = async () => {
     
     // 模拟数据
     stats.value = {
-      totalUsers: 28,
-      activeUsers: 23,
-      newUsers: 5,
-      avgExpense: 1250
+      totalUsers: 156,
+      activeUsers: 98,
+      newUsers: 12,
+      avgExpense: 340.50
     }
   } catch (error) {
     console.error('获取用户统计数据失败:', error)
@@ -186,17 +186,9 @@ const fetchUserStats = async () => {
 const fetchUserList = async () => {
   loading.value = true
   try {
-    // 模拟API调用，实际项目中应该调用真实的API
+    // 实际项目中应该调用真实的API
     // const response = await userApi.getUserList()
-    
-    // 模拟数据
-    userList.value = [
-      { name: '张三', email: 'zhangsan@example.com', room: '101', totalExpense: 3500, expenseCount: 12, lastActive: '2023-06-15', status: '活跃' },
-      { name: '李四', email: 'lisi@example.com', room: '102', totalExpense: 2200, expenseCount: 8, lastActive: '2023-06-14', status: '活跃' },
-      { name: '王五', email: 'wangwu@example.com', room: '101', totalExpense: 1800, expenseCount: 6, lastActive: '2023-06-10', status: '一般' },
-      { name: '赵六', email: 'zhaoliu@example.com', room: '103', totalExpense: 1200, expenseCount: 4, lastActive: '2023-06-08', status: '一般' },
-      { name: '钱七', email: 'qianqi@example.com', room: '102', totalExpense: 2800, expenseCount: 10, lastActive: '2023-06-15', status: '活跃' }
-    ]
+    // userList.value = response.data
   } catch (error) {
     console.error('获取用户列表失败:', error)
   } finally {
@@ -217,57 +209,65 @@ const initActivityChart = () => {
 /**
  * 更新用户活跃度图表
  */
-const updateActivityChart = () => {
+const updateActivityChart = async () => {
   if (!activityChartInstance) return
   
-  // 模拟数据
-  const option = {
-    tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
-    },
-    legend: {
-      orient: 'vertical',
-      right: 10,
-      top: 'center',
-      data: ['非常活跃', '活跃', '一般', '不活跃']
-    },
-    series: [
-      {
-        name: '用户活跃度',
-        type: 'pie',
-        radius: ['50%', '70%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 10,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: false,
-          position: 'center'
-        },
-        emphasis: {
+  try {
+    // 实际项目中应该调用真实的API获取数据
+    // const response = await userApi.getUserActivityStats()
+    // const data = response.data
+    
+    // 暂时使用模拟数据
+    const option = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b}: {c} ({d}%)'
+      },
+      legend: {
+        orient: 'vertical',
+        right: 10,
+        top: 'center',
+        data: ['非常活跃', '活跃', '一般', '不活跃']
+      },
+      series: [
+        {
+          name: '用户活跃度',
+          type: 'pie',
+          radius: ['50%', '70%'],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 10,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
           label: {
-            show: true,
-            fontSize: '18',
-            fontWeight: 'bold'
-          }
-        },
-        labelLine: {
-          show: false
-        },
-        data: [
-          { value: 8, name: '非常活跃', itemStyle: { color: '#5470C6' } },
-          { value: 15, name: '活跃', itemStyle: { color: '#91CC75' } },
-          { value: 3, name: '一般', itemStyle: { color: '#FAC858' } },
-          { value: 2, name: '不活跃', itemStyle: { color: '#EE6666' } }
-        ]
-      }
-    ]
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: '18',
+              fontWeight: 'bold'
+            }
+          },
+          labelLine: {
+            show: false
+          },
+          data: [
+            { value: 8, name: '非常活跃', itemStyle: { color: '#5470C6' } },
+            { value: 15, name: '活跃', itemStyle: { color: '#91CC75' } },
+            { value: 3, name: '一般', itemStyle: { color: '#FAC858' } },
+            { value: 2, name: '不活跃', itemStyle: { color: '#EE6666' } }
+          ]
+        }
+      ]
+    }
+    
+    activityChartInstance.setOption(option)
+  } catch (error) {
+    console.error('更新用户活跃度图表失败:', error)
   }
-  
-  activityChartInstance.setOption(option)
 }
 
 /**

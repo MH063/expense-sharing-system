@@ -26,6 +26,15 @@ api.interceptors.request.use(
 // 响应拦截器 - 处理错误
 api.interceptors.response.use(
   response => {
+    // 处理后端返回的双层嵌套结构 {success: true, data: {xxx: []}}
+    const res = response.data
+    
+    // 如果返回的数据结构是 {success: true, data: {...}}，则返回res.data
+    if (res && typeof res === 'object' && 'success' in res && 'data' in res) {
+      return res.data
+    }
+    
+    // 否则返回原始响应数据
     return response;
   },
   error => {

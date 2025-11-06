@@ -102,9 +102,20 @@ class WebSocketManager {
     if (!ws) return;
     
     try {
-      // 验证JWT token
+      // 验证JWT token - 使用与TokenManager相同的密钥获取方式
       const jwt = require('jsonwebtoken');
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const { getEnvironmentConfig } = require('../config/environment');
+      const envConfig = getEnvironmentConfig();
+      
+      // 使用与TokenManager相同的密钥获取逻辑
+      const accessSecrets = envConfig.jwtKeys.accessSecrets.length ? 
+        envConfig.jwtKeys.accessSecrets : 
+        [(process.env.JWT_SECRET || 'change-me-please-change-me-32chars-minimum')];
+      
+      const jwtSecret = accessSecrets[0];
+      const algorithm = envConfig.jwtKeys.algorithm || 'HS512';
+      
+      const decoded = jwt.verify(token, jwtSecret, { algorithms: [algorithm] });
       
       // 存储用户信息到客户端连接
       ws.userId = decoded.sub;

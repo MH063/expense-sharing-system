@@ -49,8 +49,9 @@ const updateChart = async () => {
     
     // 模拟API调用，实际项目中应该调用真实的API
     // const response = await roomsApi.getRoomActivity(params)
-    
-    // 模拟数据
+  } catch (error) {
+    console.error('获取房间活跃度数据失败:', error)
+    // 使用模拟数据
     const rooms = [
       { name: '302寝室', activity: 95, expenses: 5800 },
       { name: '205寝室', activity: 88, expenses: 4200 },
@@ -133,8 +134,6 @@ const updateChart = async () => {
     }
     
     chartInstance.setOption(option)
-  } catch (error) {
-    console.error('获取房间活跃度数据失败:', error)
   } finally {
     loading.value = false
   }

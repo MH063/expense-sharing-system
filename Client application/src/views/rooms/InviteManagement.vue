@@ -330,49 +330,19 @@ const loadInviteData = async () => {
     // const roomInfo = await api.getCurrentRoom()
     // hasRoom.value = !!roomInfo
     
-    // 模拟数据
-    hasRoom.value = true
+    // 检查用户是否有寝室
+    const roomInfo = await api.getCurrentRoom()
+    hasRoom.value = !!roomInfo
     
     if (hasRoom.value) {
       // 获取当前邀请码
-      // currentInviteCode.value = await api.getCurrentInviteCode()
-      
-      // 模拟当前邀请码
-      currentInviteCode.value = 'ABC123XYZ'
+      currentInviteCode.value = await api.getCurrentInviteCode()
       
       // 获取邀请历史
-      // inviteHistory.value = await api.getInviteHistory()
-      
-      // 模拟邀请历史数据
-      inviteHistory.value = [
-        {
-          id: 'invite-1',
-          code: 'ABC123XYZ',
-          status: 'accepted',
-          createdAt: new Date('2023-10-01').toISOString(),
-          acceptedAt: new Date('2023-10-02').toISOString(),
-          expiresAt: null
-        },
-        {
-          id: 'invite-2',
-          code: 'DEF456UVW',
-          status: 'pending',
-          createdAt: new Date('2023-10-05').toISOString(),
-          acceptedAt: null,
-          expiresAt: new Date('2023-10-19').toISOString()
-        },
-        {
-          id: 'invite-3',
-          code: 'GHI789RST',
-          status: 'expired',
-          createdAt: new Date('2023-09-10').toISOString(),
-          acceptedAt: null,
-          expiresAt: new Date('2023-09-24').toISOString()
-        }
-      ]
+      inviteHistory.value = await api.getInviteHistory()
       
       // 获取邀请设置
-      // Object.assign(inviteSettings, await api.getInviteSettings())
+      Object.assign(inviteSettings, await api.getInviteSettings())
     }
     
   } catch (error) {
@@ -444,23 +414,8 @@ const regenerateInviteCode = async () => {
   errorMessage.value = ''
   
   try {
-    // const newCode = await api.regenerateInviteCode()
-    // currentInviteCode.value = newCode
-    
-    // 模拟新邀请码
-    currentInviteCode.value = 'XYZ789ABC'
-    
-    // 添加到邀请历史
-    inviteHistory.value.unshift({
-      id: `invite-${Date.now()}`,
-      code: currentInviteCode.value,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      acceptedAt: null,
-      expiresAt: inviteSettings.expiryDays !== '0' 
-        ? new Date(Date.now() + parseInt(inviteSettings.expiryDays) * 24 * 60 * 60 * 1000).toISOString()
-        : null
-    })
+    const newCode = await api.regenerateInviteCode()
+    currentInviteCode.value = newCode
     
     successMessage.value = '邀请码已重新生成'
     

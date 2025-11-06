@@ -15,7 +15,17 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshPromise = ref(null)
 
   const isAuthenticated = computed(() => {
-    return Boolean(accessToken.value) && tokenManager.isTokenValid()
+    const hasToken = Boolean(accessToken.value)
+    const tokenValid = tokenManager.isTokenValid()
+    
+    console.log('认证状态检查:', {
+      hasToken,
+      tokenValid,
+      accessToken: accessToken.value ? '存在' : '不存在',
+      tokenStatus: tokenManager.checkTokenStatus()
+    })
+    
+    return hasToken && tokenValid
   })
   
   const hasRefreshToken = computed(() => Boolean(refreshToken.value))
@@ -97,7 +107,20 @@ export const useAuthStore = defineStore('auth', () => {
         refreshToken.value = refreshTkn
         console.log('已从Token管理器加载刷新Token')
       } else {
-        console.log('Token管理器中没有刷新Token')
+        // 尝试从localStorage或sessionStorage直接获取刷新令牌
+        const currentUser = tokenManager.getCurrentUser()
+        const rememberMe = localStorage.getItem('remember_me') === 'true'
+        const storage = rememberMe ? localStorage : sessionStorage
+        const userRefreshTokenKey = currentUser ? `refresh_token_${currentUser}` : 'refresh_token'
+        const directRefreshToken = storage.getItem(userRefreshTokenKey)
+        
+        if (directRefreshToken) {
+          refreshToken.value = directRefreshToken
+          tokenManager.setRefreshToken(directRefreshToken)
+          console.log('从存储直接获取并设置刷新Token')
+        } else {
+          console.log('Token管理器和存储中都没有刷新Token')
+        }
       }
       
       // 设置Token管理器的刷新回调
@@ -133,14 +156,15 @@ export const useAuthStore = defineStore('auth', () => {
     isRefreshing.value = true
     
     try {
-      refreshPromise.value = http.post('/api/auth/refresh', {
+      refreshPromise.value = http.post('/auth/refresh-token', {
         refreshToken: refreshToken.value
       })
       
       const response = await refreshPromise.value
       
-      if (response.success) {
-        const { token: newAccessToken, refreshToken: newRefreshToken } = response.data
+      // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+      if (response.data.success && response.data.data) {
+        const { token: newAccessToken, refreshToken: newRefreshToken } = response.data.data
         
         // 获取当前用户名，确保Token刷新时使用正确的用户上下文
         const currentUsername = tokenManager.getCurrentUser()
@@ -179,19 +203,46 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   
-  // 刷新会话
+  /**
+   * 刷新会话
+   * @returns {Promise} 刷新结果
+   */
   const refreshSession = async () => {
     try {
-      // 直接调用refreshTokens方法，而不是通过tokenManager
-      await refreshTokens()
+      if (!tokenManager.getRefreshToken()) {
+        throw new Error('无刷新令牌')
+      }
       
-      // 更新本地状态
-      accessToken.value = tokenManager.getToken()
-      refreshToken.value = tokenManager.getRefreshToken()
+      console.log('刷新会话中...')
       
-      return { success: true }
+      // 使用Token管理器刷新Token
+      const newTokens = await tokenManager.refreshToken(async () => {
+        const response = await http.post('/auth/refresh-token', {
+          refreshToken: tokenManager.getRefreshToken()
+        })
+        
+        // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+        if (response.data.success && response.data.data) {
+          return response.data.data
+        } else {
+          throw new Error(response.data.message || '刷新令牌失败')
+        }
+      })
+      
+      // 更新状态
+      if (newTokens) {
+        accessToken.value = newTokens.token
+        refreshToken.value = newTokens.refreshToken
+        
+        // 连接WebSocket
+        connectWebSocket()
+        
+        console.log('会话刷新成功')
+      }
+      
+      return newTokens
     } catch (error) {
-      console.error('会话刷新失败:', error)
+      console.error('刷新会话失败:', error)
       throw error
     }
   }
@@ -218,50 +269,24 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const login = async (credentials, username) => {
     try {
-      // 模拟登录API调用
-      console.log('模拟登录API调用:', credentials)
+      // 调用登录API
+      console.log('调用登录API:', credentials)
       
-      // 模拟API响应延迟
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // 使用http客户端调用后端登录接口
+      const response = await http.post('/auth/login', credentials)
       
-      // 模拟登录成功响应
-      const mockResponse = {
-        success: true,
-        data: {
-          token: 'mock-jwt-token-' + Date.now(),
-          refreshToken: 'mock-refresh-token-' + Date.now(),
-          user: {
-            id: 1,
-            username: credentials.username,
-            name: '管理员', // 所有模拟登录用户都是管理员
-            email: credentials.username + '@example.com',
-            avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
-            role: 'admin', // 所有模拟登录用户都是管理员
-            roles: ['admin'],
-            permissions: ['all'], // 所有模拟登录用户拥有所有权限
-            roomId: 1,
-            rooms: [
-              {
-                id: 1,
-                name: '默认寝室',
-                role: 'owner'
-              }
-            ]
-          }
-        }
-      }
-      
-      // 如果是真实API，使用下面的代码
-      // const response = await http.post('/api/users/login', credentials)
-      
-      if (mockResponse.success) {
-        const { token, refreshToken: refreshTkn, user: userData } = mockResponse.data
+      // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+      if (response.data.success && response.data.data) {
+        const { token, refreshToken: refreshTkn, user: userData } = response.data.data
+        
+        console.log('登录成功，收到Token:', {
+          hasToken: !!token,
+          hasRefreshToken: !!refreshTkn,
+          userData
+        })
         
         // 存储Token到Token管理器，支持多用户
-        tokenManager.setTokens({
-          token,
-          refreshToken: refreshTkn
-        }, username)
+        tokenManager.setTokens(token, refreshTkn, null, username || userData?.username)
         
         // 更新状态
         accessToken.value = token
@@ -276,9 +301,16 @@ export const useAuthStore = defineStore('auth', () => {
         // 连接WebSocket
         connectWebSocket()
         
+        console.log('登录状态设置完成:', {
+          isAuthenticated: isAuthenticated.value,
+          currentUser: currentUser.value,
+          hasAccessToken: !!accessToken.value,
+          hasRefreshToken: !!refreshToken.value
+        })
+        
         return { success: true, user: userData }
       } else {
-        throw new Error(mockResponse.data.message || '登录失败')
+        throw new Error(response.data.message || '登录失败')
       }
     } catch (error) {
       console.error('登录失败:', error)
@@ -294,7 +326,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // 通知服务器登出
       if (accessToken.value) {
-        await http.post('/api/users/logout')
+        await http.post('/users/logout')
       }
     } catch (error) {
       console.error('服务器登出失败:', error)
@@ -332,10 +364,7 @@ export const useAuthStore = defineStore('auth', () => {
       
       // 存储Token到Token管理器，支持多用户
       if (tokens.token) {
-        tokenManager.setTokens({
-          token: tokens.token,
-          refreshToken: tokens.refreshToken
-        }, username || user?.username)
+        tokenManager.setTokens(tokens.token, tokens.refreshToken, tokens.accessTokenExpiresAt, username || user?.username)
       }
     }
     

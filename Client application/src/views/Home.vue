@@ -53,10 +53,7 @@ const navigateToExpenses = () => {
     router.push('/dashboard')
   } else {
     // 未登录用户跳转到登录页面
-    router.push({
-      name: 'Login',
-      query: { redirect: '/dashboard' }
-    })
+    router.push('/auth/login')
   }
 }
 

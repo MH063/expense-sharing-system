@@ -10,7 +10,7 @@ import request from './request'
  */
 export function getBills(params) {
   return request({
-    url: '/bills',
+    url: '/api/bills',
     method: 'get',
     params
   })
@@ -23,7 +23,7 @@ export function getBills(params) {
  */
 export function getBillDetail(billId) {
   return request({
-    url: `/bills/${billId}`,
+    url: `/api/bills/${billId}`,
     method: 'get'
   })
 }
@@ -35,7 +35,7 @@ export function getBillDetail(billId) {
  */
 export function createBill(data) {
   return request({
-    url: '/bills',
+    url: '/api/bills',
     method: 'post',
     data
   })
@@ -49,7 +49,7 @@ export function createBill(data) {
  */
 export function updateBill(billId, data) {
   return request({
-    url: `/bills/${billId}`,
+    url: `/api/bills/${billId}`,
     method: 'put',
     data
   })
@@ -62,7 +62,7 @@ export function updateBill(billId, data) {
  */
 export function deleteBill(billId) {
   return request({
-    url: `/bills/${billId}`,
+    url: `/api/bills/${billId}`,
     method: 'delete'
   })
 }
@@ -74,7 +74,7 @@ export function deleteBill(billId) {
  */
 export function settleBill(billId) {
   return request({
-    url: `/bills/${billId}/settle`,
+    url: `/api/bills/${billId}/settle`,
     method: 'post'
   })
 }
@@ -86,7 +86,7 @@ export function settleBill(billId) {
  */
 export function getBillSettlementDetail(billId) {
   return request({
-    url: `/bills/${billId}/settlement`,
+    url: `/api/bills/${billId}/settlement`,
     method: 'get'
   })
 }
@@ -99,7 +99,7 @@ export function getBillSettlementDetail(billId) {
  */
 export function confirmBillSettlement(billId, data) {
   return request({
-    url: `/bills/${billId}/settlement/confirm`,
+    url: `/api/bills/${billId}/settlement/confirm`,
     method: 'post',
     data
   })
@@ -112,7 +112,7 @@ export function confirmBillSettlement(billId, data) {
  */
 export function getBillStatistics(params) {
   return request({
-    url: '/bills/statistics',
+    url: '/api/bills/statistics',
     method: 'get',
     params
   })
@@ -126,7 +126,7 @@ export function getBillStatistics(params) {
  */
 export function exportBill(billId, params) {
   return request({
-    url: `/bills/${billId}/export`,
+    url: `/api/bills/${billId}/export`,
     method: 'get',
     params,
     responseType: 'blob'
@@ -140,7 +140,7 @@ export function exportBill(billId, params) {
  */
 export function shareBill(billId) {
   return request({
-    url: `/bills/${billId}/share`,
+    url: `/api/bills/${billId}/share`,
     method: 'post'
   })
 }
@@ -152,7 +152,7 @@ export function shareBill(billId) {
  */
 export function getSharedBill(shareCode) {
   return request({
-    url: `/bills/shared/${shareCode}`,
+    url: `/api/bills/shared/${shareCode}`,
     method: 'get'
   })
 }
@@ -165,7 +165,7 @@ export function getSharedBill(shareCode) {
  */
 export function addBillComment(billId, data) {
   return request({
-    url: `/bills/${billId}/comments`,
+    url: `/api/bills/${billId}/comments`,
     method: 'post',
     data
   })
@@ -179,7 +179,7 @@ export function addBillComment(billId, data) {
  */
 export function getBillComments(billId, params) {
   return request({
-    url: `/bills/${billId}/comments`,
+    url: `/api/bills/${billId}/comments`,
     method: 'get',
     params
   })
@@ -193,7 +193,7 @@ export function getBillComments(billId, params) {
  */
 export function deleteBillComment(billId, commentId) {
   return request({
-    url: `/bills/${billId}/comments/${commentId}`,
+    url: `/api/bills/${billId}/comments/${commentId}`,
     method: 'delete'
   })
 }

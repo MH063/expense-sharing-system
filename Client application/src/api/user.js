@@ -10,7 +10,7 @@ import request from './request'
  */
 export function login(data) {
   return request({
-    url: '/auth/login',
+    url: '/api/auth/login',
     method: 'post',
     data
   })
@@ -23,7 +23,7 @@ export function login(data) {
  */
 export function register(data) {
   return request({
-    url: '/users/register',
+    url: '/api/auth/register',
     method: 'post',
     data
   })
@@ -35,7 +35,7 @@ export function register(data) {
  */
 export function logout() {
   return request({
-    url: '/auth/logout',
+    url: '/api/auth/logout',
     method: 'post'
   })
 }
@@ -46,7 +46,7 @@ export function logout() {
  */
 export function refreshToken() {
   return request({
-    url: '/auth/refresh',
+    url: '/api/auth/refresh',
     method: 'post'
   })
 }
@@ -57,7 +57,7 @@ export function refreshToken() {
  */
 export function getCurrentUser() {
   return request({
-    url: '/user/profile',
+    url: '/api/users/profile',
     method: 'get'
   })
 }
@@ -69,7 +69,7 @@ export function getCurrentUser() {
  */
 export function updateProfile(data) {
   return request({
-    url: '/user/profile',
+    url: '/api/users/profile',
     method: 'put',
     data
   })
@@ -82,7 +82,7 @@ export function updateProfile(data) {
  */
 export function changePassword(data) {
   return request({
-    url: '/user/password',
+    url: '/api/users/password',
     method: 'put',
     data
   })
@@ -95,7 +95,7 @@ export function changePassword(data) {
  */
 export function uploadAvatar(data) {
   return request({
-    url: '/user/avatar',
+    url: '/api/users/avatar',
     method: 'post',
     data,
     headers: {
@@ -111,7 +111,7 @@ export function uploadAvatar(data) {
  */
 export function getNotifications(params) {
   return request({
-    url: '/user/notifications',
+    url: '/api/notifications',
     method: 'get',
     params
   })
@@ -124,7 +124,7 @@ export function getNotifications(params) {
  */
 export function markNotificationAsRead(notificationId) {
   return request({
-    url: `/user/notifications/${notificationId}/read`,
+    url: `/api/notifications/${notificationId}/read`,
     method: 'put'
   })
 }
@@ -135,7 +135,7 @@ export function markNotificationAsRead(notificationId) {
  */
 export function markAllNotificationsAsRead() {
   return request({
-    url: '/user/notifications/read-all',
+    url: '/api/notifications/read-all',
     method: 'put'
   })
 }
@@ -147,7 +147,7 @@ export function markAllNotificationsAsRead() {
  */
 export function deleteNotification(notificationId) {
   return request({
-    url: `/user/notifications/${notificationId}`,
+    url: `/api/notifications/${notificationId}`,
     method: 'delete'
   })
 }
@@ -158,7 +158,7 @@ export function deleteNotification(notificationId) {
  */
 export function getUserSettings() {
   return request({
-    url: '/user/settings',
+    url: '/api/users/settings',
     method: 'get'
   })
 }
@@ -170,7 +170,7 @@ export function getUserSettings() {
  */
 export function updateUserSettings(data) {
   return request({
-    url: '/user/settings',
+    url: '/api/users/settings',
     method: 'put',
     data
   })
@@ -184,7 +184,7 @@ export function updateUserSettings(data) {
  */
 export function bindThirdPartyAccount(provider, data) {
   return request({
-    url: `/user/bind/${provider}`,
+    url: `/api/users/bind/${provider}`,
     method: 'post',
     data
   })
@@ -197,7 +197,7 @@ export function bindThirdPartyAccount(provider, data) {
  */
 export function unbindThirdPartyAccount(provider) {
   return request({
-    url: `/user/unbind/${provider}`,
+    url: `/api/users/unbind/${provider}`,
     method: 'post'
   })
 }
@@ -209,7 +209,7 @@ export function unbindThirdPartyAccount(provider) {
  */
 export function getUserActivityLogs(params) {
   return request({
-    url: '/api/user/activity-logs',
+    url: '/api/users/activity-logs',
     method: 'get',
     params
   })

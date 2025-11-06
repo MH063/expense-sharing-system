@@ -5,17 +5,11 @@ import { ref } from 'vue'
  * 用于管理用户登录状态和权限验证
  */
 
-// 模拟登录状态
-const isLoggedIn = ref(true)
+// 登录状态
+const isLoggedIn = ref(false)
 
-// 模拟用户信息
-const currentUser = ref({
-  id: 'admin-001',
-  username: 'admin',
-  name: '系统管理员',
-  role: 'admin',
-  permissions: ['all']
-})
+// 用户信息
+const currentUser = ref(null)
 
 /**
  * 检查用户是否已登录
@@ -27,29 +21,30 @@ export const checkAuth = () => {
 
 /**
  * 获取当前用户信息
- * @returns {Object} 用户信息
+ * @returns {Object|null} 用户信息
  */
 export const getCurrentUser = () => {
   return currentUser.value
 }
 
 /**
- * 模拟登录操作
+ * 登录操作
  * @param {Object} userInfo - 用户信息
  */
 export const login = (userInfo) => {
   isLoggedIn.value = true
-  currentUser.value = { ...currentUser.value, ...userInfo }
-  localStorage.setItem('admin-user', JSON.stringify(currentUser.value))
+  currentUser.value = userInfo
+  localStorage.setItem('admin-user', JSON.stringify(userInfo))
 }
 
 /**
- * 模拟登出操作
+ * 登出操作
  */
 export const logout = () => {
   isLoggedIn.value = false
   currentUser.value = null
   localStorage.removeItem('admin-user')
+  localStorage.removeItem('admin-token')
 }
 
 /**
@@ -58,9 +53,9 @@ export const logout = () => {
  * @returns {boolean} 是否有权限
  */
 export const hasPermission = (permission) => {
-  if (!isLoggedIn.value) return false
-  if (currentUser.value.permissions.includes('all')) return true
-  return currentUser.value.permissions.includes(permission)
+  if (!isLoggedIn.value || !currentUser.value) return false
+  if (currentUser.value.permissions && currentUser.value.permissions.includes('all')) return true
+  return currentUser.value.permissions && currentUser.value.permissions.includes(permission)
 }
 
 /**
@@ -68,17 +63,18 @@ export const hasPermission = (permission) => {
  */
 export const initAuth = () => {
   const savedUser = localStorage.getItem('admin-user')
-  if (savedUser) {
+  const savedToken = localStorage.getItem('admin-token')
+  
+  if (savedUser && savedToken) {
     try {
       currentUser.value = JSON.parse(savedUser)
       isLoggedIn.value = true
     } catch (e) {
       console.error('解析用户信息失败', e)
       isLoggedIn.value = false
+      localStorage.removeItem('admin-user')
+      localStorage.removeItem('admin-token')
     }
-  } else {
-    // 默认设置为已登录状态，用于模拟环境
-    isLoggedIn.value = true
   }
 }
 

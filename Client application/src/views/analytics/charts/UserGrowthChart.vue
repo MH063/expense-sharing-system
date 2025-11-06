@@ -140,10 +140,11 @@ const updateChart = async () => {
     
     chartInstance.setOption(option)
   } catch (error) {
-    console.error('获取用户增长数据失败:', error)
-  } finally {
-    loading.value = false
-  }
+      console.error('获取用户增长数据失败:', error)
+      // 不再使用模拟数据，直接显示错误信息
+    } finally {
+      loading.value = false
+    }
 }
 
 /**

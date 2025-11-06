@@ -6,9 +6,16 @@ initAuth()
 
 const routes = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     name: 'AdminHome',
-    component: () => import('../views/AdminHome.vue')
+    component: () => import('../views/AdminHome.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/docs',
@@ -156,21 +163,23 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   console.log('路由导航:', to.path)
   
-  // 在模拟环境下，允许所有路由访问
-  // 在生产环境中，可以取消下面的注释来启用权限验证
+  // 检查路由是否需要身份验证
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth !== false)
   
-  /*
-  // 检查用户是否已登录
-  if (!checkAuth()) {
-    console.log('用户未登录，重定向到登录页')
-    // 这里可以重定向到登录页面
-    // next('/login')
-    next() // 临时允许访问
+  // 如果是登录页面，且用户已登录，则重定向到首页
+  if (to.path === '/login' && checkAuth()) {
+    next('/')
     return
   }
-  */
   
-  // 模拟环境下，允许所有路由访问
+  // 如果路由需要身份验证且用户未登录，则重定向到登录页面
+  if (requiresAuth && !checkAuth()) {
+    console.log('用户未登录，重定向到登录页')
+    next('/login')
+    return
+  }
+  
+  // 其他情况允许访问
   console.log('权限验证通过，允许访问')
   next()
 })

@@ -51,12 +51,12 @@ const updateChart = async () => {
     
     // 模拟数据
     const categories = [
-      { name: '餐饮', value: 3500, color: '#5470c6' },
-      { name: '日用品', value: 1200, color: '#91cc75' },
-      { name: '交通', value: 800, color: '#fac858' },
-      { name: '娱乐', value: 1500, color: '#ee6666' },
-      { name: '购物', value: 2000, color: '#73c0de' },
-      { name: '其他', value: 600, color: '#3ba272' }
+      { name: '餐饮', value: 1250, color: '#5470c6' },
+      { name: '日用品', value: 580, color: '#91cc75' },
+      { name: '水电费', value: 420, color: '#fac858' },
+      { name: '娱乐', value: 350, color: '#ee6666' },
+      { name: '交通', value: 220, color: '#73c0de' },
+      { name: '其他', value: 180, color: '#3ba272' }
     ]
     
     const option = {

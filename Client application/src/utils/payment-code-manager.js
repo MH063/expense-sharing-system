@@ -464,9 +464,31 @@ class PaymentCodeValidator {
    * 解码二维码（简化实现）
    */
   async decodeQRCode(imageData) {
-    // 实际项目需要集成二维码解码库，如jsQR
-    // 这里返回模拟数据
-    return `weixin://wxpay/bizpayurl?pr=xxxxxxxxxxxx`;
+    try {
+      // 实际项目需要集成二维码解码库，如jsQR
+      // 这里返回模拟数据，包含URL参数以便解析
+      const mockQRCode = `weixin://wxpay/bizpayurl?payeeId=user123&amount=100.00&description=测试支付&timestamp=${new Date().toISOString()}`;
+      
+      // 解析URL参数
+      const url = new URL(mockQRCode);
+      const params = new URLSearchParams(url.search);
+      
+      return {
+        success: true,
+        data: {
+          payeeId: params.get('payeeId'),
+          amount: params.get('amount'),
+          description: params.get('description') || '无描述',
+          timestamp: params.get('timestamp')
+        }
+      };
+    } catch (error) {
+      console.error('解析二维码失败:', error);
+      return {
+        success: false,
+        message: '无效的二维码'
+      };
+    }
   }
   
   /**
@@ -563,25 +585,46 @@ class PaymentFlowManager {
   }
   
   // 模拟方法 - 实际项目中需要调用后端API
-  async getPayeeInfo(billId) {
-    // 模拟返回收款人信息
-    return {
-      userId: 'user_123',
-      name: '张三'
-    };
+  async getPayeeInfo(payeeId) {
+    try {
+      // 实际应该调用后端API获取收款方信息
+      // const response = await userApi.getUserInfo(payeeId)
+      // return response.data
+      
+      // 这里应该返回从API获取的真实数据
+      throw new Error('API接口尚未实现')
+    } catch (error) {
+      console.error('获取收款方信息失败:', error)
+      throw error
+    }
   }
   
-  async createPaymentRecord(recordData) {
-    // 模拟创建支付记录
-    return {
-      id: 'payment_' + Date.now(),
-      ...recordData
-    };
+  async createPaymentRecord(paymentData) {
+    try {
+      // 实际应该调用后端API创建支付记录
+      // const response = await paymentApi.createPayment(paymentData)
+      // return response.data
+      
+      // 这里应该返回从API创建的真实支付记录
+      throw new Error('API接口尚未实现')
+    } catch (error) {
+      console.error('创建支付记录失败:', error)
+      throw error
+    }
   }
   
   async updatePaymentStatus(paymentId, status) {
-    // 模拟更新支付状态
-    console.log(`更新支付状态: ${paymentId} -> ${status}`);
+    try {
+      // 实际应该调用后端API更新支付状态
+      // const response = await paymentApi.updatePaymentStatus(paymentId, status)
+      // return response.data
+      
+      // 这里应该返回从API更新的真实支付状态
+      throw new Error('API接口尚未实现')
+    } catch (error) {
+      console.error('更新支付状态失败:', error)
+      throw error
+    }
   }
   
   async sendPaymentNotification(paymentId) {

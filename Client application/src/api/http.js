@@ -5,7 +5,10 @@ import { useAuthStore } from '@/stores'
 // 创建基础HTTP客户端
 const http = axios.create({
   baseURL: '/api',
-  timeout: 15000
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 })
 
 // 集成Token拦截器

@@ -338,7 +338,7 @@ class WebSocketEventsHandler {
       // 为了简化，这里使用一个假设的查询
       const { pool } = require('../config/db');
       const result = await pool.query(
-        'SELECT user_id FROM user_room_relations WHERE room_id = $1',
+        'SELECT user_id FROM room_members WHERE room_id = $1',
         [roomId]
       );
       

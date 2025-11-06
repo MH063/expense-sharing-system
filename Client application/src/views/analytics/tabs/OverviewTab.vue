@@ -171,28 +171,18 @@ const recentActivities = ref([])
 const loadOverviewData = async () => {
   loading.value = true
   try {
-    // 模拟API调用
-    console.log('模拟调用 analyticsApi.getOverviewData，参数:', {
+    const resp = await analyticsApi.getOverviewData({
       startDate: props.dateRange[0],
       endDate: props.dateRange[1]
     })
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 模拟返回数据
-    const mockData = {
-      totalUsers: 156,
-      totalRooms: 24,
-      totalExpenses: 48650.75,
-      activeUsers: 89
+    if (resp && resp.success) {
+      Object.assign(overviewData, resp.data)
+    } else {
+      console.error('获取概览数据失败:', resp?.message)
     }
-    
-    Object.assign(overviewData, mockData)
-    console.log('模拟获取概览数据成功:', mockData)
   } catch (error) {
     console.error('加载概览数据失败:', error)
-    // 不再使用模拟数据，直接显示错误信息
   } finally {
     loading.value = false
   }
@@ -203,56 +193,15 @@ const loadOverviewData = async () => {
  */
 const loadRecentActivities = async () => {
   try {
-    // 模拟API调用
-    console.log('模拟调用 analyticsApi.getRecentActivities，参数:', { limit: 10 })
+    const resp = await analyticsApi.getRecentActivities({ limit: 10 })
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 600))
-    
-    // 模拟返回数据
-    const mockActivities = [
-      {
-        id: 1,
-        type: 'expense',
-        title: '张三创建了新的费用',
-        description: '10月份电费，金额：150.00元',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 2,
-        type: 'payment',
-        title: '李四完成了支付',
-        description: '支付了10月份水费，金额：80.00元',
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 3,
-        type: 'room',
-        title: '王五加入了房间',
-        description: '加入了"101宿舍"房间',
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 4,
-        type: 'user',
-        title: '新用户注册',
-        description: '用户赵六注册了账号',
-        timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 5,
-        type: 'dispute',
-        title: '争议已解决',
-        description: '关于网费分摊的争议已解决',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      }
-    ]
-    
-    recentActivities.value = mockActivities
-    console.log('模拟获取最近活动成功:', mockActivities)
+    if (resp && resp.success) {
+      recentActivities.value = resp.data || []
+    } else {
+      console.error('获取最近活动失败:', resp?.message)
+    }
   } catch (error) {
     console.error('加载最近活动失败:', error)
-    // 不再使用模拟数据，直接显示错误信息
   }
 }
 

@@ -67,6 +67,24 @@ const inviteCodeApi = {
    */
   useInviteCode(code) {
     return http.post('/invite-codes/use', { code });
+  },
+
+  /**
+   * 获取指定房间的邀请码列表
+   * @param {string|number} roomId - 房间ID
+   * @returns {Promise} 邀请码列表
+   */
+  getRoomInviteCodes(roomId) {
+    return http.get(`/invite-codes/room/${roomId}`)
+  },
+
+  /**
+   * 撤销邀请码
+   * @param {string|number} id - 邀请码ID
+   * @returns {Promise} 撤销结果
+   */
+  revokeInviteCode(id) {
+    return http.delete(`/invite-codes/${id}`)
   }
 };
 

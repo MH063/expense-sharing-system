@@ -35,7 +35,7 @@ describe('支付流程优化集成测试', () => {
 
     // 将用户添加到房间
     await pool.query(
-      'INSERT INTO user_room_relations (id, user_id, room_id, relation_type) VALUES (gen_random_uuid(), $1, $2, $3)',
+      'INSERT INTO room_members (id, user_id, room_id, relation_type) VALUES (gen_random_uuid(), $1, $2, $3)',
       [testUser.id, testRoom.id, 'member']
     );
 
@@ -62,7 +62,7 @@ describe('支付流程优化集成测试', () => {
     await pool.query('DELETE FROM offline_payments WHERE bill_id IN (SELECT id FROM bills WHERE title LIKE \'测试%\')');
     await pool.query('DELETE FROM payment_reminders WHERE bill_id IN (SELECT id FROM bills WHERE title LIKE \'测试%\')');
     await pool.query('DELETE FROM bills WHERE title LIKE \'测试%\'');
-    await pool.query('DELETE FROM user_room_relations WHERE user_id IN (SELECT id FROM users WHERE username LIKE \'test%\')');
+    await pool.query('DELETE FROM room_members WHERE user_id IN (SELECT id FROM users WHERE username LIKE \'test%\')');
     await pool.query('DELETE FROM users WHERE username LIKE \'test%\'');
     await pool.query('DELETE FROM rooms WHERE name LIKE \'测试%\'');
   });

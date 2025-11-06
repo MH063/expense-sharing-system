@@ -43,7 +43,7 @@ class StatsController {
       
       if (room_id) {
         const memberCheck = await client.query(
-          'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
+          'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2',
           [room_id, user_id]
         );
         
@@ -82,7 +82,7 @@ class StatsController {
           COALESCE(SUM(e.amount), 0) as total_paid,
           COALESCE(AVG(e.amount), 0) as avg_payment
         FROM expenses e
-        WHERE e.payer_id = $1 ${roomFilter} ${timeFilter}
+        WHERE e.created_by = $1 ${roomFilter} ${timeFilter}
       `;
       
       const paymentStatsResult = await client.query(paymentStatsQuery, params);
@@ -112,8 +112,8 @@ class StatsController {
           COALESCE(SUM(CASE WHEN bs.user_id = $1 AND bs.status = 'PENDING_PAYMENT' THEN bs.amount ELSE 0 END), 0) as total_bill_pending
         FROM bills b
         LEFT JOIN bill_splits bs ON b.id = bs.bill_id
-        JOIN user_room_relations urr ON b.room_id = urr.room_id AND urr.is_active = TRUE
-        WHERE urr.user_id = $1 ${roomFilter} ${timeFilter}
+        JOIN room_members rm ON b.room_id = rm.room_id
+        WHERE rm.user_id = $1 ${roomFilter} ${timeFilter}
       `;
       
       const billStatsResult = await client.query(billStatsQuery, params);
@@ -122,13 +122,12 @@ class StatsController {
       // 获取费用类型分布
       const expenseTypeQuery = `
         SELECT 
-          et.name as type_name,
+          e.category as type_name,
           COUNT(*) as count,
           COALESCE(SUM(e.amount), 0) as total_amount
         FROM expenses e
-        JOIN expense_types et ON e.type_id = et.id
-        WHERE e.payer_id = $1 ${roomFilter} ${timeFilter}
-        GROUP BY et.id, et.name
+        WHERE e.created_by = $1 ${roomFilter} ${timeFilter}
+        GROUP BY e.category
         ORDER BY total_amount DESC
       `;
       
@@ -142,7 +141,7 @@ class StatsController {
           COALESCE(SUM(e.amount), 0) as total_amount,
           COUNT(*) as count
         FROM expenses e
-        WHERE e.payer_id = $1 ${roomFilter} ${timeFilter}
+        WHERE e.created_by = $1 ${roomFilter} ${timeFilter}
         GROUP BY DATE_TRUNC('day', e.created_at)
         ORDER BY date
       `;
@@ -212,7 +211,7 @@ class StatsController {
       
       if (room_id) {
         const memberCheck = await client.query(
-          'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
+          'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2',
           [room_id, user_id]
         );
         
@@ -228,8 +227,8 @@ class StatsController {
       } else {
         // 如果没有指定房间，获取用户所在的所有房间
         const userRoomsQuery = `
-          SELECT room_id FROM user_room_relations 
-          WHERE user_id = $1 AND is_active = TRUE
+          SELECT room_id FROM room_members 
+          WHERE user_id = $1
         `;
         const userRoomsResult = await client.query(userRoomsQuery, [user_id]);
         
@@ -268,7 +267,7 @@ class StatsController {
           COUNT(*) as expense_count,
           COALESCE(SUM(e.amount), 0) as total_expense,
           COALESCE(AVG(e.amount), 0) as avg_expense,
-          COUNT(DISTINCT e.payer_id) as unique_payers
+          COUNT(DISTINCT e.created_by) as unique_payers
         FROM expenses e
         WHERE 1=1 ${roomFilter} ${timeFilter}
       `;
@@ -280,9 +279,9 @@ class StatsController {
       const billStatsQuery = `
         SELECT 
           COUNT(*) as bill_count,
-          COALESCE(SUM(b.total_amount), 0) as total_bill_amount,
-          COALESCE(SUM(CASE WHEN b.status = 'COMPLETED' THEN b.total_amount ELSE 0 END), 0) as paid_amount,
-          COALESCE(SUM(CASE WHEN b.status = 'PENDING' THEN b.total_amount ELSE 0 END), 0) as pending_amount
+          COALESCE(SUM(b.amount), 0) as total_bill_amount,
+          COALESCE(SUM(CASE WHEN b.status = 'settled' THEN b.amount ELSE 0 END), 0) as paid_amount,
+          COALESCE(SUM(CASE WHEN b.status = 'open' THEN b.amount ELSE 0 END), 0) as pending_amount
         FROM bills b
         WHERE 1=1 ${roomFilter} ${timeFilter}
       `;
@@ -296,34 +295,37 @@ class StatsController {
           u.id,
           u.username,
           u.avatar,
-          COUNT(e.id) as expense_count,
+          COUNT(DISTINCT e.id) as expense_count,
           COALESCE(SUM(e.amount), 0) as total_paid,
           COALESCE(SUM(es.amount), 0) as total_owed
         FROM users u
-        LEFT JOIN expenses e ON u.id = e.payer_id ${roomFilter.replace('AND e.room_id', 'AND e.room_id')} ${timeFilter}
+        LEFT JOIN expenses e ON u.id = e.created_by AND e.room_id = $1
         LEFT JOIN expense_splits es ON u.id = es.user_id 
-        LEFT JOIN expenses e2 ON es.expense_id = e2.id ${roomFilter.replace('AND e.room_id', 'AND e2.room_id')} ${timeFilter}
+        LEFT JOIN expenses e2 ON es.expense_id = e2.id AND e2.room_id = $1
         WHERE u.id IN (
-          SELECT user_id FROM user_room_relations urr 
-          ${room_id ? 'WHERE urr.room_id = $1 AND urr.is_active = TRUE' : 'WHERE urr.room_id = ANY($1) AND urr.is_active = TRUE'}
+          SELECT user_id FROM room_members rm 
+          WHERE rm.room_id = $1
         )
+        AND (e.id IS NULL OR e.created_at >= CURRENT_DATE - INTERVAL '30 days')
+        AND (e2.id IS NULL OR e2.created_at >= CURRENT_DATE - INTERVAL '30 days')
         GROUP BY u.id, u.username, u.avatar
         ORDER BY total_paid DESC
       `;
       
-      const memberContributionResult = await client.query(memberContributionQuery, params);
+      // 使用正确的参数，如果room_id存在则使用room_id，否则使用params数组
+      const memberContributionParams = room_id ? [room_id] : params;
+      const memberContributionResult = await client.query(memberContributionQuery, memberContributionParams);
       const memberContributions = memberContributionResult.rows;
       
       // 获取费用类型分布
       const expenseTypeQuery = `
         SELECT 
-          et.name as type_name,
+          e.category as type_name,
           COUNT(*) as count,
           COALESCE(SUM(e.amount), 0) as total_amount
         FROM expenses e
-        JOIN expense_types et ON e.type_id = et.id
         WHERE 1=1 ${roomFilter} ${timeFilter}
-        GROUP BY et.id, et.name
+        GROUP BY e.category
         ORDER BY total_amount DESC
       `;
       
@@ -457,9 +459,9 @@ class StatsController {
       const billStatsQuery = `
         SELECT 
           COUNT(*) as total_bills,
-          COALESCE(SUM(total_amount), 0) as total_amount,
-          COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed_bills,
-          COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending_bills
+          COALESCE(SUM(amount), 0) as total_amount,
+          COUNT(CASE WHEN status = 'settled' THEN 1 END) as completed_bills,
+          COUNT(CASE WHEN status = 'open' THEN 1 END) as pending_bills
         FROM bills
       `;
       

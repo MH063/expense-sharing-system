@@ -1,60 +1,144 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
+// 工具函数：类型与键名转换
+const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]'
+const toCamel = (str) => str.replace(/_[a-z]/g, (s) => s[1].toUpperCase())
+const toSnake = (str) => str
+  .replace(/([A-Z])/g, '_$1')
+  .replace(/_{2,}/g, '_')
+  .toLowerCase()
+
+const deepMapKeys = (input, mapper) => {
+  if (Array.isArray(input)) {
+    return input.map((item) => deepMapKeys(item, mapper))
+  }
+  if (isPlainObject(input)) {
+    const result = {}
+    Object.keys(input).forEach((key) => {
+      const mappedKey = mapper(key)
+      result[mappedKey] = deepMapKeys(input[key], mapper)
+    })
+    return result
+  }
+  return input
+}
+
+const deepCamelCase = (input) => deepMapKeys(input, toCamel)
+const deepSnakeCase = (input) => deepMapKeys(input, toSnake)
+
+// 过滤空值：undefined、null、空字符串
+const filterEmpty = (input) => {
+  if (Array.isArray(input)) {
+    return input.map((v) => filterEmpty(v))
+  }
+  if (isPlainObject(input)) {
+    const result = {}
+    Object.keys(input).forEach((k) => {
+      const v = filterEmpty(input[k])
+      const isEmptyString = typeof v === 'string' && v.trim() === ''
+      if (v !== undefined && v !== null && !isEmptyString) {
+        result[k] = v
+      }
+    })
+    return result
+  }
+  return input
+}
+
+// 白名单：跳过大小写转换的 URL（支持字符串前缀或正则）
+const caseConvertSkipList = [
+  /^\/auth\//, // 登录/刷新等
+]
+const shouldSkipCaseConvert = (url) => {
+  if (!url) return false
+  return caseConvertSkipList.some((rule) => {
+    if (typeof rule === 'string') return url.startsWith(rule)
+    if (rule instanceof RegExp) return rule.test(url)
+    return false
+  })
+}
+
 // 创建axios实例
 const request = axios.create({
-  baseURL: 'http://localhost:4000', // 后端API地址
-  timeout: 5000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: '/api',
+  timeout: 10000,
+  headers: { 'Content-Type': 'application/json' }
 })
 
 // 请求拦截器
 request.interceptors.request.use(
-  config => {
-    // 在发送请求之前做些什么，例如加入token
+  (config) => {
+    // token
     const token = localStorage.getItem('admin-token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // 路径去重：若 baseURL 已含 /api，且 url 以 /api/ 开头则去掉前缀
+    if (typeof config.url === 'string' && config.url.startsWith('/api/')) {
+      config.url = config.url.replace(/^\/api\//, '/')
+    }
+
+    // 出站：统一转换为 snake_case，并过滤空值
+    if (config.params) {
+      config.params = deepSnakeCase(filterEmpty(config.params))
+    }
+    if (config.data) {
+      config.data = deepSnakeCase(filterEmpty(config.data))
+    }
+
     return config
   },
-  error => {
-    // 对请求错误做些什么
-    console.error('请求错误:', error)
+  (error) => {
+    console.error('[Admin][HTTP请求错误]', error)
     return Promise.reject(error)
   }
 )
 
 // 响应拦截器
 request.interceptors.response.use(
-  response => {
-    // 对响应数据做点什么
-    const res = response.data
-    
-    // 处理后端返回的双层嵌套结构 {success:true，data:{xxx：[]}}
-    if (res.success) {
-      return res
-    }
-    
-    // 如果返回的状态码为200，说明接口请求成功，可以正常拿到数据
-    if (res.code === 200) {
-      return res
+  (response) => {
+    const raw = response?.data
+
+    // 标准化：解包 {success,data} 的二次 data；其余包裹为 success=true
+    let success = true
+    let code = response.status
+    let message = ''
+    let payload
+
+    if (raw && typeof raw === 'object' && 'success' in raw) {
+      success = Boolean(raw.success)
+      code = raw.code ?? code
+      message = raw.message ?? ''
+      payload = 'data' in raw ? raw.data : undefined
     } else {
-      // 否则的话抛出错误
-      ElMessage.error(res.message || '请求失败')
-      return Promise.reject(new Error(res.message || '请求失败'))
+      payload = raw
     }
+
+    // 字段命名：入站转换为 camelCase（支持按 URL 白名单跳过）
+    const skip = shouldSkipCaseConvert(response?.config?.url)
+    const dataCamel = skip ? payload : deepCamelCase(payload)
+
+    const normalized = {
+      success,
+      data: dataCamel,
+      message,
+      code,
+      raw
+    }
+
+    // 兼容旧用法：调用方仍可用 response.data.xxx 访问
+    return normalized
   },
-  error => {
-    // 对响应错误做点什么
-    console.error('响应错误:', error)
+  (error) => {
+    console.error('[Admin][HTTP响应错误]', error)
     if (error.response) {
-      switch (error.response.status) {
+      const { status, data } = error.response
+      const serverMsg = (data && (data.message || data.msg)) || error.message || '请求失败'
+      switch (status) {
         case 401:
-          ElMessage.error('未授权，请登录')
-          // 清除token并跳转到登录页
+          ElMessage.error('未授权，请重新登录')
           localStorage.removeItem('admin-token')
           localStorage.removeItem('admin-user')
           window.location.href = '/login'
@@ -63,16 +147,16 @@ request.interceptors.response.use(
           ElMessage.error('拒绝访问')
           break
         case 404:
-          ElMessage.error('请求地址出错')
+          ElMessage.error('请求地址不存在')
           break
         case 500:
           ElMessage.error('服务器内部错误')
           break
         default:
-          ElMessage.error(`连接出错${error.response.status}`)
+          ElMessage.error(serverMsg)
       }
     } else {
-      ElMessage.error('连接服务器失败')
+      ElMessage.error('网络错误，请检查网络连接')
     }
     return Promise.reject(error)
   }

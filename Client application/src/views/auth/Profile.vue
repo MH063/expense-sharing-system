@@ -434,53 +434,28 @@ const loadProfile = async () => {
       profileForm.bio = profile.bio
     }
     
-    // 模拟加载登录活动记录
-    console.log('加载登录活动记录')
-    const mockLoginActivities = [
-      {
-        id: 'activity-1',
-        device: 'Chrome浏览器 / Windows 10',
-        location: '北京市朝阳区',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        status: 'current'
-      },
-      {
-        id: 'activity-2',
-        device: 'Safari浏览器 / iPhone 14',
-        location: '北京市海淀区',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        status: 'exited'
-      },
-      {
-        id: 'activity-3',
-        device: 'Chrome浏览器 / macOS',
-        location: '上海市浦东新区',
-        timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'exited'
+    // 加载用户活动日志
+    try {
+      const { userApi } = await import('@/api/user')
+      const respLogs = await userApi.getUserActivityLogs({ page: 1, limit: 20 })
+      if (respLogs?.data?.success) {
+        loginActivities.value = respLogs.data.data || []
+      } else {
+        loginActivities.value = []
       }
-    ]
-    loginActivities.value = mockLoginActivities
+    } catch (error) {
+      console.error('加载用户活动日志失败:', error)
+      loginActivities.value = []
+    }
     
     // 加载通知设置
-    console.log('加载通知设置')
     try {
-      const response = await fetch('/api/notification-settings', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authStore.token}`
-        }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          Object.assign(notificationSettings, data.data)
-        } else {
-          console.error('加载通知设置失败:', data.message)
-        }
+      const { userApi } = await import('@/api/user')
+      const resp = await userApi.getUserSettings()
+      if (resp?.data?.success) {
+        Object.assign(notificationSettings, resp.data.data)
       } else {
-        console.error('加载通知设置失败:', response.statusText)
+        console.error('加载通知设置失败:', resp?.data?.message)
       }
     } catch (error) {
       console.error('加载通知设置失败:', error)
@@ -529,19 +504,16 @@ const updateProfile = async () => {
   successMessage.value = ''
   
   try {
-    // 模拟API调用
-    console.log('更新个人资料:', profileForm)
+    // 调用真实API
+    const { userApi } = await import('@/api/user')
+    const resp = await userApi.updateProfile({
+      username: profileForm.username,
+      email: profileForm.email,
+      displayName: profileForm.displayName,
+      bio: profileForm.bio
+    })
     
-    // 模拟API响应
-    const mockResponse = {
-      success: true,
-      data: {
-        ...profileForm,
-        updatedAt: new Date().toISOString()
-      }
-    }
-    
-    if (mockResponse.success) {
+    if (resp?.data?.success) {
       // 更新本地状态
       profile.username = profileForm.username
       profile.email = profileForm.email
@@ -555,7 +527,7 @@ const updateProfile = async () => {
         successMessage.value = ''
       }, 3000)
     } else {
-      errorMessage.value = '更新个人资料失败'
+      errorMessage.value = resp?.data?.message || '更新个人资料失败'
     }
   } catch (error) {
     console.error('更新个人资料失败:', error)
@@ -605,38 +577,19 @@ const changePassword = async () => {
   try {
     console.log('修改密码')
     
-    const response = await fetch('/api/users/password', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authStore.token}`
-      },
-      body: JSON.stringify({
-        currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword
-      })
+    const { userApi } = await import('@/api/user')
+    const resp = await userApi.changePassword({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword
     })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success) {
-        // 重置表单
-        passwordForm.currentPassword = ''
-        passwordForm.newPassword = ''
-        passwordForm.confirmPassword = ''
-        
-        successMessage.value = '密码修改成功'
-        
-        // 3秒后隐藏成功消息
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 3000)
-      } else {
-        errorMessage.value = data.message || '密码修改失败'
-      }
+    if (resp?.data?.success) {
+      passwordForm.currentPassword = ''
+      passwordForm.newPassword = ''
+      passwordForm.confirmPassword = ''
+      successMessage.value = '密码修改成功'
+      setTimeout(() => { successMessage.value = '' }, 3000)
     } else {
-      const errorData = await response.json()
-      errorMessage.value = errorData.message || `密码修改失败: ${response.statusText}`
+      errorMessage.value = resp?.data?.message || '密码修改失败'
     }
   } catch (error) {
     console.error('修改密码失败:', error)
@@ -651,29 +604,13 @@ const updateNotificationSettings = async () => {
   try {
     console.log('更新通知设置:', notificationSettings)
     
-    const response = await fetch('/api/notification-settings', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authStore.token}`
-      },
-      body: JSON.stringify(notificationSettings)
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success) {
-        successMessage.value = '通知设置已更新'
-        
-        // 3秒后隐藏成功消息
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 3000)
-      } else {
-        errorMessage.value = data.message || '更新通知设置失败'
-      }
+    const { userApi } = await import('@/api/user')
+    const resp = await userApi.updateUserSettings(notificationSettings)
+    if (resp?.data?.success) {
+      successMessage.value = '通知设置已更新'
+      setTimeout(() => { successMessage.value = '' }, 3000)
     } else {
-      errorMessage.value = `更新通知设置失败: ${response.statusText}`
+      errorMessage.value = resp?.data?.message || '更新通知设置失败'
     }
   } catch (error) {
     console.error('更新通知设置失败:', error)
@@ -744,25 +681,20 @@ const uploadAvatar = async () => {
   errorMessage.value = ''
   
   try {
-    // 模拟API调用
-    console.log('上传头像')
-    
-    // 模拟上传成功，生成一个随机头像URL
-    const avatarUrl = `https://picsum.photos/seed/avatar${Date.now()}/200/200.jpg`
-    
-    // 更新头像
-    profile.avatar = avatarUrl
-    
-    // 关闭弹窗
-    showAvatarUpload.value = false
-    selectedAvatar.value = ''
-    
-    successMessage.value = '头像上传成功'
-    
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
+    const { userApi } = await import('@/api/user')
+    const blob = await (await fetch(selectedAvatar.value)).blob()
+    const formData = new FormData()
+    formData.append('avatar', blob, 'avatar.png')
+    const resp = await userApi.uploadAvatar(formData)
+    if (resp?.data?.success) {
+      profile.avatar = resp.data.data?.avatar || profile.avatar
+      showAvatarUpload.value = false
+      selectedAvatar.value = ''
+      successMessage.value = '头像上传成功'
+      setTimeout(() => { successMessage.value = '' }, 3000)
+    } else {
+      errorMessage.value = resp?.data?.message || '头像上传失败'
+    }
     
   } catch (error) {
     console.error('上传头像失败:', error)

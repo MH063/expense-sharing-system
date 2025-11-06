@@ -516,6 +516,7 @@ const resetFilters = () => {
     maxAmount: ''
   }
   currentPage.value = 1
+  loadBills()
 }
 
 // 创建账单
@@ -535,92 +536,23 @@ const loadBills = async () => {
   try {
     console.log('开始加载账单数据...')
     
-    // 模拟账单数据
-    bills.value = [
-      {
-        id: 'bill-1',
-        title: '10月水电费',
-        total_amount: 230.50,
-        amount: 230.50,
-        status: 'pending',
-        creator_id: 'user-1',
-        creator_name: '张三',
-        creatorName: '张三',
-        due_date: '2023-10-25',
-        dueDate: '2023-10-25',
-        created_at: '2023-10-01',
-        createdAt: '2023-10-01',
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      },
-      {
-        id: 'bill-2',
-        title: '网费',
-        total_amount: 99.00,
-        amount: 99.00,
-        status: 'paid',
-        creator_id: 'user-2',
-        creator_name: '李四',
-        creatorName: '李四',
-        due_date: '2023-10-15',
-        dueDate: '2023-10-15',
-        created_at: '2023-09-30',
-        createdAt: '2023-09-30',
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      },
-      {
-        id: 'bill-3',
-        title: '聚餐费用',
-        total_amount: 450.00,
-        amount: 450.00,
-        status: 'overdue',
-        creator_id: 'user-3',
-        creator_name: '王五',
-        creatorName: '王五',
-        due_date: '2023-10-05',
-        dueDate: '2023-10-05',
-        created_at: '2023-09-28',
-        createdAt: '2023-09-28',
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      },
-      {
-        id: 'bill-4',
-        title: '日用品采购',
-        total_amount: 186.80,
-        amount: 186.80,
-        status: 'partial',
-        creator_id: 'user-1',
-        creator_name: '张三',
-        creatorName: '张三',
-        due_date: '2023-10-20',
-        dueDate: '2023-10-20',
-        created_at: '2023-10-02',
-        createdAt: '2023-10-02',
-        participants: [
-          { id: 'user-1', name: '张三' },
-          { id: 'user-2', name: '李四' },
-          { id: 'user-3', name: '王五' }
-        ]
-      }
-    ]
-    
-    // 模拟房间成员数据
-    members.value = [
-      { id: 'user-1', name: '张三', user_id: 'user-1' },
-      { id: 'user-2', name: '李四', user_id: 'user-2' },
-      { id: 'user-3', name: '王五', user_id: 'user-3' }
-    ]
+    // 调用真实后端接口获取账单列表
+    const resp = await (await import('@/api/bills')).billApi.getBills({
+      page: currentPage.value,
+      limit: itemsPerPage.value,
+      status: filters.value.status || undefined,
+      creator: filters.value.creator || undefined,
+      startDate: filters.value.startDate || undefined,
+      endDate: filters.value.endDate || undefined,
+      minAmount: filters.value.minAmount || undefined,
+      maxAmount: filters.value.maxAmount || undefined
+    })
+    if (resp.success && resp.data) {
+      bills.value = Array.isArray(resp.data) ? resp.data : (resp.data.data || [])
+    } else {
+      bills.value = []
+      console.error('账单列表加载失败:', resp.message || '未知错误')
+    }
     
     // 计算统计数据
     stats.value = {

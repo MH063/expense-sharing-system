@@ -110,7 +110,7 @@ const RoomMember = sequelize.define('RoomMember', {
     defaultValue: Sequelize.NOW
   }
 }, {
-  tableName: 'user_room_relations',
+  tableName: 'room_members',
   underscored: true,
   timestamps: true,
   createdAt: 'created_at',

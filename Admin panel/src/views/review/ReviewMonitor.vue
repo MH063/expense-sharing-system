@@ -259,7 +259,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Download, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
-import { expenseApi } from '@/api'
+import { expenseApi, statisticsApi } from '@/api'
 
 // 统计数据
 const pendingCount = ref(0)
@@ -316,39 +316,17 @@ const assignFormRules = {
 // 获取统计数据
 const fetchStatistics = async () => {
   try {
-    // 尝试从API获取数据
-    try {
-      const response = await expenseApi.getReviewStatistics()
-      if (response.data.success) {
-        const data = response.data.data
-        pendingCount.value = data.pendingCount || 0
-        pendingTrend.value = data.pendingTrend || 0
-        todayReviewedCount.value = data.todayReviewedCount || 0
-        completionRate.value = data.completionRate || 0
-        avgReviewTime.value = data.avgReviewTime || 0
-        timeTrend.value = data.timeTrend || 0
-        overdueCount.value = data.overdueCount || 0
-        overdueTrend.value = data.overdueTrend || 0
-        return
-      }
-    } catch (apiError) {
-      console.log('API不可用，使用模拟数据')
+    const resp = await statisticsApi.getSystemOverview()
+    if (resp && resp.success) {
+      const data = resp.data || {}
+      pendingCount.value = data.pendingReviews || data.pendingCount || 0
+      todayReviewedCount.value = data.todayReviewed || 0
+      completionRate.value = data.completionRate || 0
+      avgReviewTime.value = data.avgReviewTime || 0
+      overdueCount.value = data.overdueReviews || 0
     }
-    
-    // 如果API不可用，使用模拟数据
-    pendingCount.value = 23
-    pendingTrend.value = 5
-    todayReviewedCount.value = 18
-    completionRate.value = 78
-    avgReviewTime.value = 4.2
-    timeTrend.value = -0.5
-    overdueCount.value = 3
-    overdueTrend.value = -1
-    
-    ElMessage.info('当前使用模拟数据')
   } catch (error) {
     console.error('获取统计数据错误:', error)
-    throw new Error('获取统计数据错误')
   }
 }
 
@@ -358,25 +336,21 @@ const fetchReviewList = async () => {
     const params = {
       page: currentPage.value,
       pageSize: pageSize.value,
-      type: filterType.value,
-      status: filterStatus.value,
-      priority: filterPriority.value
+      type: filterType.value || undefined,
+      status: filterStatus.value || undefined,
+      priority: filterPriority.value || undefined
     }
-    
-    // 尝试从API获取数据
-    try {
-      const response = await expenseApi.getReviewList(params)
-      if (response.data.success) {
-        reviewList.value = response.data.data.list || []
-        totalReviews.value = response.data.data.total || 0
-        return
-      }
-    } catch (apiError) {
-      console.log('API不可用，使用模拟数据')
+    const response = await expenseApi.getPendingExpenses(params)
+    if (response && response.success) {
+      const data = response.data
+      reviewList.value = Array.isArray(data) ? data : (data.list || data.data || [])
+      totalReviews.value = data.total || reviewList.value.length
     }
-    
-    // 如果API不可用，使用模拟数据
-    const mockData = [
+  } catch (error) {
+    console.error('获取审核列表错误:', error)
+    throw new Error('获取审核列表错误')
+  }
+}
       {
         id: 1001,
         type: 'expense',
@@ -687,9 +661,9 @@ const filterReviews = async () => {
 // 查看审核详情
 const viewReview = async (review) => {
   try {
-    const response = await expenseApi.getReviewDetail(review.id)
-    if (response.data.success) {
-      currentReview.value = response.data.data
+    const response = await expenseApi.getExpenseDetail(review.id)
+    if (response && response.success) {
+      currentReview.value = response.data
       showReviewDetailDialog.value = true
     } else {
       ElMessage.error('获取审核详情失败')
@@ -720,12 +694,11 @@ const submitAssign = async () => {
     if (valid) {
       try {
         const data = {
-          reviewId: assignForm.reviewId,
           reviewerId: assignForm.reviewerId,
           comment: assignForm.comment
         }
-        const response = await expenseApi.assignReviewer(data)
-        if (response.data.success) {
+        const response = await expenseApi.reviewExpense(assignForm.reviewId, { action: 'assign', ...data })
+        if (response && response.success) {
           ElMessage.success('分配成功')
           showAssignDialog.value = false
           fetchReviewList()
@@ -750,13 +723,8 @@ const approveReview = () => {
   })
     .then(async ({ value }) => {
       try {
-        const data = {
-          reviewId: currentReview.value.id,
-          action: 'approve',
-          comment: value || '审核通过'
-        }
-        const response = await expenseApi.processReview(data)
-        if (response.data.success) {
+        const response = await expenseApi.reviewExpense(currentReview.value.id, { action: 'approve', comment: value || '审核通过' })
+        if (response && response.success) {
           ElMessage.success('审核已通过')
           showReviewDetailDialog.value = false
           fetchReviewList()
@@ -784,13 +752,8 @@ const rejectReview = () => {
   })
     .then(async ({ value }) => {
       try {
-        const data = {
-          reviewId: currentReview.value.id,
-          action: 'reject',
-          comment: value || '审核拒绝'
-        }
-        const response = await expenseApi.processReview(data)
-        if (response.data.success) {
+        const response = await expenseApi.reviewExpense(currentReview.value.id, { action: 'reject', comment: value || '审核拒绝' })
+        if (response && response.success) {
           ElMessage.success('审核已拒绝')
           showReviewDetailDialog.value = false
           fetchReviewList()

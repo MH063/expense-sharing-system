@@ -34,7 +34,7 @@ export const notificationApi = {
    */
   markAsRead(id) {
     console.log('标记通知为已读，ID:', id);
-    return http.patch(`/notifications/${id}/read`);
+    return http.put(`/notifications/${id}/read`);
   },
 
   /**
@@ -43,7 +43,7 @@ export const notificationApi = {
    */
   markAllAsRead() {
     console.log('批量标记通知为已读');
-    return http.patch('/notifications/mark-all-read');
+    return http.put('/notifications/mark-all-read');
   },
 
   /**
@@ -83,7 +83,7 @@ export const notificationApi = {
    */
   getPaymentStatusNotifications(params = {}) {
     console.log('获取支付状态变更通知，参数:', params);
-    return http.get('/notifications/payment-status-notifications', { params });
+    return http.get('/notifications/payment-status-changes', { params });
   }
 };
 

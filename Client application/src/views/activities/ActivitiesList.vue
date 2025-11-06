@@ -138,140 +138,24 @@ const loadActivities = async () => {
       endDate: filterForm.dateRange?.[1]
     })
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 800))
+    const resp = await analyticsApi.getRecentActivities({
+      page: pagination.currentPage,
+      limit: pagination.pageSize,
+      type: filterForm.type || undefined,
+      startDate: filterForm.dateRange?.[0] || undefined,
+      endDate: filterForm.dateRange?.[1] || undefined
+    })
     
-    // 模拟返回数据
-    const mockActivities = [
-      {
-        id: 1,
-        type: 'expense',
-        title: '张三创建了新的费用',
-        description: '10月份电费，金额：150.00元',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        details: {
-          amount: 150.00,
-          category: '电费',
-          period: '2023-10',
-          participants: ['张三', '李四', '王五']
-        }
-      },
-      {
-        id: 2,
-        type: 'payment',
-        title: '李四完成了支付',
-        description: '支付了10月份水费，金额：80.00元',
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        details: {
-          amount: 80.00,
-          category: '水费',
-          period: '2023-10',
-          paymentMethod: '支付宝'
-        }
-      },
-      {
-        id: 3,
-        type: 'room',
-        title: '王五加入了房间',
-        description: '加入了"101宿舍"房间',
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-        details: {
-          roomName: '101宿舍',
-          roomCode: 'ROOM101',
-          invitedBy: '赵六'
-        }
-      },
-      {
-        id: 4,
-        type: 'user',
-        title: '新用户注册',
-        description: '用户赵六注册了账号',
-        timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-        details: {
-          username: '赵六',
-          email: 'zhaoliu@example.com',
-          registrationIP: '192.168.1.100'
-        }
-      },
-      {
-        id: 5,
-        type: 'dispute',
-        title: '争议已解决',
-        description: '关于网费分摊的争议已解决',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        details: {
-          disputeId: 'DISPUTE001',
-          category: '网费分摊',
-          resolution: '按使用时长分摊',
-          resolvedBy: '管理员'
-        }
-      },
-      {
-        id: 6,
-        type: 'expense',
-        title: '钱七创建了新的费用',
-        description: '11月份网费，金额：100.00元',
-        timestamp: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
-        details: {
-          amount: 100.00,
-          category: '网费',
-          period: '2023-11',
-          participants: ['钱七', '孙八', '周九']
-        }
-      },
-      {
-        id: 7,
-        type: 'payment',
-        title: '孙八完成了支付',
-        description: '支付了11月份物业费，金额：120.00元',
-        timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-        details: {
-          amount: 120.00,
-          category: '物业费',
-          period: '2023-11',
-          paymentMethod: '微信支付'
-        }
-      },
-      {
-        id: 8,
-        type: 'room',
-        title: '周九创建了新房间',
-        description: '创建了"201宿舍"房间',
-        timestamp: new Date(Date.now() - 60 * 60 * 60 * 1000).toISOString(),
-        details: {
-          roomName: '201宿舍',
-          roomCode: 'ROOM201',
-          maxMembers: 4
-        }
-      }
-    ]
-    
-    // 应用筛选
-    let filteredActivities = mockActivities
-    if (filterForm.type) {
-      filteredActivities = filteredActivities.filter(activity => activity.type === filterForm.type)
+    if (resp?.data?.success) {
+      const payload = resp.data.data
+      const list = Array.isArray(payload) ? payload : (payload?.data || [])
+      const total = Array.isArray(payload) ? list.length : (payload?.total || 0)
+      activities.value = list
+      pagination.total = total
+      console.log('获取活动列表成功:', activities.value.length)
+    } else {
+      ElMessage.error(resp?.data?.message || '加载活动列表失败')
     }
-    
-    if (filterForm.dateRange && filterForm.dateRange.length === 2) {
-      const startDate = new Date(filterForm.dateRange[0])
-      const endDate = new Date(filterForm.dateRange[1])
-      endDate.setHours(23, 59, 59, 999) // 包含整天
-      
-      filteredActivities = filteredActivities.filter(activity => {
-        const activityDate = new Date(activity.timestamp)
-        return activityDate >= startDate && activityDate <= endDate
-      })
-    }
-    
-    // 更新分页信息
-    pagination.total = filteredActivities.length
-    
-    // 应用分页
-    const startIndex = (pagination.currentPage - 1) * pagination.pageSize
-    const endIndex = startIndex + pagination.pageSize
-    activities.value = filteredActivities.slice(startIndex, endIndex)
-    
-    console.log('获取活动列表成功:', activities.value.length)
   } catch (error) {
     console.error('加载活动列表失败:', error)
     ElMessage.error('加载活动列表失败')

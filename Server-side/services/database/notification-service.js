@@ -271,9 +271,9 @@ class NotificationService extends BaseService {
     
     // 获取房间成员（不包括创建者）
     const membersSql = `
-      SELECT urr.user_id
-      FROM user_room_relations urr
-      WHERE urr.room_id = $1 AND urr.is_active = $2 AND urr.user_id != $3
+      SELECT rm.user_id
+      FROM room_members rm
+      WHERE rm.room_id = $1 AND rm.is_active = $2 AND rm.user_id != $3
     `;
     const membersResult = await this.query(membersSql, [bill.room_id, true, bill.creator_id]);
     

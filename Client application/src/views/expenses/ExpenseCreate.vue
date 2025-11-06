@@ -338,7 +338,7 @@ const loadRoomMembers = async () => {
 
   try {
     console.log('加载房间成员，房间ID:', roomId.value)
-    const response = await roomsApi.getRoomById(roomId.value)
+    const response = await roomsApi.getRoomDetail(roomId.value)
     
     if (response.data && response.data.success) {
       const room = response.data.data
@@ -556,12 +556,21 @@ const beforeUpload = (file) => {
 /**
  * 上传成功回调
  */
-const handleUploadSuccess = (response, uploadFile) => {
-  // 模拟上传成功
-  const mockUrl = `https://picsum.photos/seed/receipt${Date.now()}/400/600.jpg`
-  expenseForm.receipt.push(mockUrl)
-  ElMessage.success('上传成功')
-  console.log('上传成功，图片URL:', mockUrl)
+const handleUploadSuccess = async (response, uploadFile) => {
+  try {
+    // 使用真实的API上传文件
+    if (response && response.success) {
+      const fileUrl = response.data.url
+      expenseForm.receipt.push(fileUrl)
+      ElMessage.success('上传成功')
+      console.log('上传成功，图片URL:', fileUrl)
+    } else {
+      ElMessage.error(response?.message || '上传失败')
+    }
+  } catch (error) {
+    console.error('上传收据失败:', error)
+    ElMessage.error('上传收据失败')
+  }
 }
 
 /**

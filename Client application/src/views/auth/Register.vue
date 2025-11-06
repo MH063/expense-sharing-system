@@ -288,39 +288,17 @@ const handleRegister = async () => {
   errorMessage.value = ''
   
   try {
-    // 模拟API调用
-    console.log('模拟注册API调用:', {
+    const { authApi } = await import('@/api/user')
+    const resp = await authApi.register({
       username: registerForm.username,
       email: registerForm.email,
       password: registerForm.password
     })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    // 模拟注册成功响应
-    const mockResponse = {
-      success: true,
-      data: {
-        user: {
-          id: Date.now(),
-          username: registerForm.username,
-          email: registerForm.email,
-          avatar: 'https://picsum.photos/seed/user' + Date.now() + '/200/200.jpg',
-          roles: ['user'],
-          permissions: ['read', 'write']
-        },
-        message: '注册成功'
-      }
+    if (resp?.data?.success) {
+      router.push({ path: '/auth/login', query: { registered: 'true' } })
+    } else {
+      errorMessage.value = resp?.data?.message || '注册失败，请稍后再试'
     }
-    
-    console.log('模拟注册成功:', mockResponse)
-    
-    // 注册成功，跳转到登录页面
-    router.push({
-      path: '/auth/login',
-      query: { registered: 'true' }
-    })
   } catch (error) {
     console.error('注册失败:', error)
     errorMessage.value = error.message || '注册失败，请稍后再试'

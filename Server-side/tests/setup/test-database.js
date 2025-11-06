@@ -66,13 +66,13 @@ function setupSequelize() {
     }
   });
   
-  const RoomMember = sequelize.define('user_room_relations', {
+  const RoomMember = sequelize.define('room_members', {
     id: { type: DataTypes.UUID, primaryKey: true, defaultValue: Sequelize.literal('gen_random_uuid()') },
     user_id: { type: DataTypes.UUID, allowNull: false },
     room_id: { type: DataTypes.UUID, allowNull: false },
     relation_type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'member' },
     is_active: { type: DataTypes.BOOLEAN, defaultValue: true }
-  }, { tableName: 'user_room_relations' });
+  }, { tableName: 'room_members' });
   
   RoomMember.beforeCreate((rm) => {
     if (rm.dataValues.role) {
@@ -296,13 +296,13 @@ async function initTestDatabase() {
     }
   });
 
-  const RoomMember = sequelize.define('user_room_relations', {
+  const RoomMember = sequelize.define('room_members', {
     id: { type: DataTypes.STRING, primaryKey: true },
     user_id: { type: DataTypes.STRING, allowNull: false },
     room_id: { type: DataTypes.STRING, allowNull: false },
     relation_type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'member' },
     is_active: { type: DataTypes.INTEGER, defaultValue: 1 }
-  }, { tableName: 'user_room_relations' });
+  }, { tableName: 'room_members' });
 
   // 兼容测试的 role -> relation_type 映射
   RoomMember.beforeCreate((rm) => {

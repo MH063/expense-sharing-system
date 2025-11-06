@@ -114,7 +114,7 @@ const clearTestDatabase = async () => {
       'offline_payments',
       'payment_transfers',
       'bills',
-      'user_room_relations',
+      'room_members',
       'rooms',
       'users',
       'notifications',

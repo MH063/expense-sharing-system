@@ -222,9 +222,9 @@ class BillService extends BaseService {
       FROM bills b
       LEFT JOIN users u ON b.creator_id = u.id
       LEFT JOIN payments p ON b.id = p.bill_id
-      LEFT JOIN user_room_relations urr ON b.room_id = urr.room_id
-      WHERE (b.creator_id = $1 OR p.user_id = $1 OR urr.user_id = $1)
-      AND urr.is_active = $2
+      LEFT JOIN room_members rm ON b.room_id = rm.room_id
+      WHERE (b.creator_id = $1 OR p.user_id = $1 OR rm.user_id = $1)
+      AND rm.is_active = $2
     `;
     const params = [userId, true];
     let paramIndex = 3;

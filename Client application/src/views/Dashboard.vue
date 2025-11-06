@@ -301,7 +301,8 @@ const loadStats = async () => {
     console.log('用户统计数据响应:', response)
     
     // 处理后端返回的数据结构 {success: true, data: {...}}
-    if (response.success && response.data) {
+    // http.js已经处理了响应结构，response已经是 {success: true, data: {...}} 格式
+    if (response && response.success && response.data) {
       const data = response.data
       stats.totalExpense = data.totalExpense || '0.00'
       stats.myExpense = data.myExpense || '0.00'
@@ -328,9 +329,11 @@ const loadRecentActivities = async () => {
     console.log('最近活动数据响应:', response)
     
     // 处理后端返回的数据结构 {success: true, data: {...}}
-    if (response.success && response.data) {
+    // http.js已经处理了响应结构，response已经是 {success: true, data: {...}} 格式
+    if (response && response.success && response.data) {
       // 将通知数据转换为活动数据格式
-      recentActivities.value = response.data.map(notification => {
+      const notifications = Array.isArray(response.data) ? response.data : []
+      recentActivities.value = notifications.map(notification => {
         return {
           type: 'notification',
           title: notification.title || '新通知',
@@ -356,9 +359,11 @@ const loadTodoList = async () => {
     console.log('待办事项数据响应:', response)
     
     // 处理后端返回的数据结构 {success: true, data: {...}}
-    if (response.success && response.data) {
+    // http.js已经处理了响应结构，response已经是 {success: true, data: {...}} 格式
+    if (response && response.success && response.data) {
       // 将账单数据转换为待办事项数据格式
-      todoList.value = response.data.map(bill => {
+      const bills = Array.isArray(response.data) ? response.data : []
+      todoList.value = bills.map(bill => {
         return {
           type: 'payment',
           title: bill.title || '待支付账单',
@@ -394,7 +399,8 @@ const loadChartData = async () => {
     console.log('图表数据响应:', response)
     
     // 处理后端返回的数据结构 {success: true, data: {...}}
-    if (response.success && response.data) {
+    // http.js已经处理了响应结构，response已经是 {success: true, data: {...}} 格式
+    if (response && response.success && response.data) {
       // 根据周期更新图表数据
       updateChartData(response.data)
     } else {

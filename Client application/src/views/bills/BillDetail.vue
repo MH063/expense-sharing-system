@@ -617,23 +617,24 @@ const addComment = async () => {
   if (!newComment.value.trim()) return
   
   try {
-    // const comment = await api.addComment(bill.value.id, newComment.value)
+    console.log('添加评论:', bill.value.id, newComment.value)
     
-    // 模拟添加评论
-    const comment = {
-      id: `comment-${Date.now()}`,
-      authorId: authStore.user.id,
-      authorName: authStore.user.name,
-      text: newComment.value,
-      createdAt: new Date().toISOString()
+    // 调用API添加评论
+    const response = await billAPI.addComment(bill.value.id, {
+      text: newComment.value
+    })
+    
+    if (response && response.success) {
+      // 添加评论到列表
+      comments.value.push(response.data)
+      newComment.value = ''
+      ElMessage.success('评论添加成功')
+    } else {
+      ElMessage.error('添加评论失败，请稍后再试')
     }
-    
-    comments.value.push(comment)
-    newComment.value = ''
-    
   } catch (error) {
     console.error('添加评论失败:', error)
-    // 显示错误提示
+    ElMessage.error('添加评论失败，请稍后再试')
   }
 }
 

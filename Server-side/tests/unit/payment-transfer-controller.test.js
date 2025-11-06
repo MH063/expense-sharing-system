@@ -25,7 +25,7 @@ describe('Payment Transfer Controller', () => {
 
     // 将用户添加到房间
     await pool.query(
-      'INSERT INTO user_room_relations (user_id, room_id) VALUES ($1, $2)',
+      'INSERT INTO room_members (user_id, room_id) VALUES ($1, $2)',
       [testUser.id, testRoom.id]
     );
 
@@ -41,7 +41,7 @@ describe('Payment Transfer Controller', () => {
     // 清理测试数据
     await pool.query('DELETE FROM payment_transfers WHERE bill_id = $1', [testBill.id]);
     await pool.query('DELETE FROM bills WHERE id = $1', [testBill.id]);
-    await pool.query('DELETE FROM user_room_relations WHERE room_id = $1', [testRoom.id]);
+    await pool.query('DELETE FROM room_members WHERE room_id = $1', [testRoom.id]);
     await pool.query('DELETE FROM rooms WHERE id = $1', [testRoom.id]);
     await pool.query('DELETE FROM users WHERE id = $1', [testUser.id]);
     await pool.end();

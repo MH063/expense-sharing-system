@@ -108,6 +108,23 @@ export const userApi = {
     })
   },
   
+  // 更新用户状态
+  updateUserStatus: (id, status) => {
+    return request({
+      url: `/api/admin/users/${id}/status`,
+      method: 'put',
+      data: { status }
+    })
+  },
+  
+  // 重置用户密码
+  resetUserPassword: (id) => {
+    return request({
+      url: `/api/admin/users/${id}/reset-password`,
+      method: 'post'
+    })
+  },
+  
   // 删除用户
   deleteUser: (id) => {
     return request({

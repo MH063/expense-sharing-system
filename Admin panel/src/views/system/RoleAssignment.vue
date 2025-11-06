@@ -337,131 +337,21 @@ import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
-// 模拟角色数据
-const roleList = ref([
-  {
-    id: 1,
-    name: 'admin',
-    description: '系统管理员，拥有所有权限',
-    permissions: ['user_manage', 'role_manage', 'expense_review', 'expense_monitor', 'system_config', 'data_export', 'system_logs'],
-    userCount: 1,
-    createTime: '2023-01-01 10:00:00',
-    status: 'active'
-  },
-  {
-    id: 2,
-    name: 'dorm_leader',
-    description: '寝室负责人，可以管理寝室成员和费用',
-    permissions: ['user_manage', 'expense_review', 'expense_monitor'],
-    userCount: 5,
-    createTime: '2023-01-02 10:00:00',
-    status: 'active'
-  },
-  {
-    id: 3,
-    name: 'user',
-    description: '普通用户，只能查看和管理自己的费用',
-    permissions: ['expense_monitor'],
-    userCount: 20,
-    createTime: '2023-01-03 10:00:00',
-    status: 'active'
-  }
-])
+// 角色列表（来自真实接口）
+const roleList = ref([])
 
-// 模拟用户角色数据
-const userRoleList = ref([
-  {
-    id: 1,
-    userId: '1001',
-    username: 'admin',
-    realName: '系统管理员',
-    avatar: 'https://picsum.photos/seed/admin/40/40.jpg',
-    role: 'admin',
-    roleName: '系统管理员',
-    assignTime: '2023-01-01 10:00:00',
-    assignBy: '系统',
-    status: 'active'
-  },
-  {
-    id: 2,
-    userId: '1002',
-    username: 'dorm_leader1',
-    realName: '寝室长一',
-    avatar: 'https://picsum.photos/seed/dorm1/40/40.jpg',
-    role: 'dorm_leader',
-    roleName: '寝室负责人',
-    assignTime: '2023-01-02 10:00:00',
-    assignBy: 'admin',
-    status: 'active'
-  },
-  {
-    id: 3,
-    userId: '1003',
-    username: 'dorm_leader2',
-    realName: '寝室长二',
-    avatar: 'https://picsum.photos/seed/dorm2/40/40.jpg',
-    role: 'dorm_leader',
-    roleName: '寝室负责人',
-    assignTime: '2023-01-03 10:00:00',
-    assignBy: 'admin',
-    status: 'active'
-  },
-  {
-    id: 4,
-    userId: '1004',
-    username: 'user1',
-    realName: '用户一',
-    avatar: 'https://picsum.photos/seed/user1/40/40.jpg',
-    role: 'user',
-    roleName: '普通用户',
-    assignTime: '2023-01-04 10:00:00',
-    assignBy: 'admin',
-    status: 'active'
-  },
-  {
-    id: 5,
-    userId: '1005',
-    username: 'user2',
-    realName: '用户二',
-    avatar: 'https://picsum.photos/seed/user2/40/40.jpg',
-    role: 'user',
-    roleName: '普通用户',
-    assignTime: '2023-01-05 10:00:00',
-    assignBy: 'admin',
-    status: 'active'
-  }
-])
 
-// 模拟可分配用户列表
-const availableUsers = ref([
-  {
-    id: '1006',
-    username: 'new_user1',
-    realName: '新用户一',
-    avatar: 'https://picsum.photos/seed/new1/40/40.jpg',
-    currentRole: null,
-    status: 'active'
-  },
-  {
-    id: '1007',
-    username: 'new_user2',
-    realName: '新用户二',
-    avatar: 'https://picsum.photos/seed/new2/40/40.jpg',
-    currentRole: null,
-    status: 'active'
-  }
-])
+// 用户角色数据（来自真实接口）
+const userRoleList = ref([])
 
-// 所有权限列表
-const allPermissions = ref([
-  { value: 'user_manage', label: '用户管理' },
-  { value: 'role_manage', label: '角色管理' },
-  { value: 'expense_manage', label: '费用管理' },
-  { value: 'expense_view', label: '费用查看' },
-  { value: 'bill_manage', label: '账单管理' },
-  { value: 'bill_view', label: '账单查看' },
-  { value: 'system_config', label: '系统配置' }
-])
+
+// 可分配用户列表（来自真实接口）
+const availableUsers = ref([])
+
+
+// 所有权限列表（来自真实接口）
+const allPermissions = ref([])
+
 
 // 分页相关
 const userCurrentPage = ref(1)
@@ -565,11 +455,21 @@ const deleteRole = (role) => {
       type: 'warning'
     }
   )
-    .then(() => {
-      const index = roleList.value.findIndex(r => r.id === role.id)
-      if (index !== -1) {
-        roleList.value.splice(index, 1)
-        ElMessage.success('删除成功')
+    .then(async () => {
+      try {
+        const resp = await roleApi.deleteRole(role.id)
+        if (resp && resp.success) {
+          ElMessage.success('删除成功')
+          const rolesResp = await roleApi.getRoleList()
+          if (rolesResp && rolesResp.success) {
+            roleList.value = rolesResp.data || []
+          }
+        } else {
+          throw new Error(resp?.message || '删除失败')
+        }
+      } catch (e) {
+        console.error('删除角色失败', e)
+        ElMessage.error('删除角色失败')
       }
     })
     .catch(() => {
@@ -578,69 +478,71 @@ const deleteRole = (role) => {
 }
 
 // 保存角色
-const saveRole = () => {
-  roleFormRef.value.validate((valid) => {
+const saveRole = async () => {
+  roleFormRef.value.validate(async (valid) => {
     if (valid) {
-      if (isEditRole.value) {
-        // 编辑角色
-        const index = roleList.value.findIndex(r => r.id === roleForm.id)
-        if (index !== -1) {
-          roleList.value[index] = { ...roleForm }
-          ElMessage.success('更新成功')
+      try {
+        if (isEditRole.value) {
+          const resp = await roleApi.updateRole(roleForm.id, {
+            description: roleForm.description,
+            permissions: roleForm.permissions
+          })
+          if (resp && resp.success) {
+            ElMessage.success('更新成功')
+          } else {
+            throw new Error(resp?.message || '更新失败')
+          }
+        } else {
+          const resp = await roleApi.createRole({
+            name: roleForm.name,
+            description: roleForm.description,
+            permissions: roleForm.permissions
+          })
+          if (resp && resp.success) {
+            ElMessage.success('添加成功')
+          } else {
+            throw new Error(resp?.message || '添加失败')
+          }
         }
-      } else {
-        // 添加角色
-        const newRole = {
-          ...roleForm,
-          id: roleList.value.length + 1,
-          userCount: 0,
-          createTime: new Date().toLocaleString(),
-          users: []
+        showAddRoleDialog.value = false
+        resetRoleForm()
+        // 重新加载角色列表
+        const rolesResp = await roleApi.getRoleList()
+        if (rolesResp && rolesResp.success) {
+          roleList.value = rolesResp.data || []
         }
-        roleList.value.unshift(newRole)
-        ElMessage.success('添加成功')
+      } catch (e) {
+        console.error('保存角色失败', e)
+        ElMessage.error('保存角色失败')
       }
-      showAddRoleDialog.value = false
-      resetRoleForm()
     }
   })
 }
 
 // 分配角色
-const assignRole = () => {
+const assignRole = async () => {
   if (!assignRoleForm.userId || !assignRoleForm.roleId) {
     ElMessage.warning('请选择用户和角色')
     return
   }
-  
-  const user = availableUsers.value.find(u => u.id === assignRoleForm.userId)
-  const role = roleList.value.find(r => r.id === assignRoleForm.roleId)
-  
-  if (user && role) {
-    const newUserRole = {
-      id: userRoleList.value.length + 1,
-      username: user.username,
-      realName: user.realName,
-      dormRoom: user.dormRoom || '未分配',
-      role: role.name,
-      assignTime: new Date().toLocaleString(),
-      assignBy: 'admin'
+  try {
+    const resp = await userApi.assignRole(assignRoleForm.userId, { roleId: assignRoleForm.roleId })
+    if (resp && resp.success) {
+      ElMessage.success('角色分配成功')
+      showAssignRoleDialog.value = false
+      resetAssignRoleForm()
+      // 刷新用户列表
+      const usersResp = await userApi.getUserList({ page: userCurrentPage.value, pageSize: userPageSize.value })
+      if (usersResp && usersResp.success) {
+        const users = usersResp.data?.data || usersResp.data || []
+        availableUsers.value = users.map(u => ({ id: u.id, username: u.username, realName: u.realName }))
+      }
+    } else {
+      throw new Error(resp?.message || '分配失败')
     }
-    
-    userRoleList.value.unshift(newUserRole)
-    
-    // 更新角色用户数量
-    role.userCount += 1
-    
-    // 从可用用户列表中移除
-    const index = availableUsers.value.findIndex(u => u.id === assignRoleForm.userId)
-    if (index !== -1) {
-      availableUsers.value.splice(index, 1)
-    }
-    
-    ElMessage.success('角色分配成功')
-    showAssignRoleDialog.value = false
-    resetAssignRoleForm()
+  } catch (e) {
+    console.error('分配角色失败', e)
+    ElMessage.error('分配角色失败')
   }
 }
 
@@ -651,15 +553,28 @@ const changeUserRole = (user) => {
     cancelButtonText: '取消',
     inputType: 'select',
     inputOptions: roleList.value.map(role => ({
-      value: role.name,
+      value: role.id,
       label: role.name
     })),
-    inputValue: user.role
+    inputValue: null
   })
-    .then(({ value }) => {
-      user.role = value
-      user.assignTime = new Date().toLocaleString()
-      ElMessage.success('角色更改成功')
+    .then(async ({ value }) => {
+      try {
+        const resp = await userApi.updateUserRole(user.id, { roleId: value })
+        if (resp && resp.success) {
+          ElMessage.success('角色更改成功')
+          const usersResp = await userApi.getUserList({ page: userCurrentPage.value, pageSize: userPageSize.value })
+          if (usersResp && usersResp.success) {
+            const users = usersResp.data?.data || usersResp.data || []
+            availableUsers.value = users.map(u => ({ id: u.id, username: u.username, realName: u.realName }))
+          }
+        } else {
+          throw new Error(resp?.message || '更改失败')
+        }
+      } catch (e) {
+        console.error('更改角色失败', e)
+        ElMessage.error('更改角色失败')
+      }
     })
     .catch(() => {
       ElMessage.info('已取消操作')
@@ -929,12 +844,20 @@ const handleUserCurrentChange = (page) => {
 }
 
 // 加载用户角色列表
-const loadUserRoleList = () => {
+const loadUserRoleList = async () => {
   userLoading.value = true
-  // 模拟API调用
-  setTimeout(() => {
+  try {
+    const usersResp = await userApi.getUserList({ page: userCurrentPage.value, pageSize: userPageSize.value })
+    if (usersResp && usersResp.success) {
+      const users = usersResp.data?.data || usersResp.data || []
+      availableUsers.value = users.map(u => ({ id: u.id, username: u.username, realName: u.realName }))
+      totalUsers.value = usersResp.data?.total || users.length
+    }
+  } catch (e) {
+    console.error('加载用户列表失败', e)
+  } finally {
     userLoading.value = false
-  }, 500)
+  }
 }
 
 // 搜索和筛选相关
@@ -1020,8 +943,31 @@ const toggleRoleStatus = (role) => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
-  // 模拟数据已在上面定义，无需额外加载
+import { roleApi, userApi } from '@/api'
+onMounted(async () => {
+  try {
+    loading.value = true
+    const [rolesResp, usersResp, permsResp] = await Promise.all([
+      roleApi.getRoleList(),
+      userApi.getUserList({ page: 1, pageSize: 100 }),
+      roleApi.getPermissionList()
+    ])
+    if (rolesResp && rolesResp.success) {
+      roleList.value = rolesResp.data || []
+    }
+    if (usersResp && usersResp.success) {
+      const users = usersResp.data?.data || usersResp.data || []
+      availableUsers.value = users.map(u => ({ id: u.id, username: u.username, realName: u.realName }))
+    }
+    if (permsResp && permsResp.success) {
+      const perms = permsResp.data || []
+      allPermissions.value = perms.map(p => ({ value: p.code || p.value, label: p.name || p.label }))
+    }
+  } catch (e) {
+    console.error('加载角色/用户/权限失败', e)
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 

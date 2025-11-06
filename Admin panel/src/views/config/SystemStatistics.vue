@@ -399,16 +399,17 @@ const filterForm = reactive({
   dateRange: []
 })
 
-// 统计数据
+import { statisticsApi } from '@/api'
+// 统计数据（来自真实接口）
 const statisticsData = reactive({
-  totalUsers: 156,
-  userChange: 12.5,
-  totalExpenses: 892,
-  expenseChange: 8.3,
-  totalAmount: 456780,
-  amountChange: 15.2,
-  totalDisputes: 23,
-  disputeChange: -5.6
+  totalUsers: 0,
+  userChange: 0,
+  totalExpenses: 0,
+  expenseChange: 0,
+  totalAmount: 0,
+  amountChange: 0,
+  totalDisputes: 0,
+  disputeChange: 0
 })
 
 // 图表周期数据
@@ -509,19 +510,30 @@ const handleTimeRangeChange = (range) => {
 }
 
 // 筛选统计数据
-const filterStatistics = () => {
-  // 模拟API调用
+const filterStatistics = async () => {
   const loadingMessage = ElMessage({ message: '正在加载统计数据...', type: 'info', duration: 0 })
-  
-  setTimeout(() => {
-    // 根据时间范围更新数据
-    updateStatisticsData()
+  try {
+    const overviewResp = await statisticsApi.getSystemOverview()
+    if (overviewResp && overviewResp.success) {
+      const s = overviewResp.data || {}
+      statisticsData.totalUsers = s.totalUsers || 0
+      statisticsData.userChange = s.userChange || 0
+      statisticsData.totalExpenses = s.totalExpenses || 0
+      statisticsData.expenseChange = s.expenseChange || 0
+      statisticsData.totalAmount = s.totalAmount || 0
+      statisticsData.amountChange = s.amountChange || 0
+      statisticsData.totalDisputes = s.totalDisputes || 0
+      statisticsData.disputeChange = s.disputeChange || 0
+    }
     updateChartData()
     updateTableData()
-    
-    loadingMessage.close()
     ElMessage.success('统计数据加载完成')
-  }, 1000)
+  } catch (e) {
+    console.error('加载系统统计失败', e)
+    ElMessage.error('统计数据加载失败')
+  } finally {
+    loadingMessage.close()
+  }
 }
 
 // 重置筛选

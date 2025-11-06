@@ -30,9 +30,9 @@ const createTestUser = async (userData) => {
       const userId = userResult.rows[0].id;
       console.log('找到已存在的用户ID:', userId);
       
-      // 先删除相关的user_room_relations记录
-      await pool.query('DELETE FROM user_room_relations WHERE user_id = $1', [userId]);
-      console.log('清理user_room_relations记录');
+      // 先删除相关的room_members记录
+      await pool.query('DELETE FROM room_members WHERE user_id = $1', [userId]);
+      console.log('清理room_members记录');
       
       // 再删除相关的rooms记录
       await pool.query('DELETE FROM rooms WHERE creator_id = $1', [userId]);

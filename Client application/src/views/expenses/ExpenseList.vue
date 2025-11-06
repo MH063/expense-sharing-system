@@ -629,11 +629,13 @@ const loadExpensesData = async (loadAllData = false) => {
       limit: itemsPerPage
     })
     
-    if (expensesResponse.data && expensesResponse.data.success) {
-      expenses.value = expensesResponse.data.data.data || []
+    if (expensesResponse.success && expensesResponse.data) {
+      // 后端统一返回 { success, data }，其中 data 可能包含分页结构 { data, total }
+      const payload = expensesResponse.data
+      expenses.value = Array.isArray(payload) ? payload : (payload.data || [])
       console.log('费用列表加载成功:', expenses.value)
     } else {
-      console.error('费用列表加载失败:', expensesResponse.data?.message || '未知错误')
+      console.error('费用列表加载失败:', expensesResponse.message || '未知错误')
     }
     
     // 只在首次加载或需要时加载类别列表和成员列表
@@ -654,22 +656,22 @@ const loadExpensesData = async (loadAllData = false) => {
     if (loadAllData || roomMembers.value.length === 0) {
       // 获取寝室成员
       console.log('加载寝室成员列表')
-      const roomsResponse = await roomsApi.getRooms()
+      const roomsResponse = await roomsApi.getUserRooms()
       
-      if (roomsResponse.data && roomsResponse.data.success) {
+      if (roomsResponse.success && roomsResponse.data) {
         // 获取第一个房间的成员列表
-        const rooms = roomsResponse.data.data || []
+        const rooms = roomsResponse.data || []
         if (rooms.length > 0) {
           const membersResponse = await roomsApi.getRoomMembers(rooms[0].id)
-          if (membersResponse.data && membersResponse.data.success) {
-            roomMembers.value = membersResponse.data.data || []
+          if (membersResponse.success && membersResponse.data) {
+            roomMembers.value = membersResponse.data || []
             console.log('寝室成员列表加载成功:', roomMembers.value)
           } else {
-            console.error('寝室成员列表加载失败:', membersResponse.data?.message || '未知错误')
+            console.error('寝室成员列表加载失败:', membersResponse.message || '未知错误')
           }
         }
       } else {
-        console.error('房间列表加载失败:', roomsResponse.data?.message || '未知错误')
+        console.error('房间列表加载失败:', roomsResponse.message || '未知错误')
       }
     }
     

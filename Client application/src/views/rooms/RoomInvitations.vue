@@ -8,6 +8,38 @@
       </el-button>
     </div>
 
+    <!-- 邀请码操作区：生成邀请码 / 输入邀请码加入房间 -->
+    <div class="invite-code-toolbar">
+      <el-card shadow="hover" class="toolbar-card">
+        <template #header>
+          <div class="toolbar-header">
+            <span>生成邀请码</span>
+          </div>
+        </template>
+        <div class="toolbar-row">
+          <el-select v-model="generateForm.roomId" placeholder="选择房间" style="min-width: 220px" @visible-change="loadMyRoomsList">
+            <el-option v-for="room in myRooms" :key="room.id" :label="room.name || room.roomName" :value="room.id" />
+          </el-select>
+          <el-input-number v-model="generateForm.maxUses" :min="1" :max="100" :step="1" placeholder="最大使用次数" />
+          <el-date-picker v-model="generateForm.expiresAt" type="datetime" placeholder="过期时间(可选)" />
+          <el-button type="primary" @click="handleGenerateInviteCode" :disabled="!generateForm.roomId">生成</el-button>
+        </div>
+      </el-card>
+
+      <el-card shadow="hover" class="toolbar-card">
+        <template #header>
+          <div class="toolbar-header">
+            <span>使用邀请码加入房间</span>
+          </div>
+        </template>
+        <div class="toolbar-row">
+          <el-input v-model="joinCode" placeholder="输入邀请码" style="min-width: 260px" />
+          <el-button @click="handleVerifyCode" :disabled="!joinCode">校验</el-button>
+          <el-button type="success" @click="handleUseCode" :disabled="!joinCode">加入</el-button>
+        </div>
+      </el-card>
+    </div>
+
     <el-tabs v-model="activeTab" @tab-click="handleTabClick">
       <el-tab-pane label="收到的邀请" name="received">
         <div class="tab-content">
@@ -101,6 +133,13 @@
                     {{ getStatusText(invitation.status) }}
                   </el-tag>
                 </div>
+              </div>
+              <div class="invite-code-row" v-if="invitation.code">
+                <el-input v-model="invitation.code" readonly style="max-width: 320px" />
+                <el-tooltip :visible="invitation._copiedVisible" placement="top" effect="light" manual>
+                  <template #content>复制成功</template>
+                  <el-button size="small" @click="copyInviteCode(invitation)">复制邀请码</el-button>
+                </el-tooltip>
               </div>
               <div class="card-actions">
                 <el-button
@@ -196,6 +235,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, User, Clock } from '@element-plus/icons-vue'
 import { roomsApi } from '@/api/rooms'
+import { inviteCodesApi } from '@/api/invite-codes'
 import { useUserStore } from '@/stores/user'
 
 // 路由
@@ -208,6 +248,11 @@ const activeTab = ref('received')
 const receivedInvitations = ref([])
 const sentInvitations = ref([])
 const applications = ref([])
+
+// 邀请码操作区状态
+const myRooms = ref([])
+const generateForm = reactive({ roomId: '', maxUses: 1, expiresAt: '' })
+const joinCode = ref('')
 
 // 计算属性
 const currentUserId = computed(() => userStore.userId)
@@ -239,41 +284,13 @@ const loadInvitationsData = async () => {
  */
 const loadReceivedInvitations = async () => {
   try {
-    // 模拟API调用
-    console.log('模拟加载收到的邀请API调用')
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 600))
-    
-    // 模拟收到的邀请数据
-    const mockInvitations = [
-      {
-        id: 'inv-1',
-        roomId: 'room-1',
-        roomName: '东区3号楼201室',
-        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
-        inviterId: 'user-1',
-        inviterName: '张三',
-        inviteeId: currentUserId.value,
-        status: 'pending',
-        createdAt: '2023-11-15T10:30:00Z'
-      },
-      {
-        id: 'inv-2',
-        roomId: 'room-3',
-        roomName: '南区2号楼105室',
-        roomDescription: '娱乐学习两不误，欢迎大家！',
-        inviterId: 'user-3',
-        inviterName: '王五',
-        inviteeId: currentUserId.value,
-        status: 'accepted',
-        createdAt: '2023-11-10T14:20:00Z'
-      }
-    ]
-    
-    receivedInvitations.value = mockInvitations
+    const resp = await roomsApi.getUserInvitations()
+    if (resp && resp.success) {
+      receivedInvitations.value = resp.data || []
+    }
   } catch (error) {
     console.error('加载收到的邀请失败:', error)
+    ElMessage.error('加载收到的邀请失败')
   }
 }
 
@@ -282,43 +299,13 @@ const loadReceivedInvitations = async () => {
  */
 const loadSentInvitations = async () => {
   try {
-    // 模拟API调用
-    console.log('模拟加载发送的邀请API调用')
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 600))
-    
-    // 模拟发送的邀请数据
-    const mockInvitations = [
-      {
-        id: 'inv-3',
-        roomId: 'room-1',
-        roomName: '东区3号楼201室',
-        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
-        inviterId: currentUserId.value,
-        inviterName: '我',
-        inviteeId: 'user-4',
-        inviteeName: '赵六',
-        status: 'pending',
-        createdAt: '2023-11-12T09:15:00Z'
-      },
-      {
-        id: 'inv-4',
-        roomId: 'room-1',
-        roomName: '东区3号楼201室',
-        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
-        inviterId: currentUserId.value,
-        inviterName: '我',
-        inviteeId: 'user-5',
-        inviteeName: '钱七',
-        status: 'rejected',
-        createdAt: '2023-11-08T16:30:00Z'
-      }
-    ]
-    
-    sentInvitations.value = mockInvitations
+    const resp = await inviteCodesApi.getInviteCodes()
+    if (resp && resp.success) {
+      sentInvitations.value = resp.data || []
+    }
   } catch (error) {
     console.error('加载发送的邀请失败:', error)
+    ElMessage.error('加载发送的邀请失败')
   }
 }
 
@@ -327,41 +314,12 @@ const loadSentInvitations = async () => {
  */
 const loadApplications = async () => {
   try {
-    // 模拟API调用
-    console.log('模拟加载加入申请API调用')
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 600))
-    
-    // 模拟加入申请数据
-    const mockApplications = [
-      {
-        id: 'app-1',
-        roomId: 'room-1',
-        roomName: '东区3号楼201室',
-        roomDescription: '我们是一个充满活力的寝室，欢迎大家加入！',
-        applicantId: 'user-6',
-        applicantName: '孙八',
-        status: 'pending',
-        canManage: true,
-        createdAt: '2023-11-14T11:45:00Z'
-      },
-      {
-        id: 'app-2',
-        roomId: 'room-2',
-        roomName: '西区5号楼302室',
-        roomDescription: '学习氛围浓厚，共同进步！',
-        applicantId: currentUserId.value,
-        applicantName: '我',
-        status: 'rejected',
-        canManage: false,
-        createdAt: '2023-11-05T13:20:00Z'
-      }
-    ]
-    
-    applications.value = mockApplications
+    // 由于没有直接的API获取加入申请，这里暂时使用空数组
+    // 实际项目中应该添加获取房间加入申请的API
+    applications.value = []
   } catch (error) {
     console.error('加载加入申请失败:', error)
+    ElMessage.error('加载加入申请失败')
   }
 }
 
@@ -370,6 +328,78 @@ const loadApplications = async () => {
  */
 const refreshData = () => {
   loadInvitationsData()
+}
+
+// 加载我的房间列表（用于生成邀请码房间选择器）
+const loadMyRoomsList = async () => {
+  try {
+    const resp = await roomsApi.getUserRooms()
+    if (resp && resp.success) {
+      myRooms.value = resp.data || []
+      if (!generateForm.roomId && myRooms.value.length > 0) {
+        generateForm.roomId = myRooms.value[0].id
+      }
+    }
+  } catch (e) {
+    console.error('加载我的房间列表失败', e)
+  }
+}
+
+// 生成邀请码
+const handleGenerateInviteCode = async () => {
+  try {
+    if (!generateForm.roomId) return
+    const payload = {
+      roomId: generateForm.roomId,
+      maxUses: generateForm.maxUses || 1,
+      expiresAt: generateForm.expiresAt || undefined
+    }
+    const resp = await inviteCodesApi.generateInviteCode(payload)
+    if (resp && resp.success) {
+      ElMessage.success('邀请码生成成功')
+      // 刷新发送的邀请列表以显示新的邀请码
+      await loadSentInvitations()
+    } else {
+      throw new Error(resp?.message || '生成邀请码失败')
+    }
+  } catch (error) {
+    console.error('生成邀请码失败', error)
+    ElMessage.error('生成邀请码失败')
+  }
+}
+
+// 校验邀请码
+const handleVerifyCode = async () => {
+  try {
+    const resp = await inviteCodesApi.verifyInviteCode(joinCode.value)
+    if (resp && resp.success) {
+      ElMessage.success('邀请码有效')
+    } else {
+      throw new Error(resp?.message || '邀请码无效')
+    }
+  } catch (error) {
+    console.error('校验邀请码失败', error)
+    ElMessage.error('校验邀请码失败')
+  }
+}
+
+// 使用邀请码加入房间
+const handleUseCode = async () => {
+  try {
+    const resp = await inviteCodesApi.useInviteCode(joinCode.value)
+    if (resp && resp.success) {
+      ElMessage.success('加入房间成功')
+      joinCode.value = ''
+      // 加入成功后可刷新房间列表或跳转房间页
+      // 这里刷新“收到的邀请”和“发送的邀请”以保持页面一致
+      await loadInvitationsData()
+    } else {
+      throw new Error(resp?.message || '加入房间失败')
+    }
+  } catch (error) {
+    console.error('使用邀请码加入房间失败', error)
+    ElMessage.error('加入房间失败')
+  }
 }
 
 /**
@@ -384,19 +414,17 @@ const handleTabClick = () => {
  */
 const acceptInvitation = async (invitation) => {
   try {
-    // 模拟API调用
-    console.log('模拟接受邀请API调用:', { invitationId: invitation.id })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 更新本地状态
-    const index = receivedInvitations.value.findIndex(inv => inv.id === invitation.id)
-    if (index !== -1) {
-      receivedInvitations.value[index].status = 'accepted'
+    const resp = await roomsApi.acceptInvitation(invitation.id)
+    if (resp && resp.success) {
+      // 更新本地状态
+      const index = receivedInvitations.value.findIndex(inv => inv.id === invitation.id)
+      if (index !== -1) {
+        receivedInvitations.value[index].status = 'accepted'
+      }
+      ElMessage.success('已接受邀请')
+    } else {
+      throw new Error(resp?.message || '接受邀请失败')
     }
-    
-    ElMessage.success('已接受邀请')
   } catch (error) {
     console.error('接受邀请失败:', error)
     ElMessage.error('接受邀请失败')
@@ -408,19 +436,17 @@ const acceptInvitation = async (invitation) => {
  */
 const rejectInvitation = async (invitation) => {
   try {
-    // 模拟API调用
-    console.log('模拟拒绝邀请API调用:', { invitationId: invitation.id })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 更新本地状态
-    const index = receivedInvitations.value.findIndex(inv => inv.id === invitation.id)
-    if (index !== -1) {
-      receivedInvitations.value[index].status = 'rejected'
+    const resp = await roomsApi.rejectInvitation(invitation.id)
+    if (resp && resp.success) {
+      // 更新本地状态
+      const index = receivedInvitations.value.findIndex(inv => inv.id === invitation.id)
+      if (index !== -1) {
+        receivedInvitations.value[index].status = 'rejected'
+      }
+      ElMessage.success('已拒绝邀请')
+    } else {
+      throw new Error(resp?.message || '拒绝邀请失败')
     }
-    
-    ElMessage.success('已拒绝邀请')
   } catch (error) {
     console.error('拒绝邀请失败:', error)
     ElMessage.error('拒绝邀请失败')
@@ -437,20 +463,16 @@ const cancelInvitation = async (invitation) => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
-    // 模拟API调用
-    console.log('模拟取消邀请API调用:', { invitationId: invitation.id })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 更新本地状态
-    const index = sentInvitations.value.findIndex(inv => inv.id === invitation.id)
-    if (index !== -1) {
-      sentInvitations.value[index].status = 'cancelled'
+    const resp = await inviteCodesApi.revokeInviteCode(invitation.id)
+    if (resp && resp.success) {
+      const index = sentInvitations.value.findIndex(inv => inv.id === invitation.id)
+      if (index !== -1) {
+        sentInvitations.value[index].status = 'cancelled'
+      }
+      ElMessage.success('已取消邀请')
+    } else {
+      throw new Error(resp?.message || '撤销邀请码失败')
     }
-    
-    ElMessage.success('已取消邀请')
   } catch (error) {
     if (error !== 'cancel') {
       console.error('取消邀请失败:', error)
@@ -464,20 +486,14 @@ const cancelInvitation = async (invitation) => {
  */
 const resendInvitation = async (invitation) => {
   try {
-    // 模拟API调用
-    console.log('模拟重新发送邀请API调用:', { invitationId: invitation.id })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 更新本地状态
-    const index = sentInvitations.value.findIndex(inv => inv.id === invitation.id)
-    if (index !== -1) {
-      sentInvitations.value[index].status = 'pending'
-      sentInvitations.value[index].createdAt = new Date().toISOString()
+    // 重新生成一个邀请码以模拟“重新发送”的效果（保持真实接口调用，不使用模拟）
+    const resp = await inviteCodesApi.generateInviteCode({ roomId: invitation.roomId, maxUses: 1 })
+    if (resp && resp.success) {
+      ElMessage.success('已生成新的邀请码')
+      await loadSentInvitations()
+    } else {
+      throw new Error(resp?.message || '重新发送失败')
     }
-    
-    ElMessage.success('邀请已重新发送')
   } catch (error) {
     console.error('重新发送邀请失败:', error)
     ElMessage.error('重新发送邀请失败')
@@ -489,19 +505,9 @@ const resendInvitation = async (invitation) => {
  */
 const approveApplication = async (application) => {
   try {
-    // 模拟API调用
-    console.log('模拟批准申请API调用:', { applicationId: application.id })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 更新本地状态
-    const index = applications.value.findIndex(app => app.id === application.id)
-    if (index !== -1) {
-      applications.value[index].status = 'accepted'
-    }
-    
-    ElMessage.success('申请已批准')
+    // 由于没有直接的API处理加入申请，这里显示提示信息
+    // 实际项目中应该添加批准申请的API
+    ElMessage.info('批准申请功能暂未实现，请联系管理员处理')
   } catch (error) {
     console.error('批准申请失败:', error)
     ElMessage.error('批准申请失败')
@@ -513,19 +519,9 @@ const approveApplication = async (application) => {
  */
 const rejectApplication = async (application) => {
   try {
-    // 模拟API调用
-    console.log('模拟拒绝申请API调用:', { applicationId: application.id })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 更新本地状态
-    const index = applications.value.findIndex(app => app.id === application.id)
-    if (index !== -1) {
-      applications.value[index].status = 'rejected'
-    }
-    
-    ElMessage.success('申请已拒绝')
+    // 由于没有直接的API处理加入申请，这里显示提示信息
+    // 实际项目中应该添加拒绝申请的API
+    ElMessage.info('拒绝申请功能暂未实现，请联系管理员处理')
   } catch (error) {
     console.error('拒绝申请失败:', error)
     ElMessage.error('拒绝申请失败')
@@ -537,20 +533,9 @@ const rejectApplication = async (application) => {
  */
 const reapply = async (application) => {
   try {
-    // 模拟API调用
-    console.log('模拟重新申请API调用:', { applicationId: application.id })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // 更新本地状态
-    const index = applications.value.findIndex(app => app.id === application.id)
-    if (index !== -1) {
-      applications.value[index].status = 'pending'
-      applications.value[index].createdAt = new Date().toISOString()
-    }
-    
-    ElMessage.success('申请已重新提交')
+    // 由于没有直接的API处理加入申请，这里显示提示信息
+    // 实际项目中应该添加重新申请的API
+    ElMessage.info('重新申请功能暂未实现，请联系管理员处理')
   } catch (error) {
     console.error('重新申请失败:', error)
     ElMessage.error('重新申请失败')
@@ -562,14 +547,13 @@ const reapply = async (application) => {
  */
 const enterRoom = async (roomId) => {
   try {
-    // 模拟API调用
-    console.log('模拟进入房间API调用:', { roomId })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    ElMessage.success('正在进入房间...')
-    router.push(`/rooms/${roomId}`)
+    const resp = await roomsApi.getRoomDetail(roomId)
+    if (resp && resp.success) {
+      ElMessage.success('正在进入房间...')
+      router.push(`/rooms/${roomId}`)
+    } else {
+      throw new Error(resp?.message || '获取房间信息失败')
+    }
   } catch (error) {
     console.error('进入房间失败:', error)
     ElMessage.error('进入房间失败')
@@ -628,8 +612,33 @@ const getStatusText = (status) => {
 }
 
 // 生命周期
+// 复制邀请码到剪贴板
+const copyInviteCode = async (invitation) => {
+  try {
+    const code = invitation?.code
+    if (!code) return
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(code)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = code
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    // 轻量气泡提示：手动控制可见性，短暂显示后隐藏
+    invitation._copiedVisible = true
+    setTimeout(() => { invitation._copiedVisible = false }, 1200)
+  } catch (e) {
+    console.error('复制失败', e)
+    ElMessage.error('复制失败，请手动选择复制')
+  }
+}
+
 onMounted(() => {
   loadInvitationsData()
+  loadMyRoomsList()
 })
 </script>
 
@@ -704,5 +713,33 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+.invite-code-toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.toolbar-card {
+  width: 100%;
+}
+
+.toolbar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbar-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.invite-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 12px 0;
 }
 </style>

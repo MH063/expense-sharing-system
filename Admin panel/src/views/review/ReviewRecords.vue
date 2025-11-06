@@ -292,37 +292,22 @@ const searchForm = reactive({
   dateRange: []
 })
 
-// 统计数据
-const totalReviews = ref(526)
-const monthlyReviews = ref(48)
-const approvalRate = ref(85.6)
-const rateTrend = ref(2.3)
-const avgProcessTime = ref(3.8)
-const timeTrend = ref(-0.5)
-const overdueCount = ref(12)
-const overdueTrend = ref(-3)
+// 统计数据（来自真实接口）
+const totalReviews = ref(0)
+const monthlyReviews = ref(0)
+const approvalRate = ref(0)
+const rateTrend = ref(0)
+const avgProcessTime = ref(0)
+const timeTrend = ref(0)
+const overdueCount = ref(0)
+const overdueTrend = ref(0)
 
 // 视图模式
 const viewMode = ref('table')
 
-// 审核记录列表
-const reviewRecords = ref([
-  {
-    id: 1,
-    type: 'expense',
-    title: '高额电费审核',
-    applicant: '张三',
-    submitTime: '2023-11-20 09:30:00',
-    reviewTime: '2023-11-20 14:20:00',
-    reviewer: '王审核员',
-    status: 'approved',
-    processTime: 4.8,
-    content: '本月电费350元，超过平均值50%，需要审核确认',
-    attachments: [
-      { id: 1, name: '电费账单.pdf', url: '/files/electricity_bill.pdf' }
-    ],
-    comment: '已核实，电费正常，审核通过',
-    history: [
+// 审核记录列表（来自真实接口）
+const reviewRecords = ref([])
+
       {
         time: '2023-11-20 09:30:00',
         operator: '系统',
@@ -554,13 +539,41 @@ const getTimelineType = (status) => {
 }
 
 // 搜索审核记录
-const searchRecords = () => {
+import { expenseApi, statisticsApi } from '@/api'
+const searchRecords = async () => {
   loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
+  try {
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      type: searchForm.type || undefined,
+      status: searchForm.status || undefined,
+      applicant: searchForm.applicant || undefined,
+      reviewer: searchForm.reviewer || undefined,
+      startDate: searchForm.dateRange?.[0] || undefined,
+      endDate: searchForm.dateRange?.[1] || undefined
+    }
+    const listResp = await expenseApi.getPendingExpenses(params)
+    if (listResp && listResp.success) {
+      const data = listResp.data
+      reviewRecords.value = Array.isArray(data) ? data : (data.list || data.data || [])
+      totalRecords.value = data.total || reviewRecords.value.length
+    }
+    const statsResp = await statisticsApi.getSystemOverview()
+    if (statsResp && statsResp.success) {
+      const s = statsResp.data || {}
+      totalReviews.value = s.totalReviews || s.reviewsTotal || totalRecords.value
+      monthlyReviews.value = s.monthlyReviews || s.reviewsMonthly || 0
+      approvalRate.value = s.approvalRate || 0
+      avgProcessTime.value = s.avgReviewTime || 0
+    }
     ElMessage.success('查询完成')
-  }, 500)
+  } catch (e) {
+    console.error('查询审核记录失败', e)
+    ElMessage.error('查询失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 重置搜索
@@ -580,9 +593,21 @@ const exportRecords = () => {
 }
 
 // 查看记录详情
-const viewRecord = (record) => {
-  currentRecord.value = { ...record }
-  showRecordDetailDialog.value = true
+const viewRecord = async (record) => {
+  try {
+    const resp = await expenseApi.getExpenseDetail(record.id)
+    if (resp && resp.success) {
+      currentRecord.value = resp.data
+      showRecordDetailDialog.value = true
+    } else {
+      currentRecord.value = { ...record }
+      showRecordDetailDialog.value = true
+    }
+  } catch (e) {
+    console.error('获取审核详情失败', e)
+    currentRecord.value = { ...record }
+    showRecordDetailDialog.value = true
+  }
 }
 
 // 重新处理记录

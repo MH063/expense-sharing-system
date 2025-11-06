@@ -107,7 +107,7 @@ export const userApi = {
    * @returns {Promise} 标记结果
    */
   markAllNotificationsAsRead() {
-    return http.put('/notifications/read-all');
+    return http.put('/notifications/mark-all-read');
   },
 
   /**

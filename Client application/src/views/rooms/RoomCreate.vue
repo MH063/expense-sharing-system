@@ -158,28 +158,20 @@ const submitForm = async () => {
     await roomFormRef.value.validate()
     submitting.value = true
     
-    // 调用API创建房间
+    // 调用真实API创建房间
     console.log('创建房间API调用:', roomForm)
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const response = await roomsApi.createRoom(roomForm)
     
-    // 模拟成功响应
-    const mockResponse = {
-      success: true,
-      data: {
-        id: 'room-' + Date.now(),
-        ...roomForm,
-        creatorId: 'user-1',
-        createdAt: new Date().toISOString(),
-        memberCount: 1
-      }
+    if (response && response.success) {
+      const newRoom = response.data
+      ElMessage.success('房间创建成功')
+      
+      // 跳转到房间详情页
+      router.push(`/rooms/${newRoom.id}`)
+    } else {
+      ElMessage.error(response?.message || '创建房间失败')
     }
-    
-    ElMessage.success('房间创建成功')
-    
-    // 跳转到房间详情页
-    router.push(`/rooms/${mockResponse.data.id}`)
   } catch (error) {
     console.error('创建房间失败:', error)
     ElMessage.error('创建房间失败，请重试')

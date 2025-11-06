@@ -149,11 +149,11 @@ class UserService extends BaseService {
    */
   async getUserRooms(userId) {
     const sql = `
-      SELECT r.*, urr.relation_type, urr.join_date
+      SELECT r.*, rm.relation_type, rm.join_date
       FROM rooms r
-      JOIN user_room_relations urr ON r.id = urr.room_id
-      WHERE urr.user_id = $1 AND urr.is_active = $2 AND r.is_active = $2
-      ORDER BY urr.join_date DESC
+      JOIN room_members rm ON r.id = rm.room_id
+      WHERE rm.user_id = $1 AND rm.is_active = $2 AND r.is_active = $2
+      ORDER BY rm.join_date DESC
     `;
     const result = await this.query(sql, [userId, true]);
     return result.rows;
@@ -166,11 +166,11 @@ class UserService extends BaseService {
    */
   async getRoomUsers(roomId) {
     const sql = `
-      SELECT u.id, u.username, u.email, u.name, u.avatar, u.phone, urr.relation_type, urr.join_date
+      SELECT u.id, u.username, u.email, u.name, u.avatar, u.phone, rm.relation_type, rm.join_date
       FROM users u
-      JOIN user_room_relations urr ON u.id = urr.user_id
-      WHERE urr.room_id = $1 AND urr.is_active = $2 AND u.is_active = $2
-      ORDER BY urr.join_date ASC
+      JOIN room_members rm ON u.id = rm.user_id
+      WHERE rm.room_id = $1 AND rm.is_active = $2 AND u.is_active = $2
+      ORDER BY rm.join_date ASC
     `;
     const result = await this.query(sql, [roomId, true]);
     return result.rows;

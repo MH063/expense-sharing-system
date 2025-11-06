@@ -129,13 +129,13 @@
               <div class="welcome-content">
                 <el-row :gutter="20">
                   <el-col :span="8">
-                    <el-statistic title="总用户数" :value="1234" />
+                    <el-statistic title="总用户数" :value="statistics.totalUsers" />
                   </el-col>
                   <el-col :span="8">
-                    <el-statistic title="总费用记录" :value="5678" />
+                    <el-statistic title="总费用记录" :value="statistics.totalExpenses" />
                   </el-col>
                   <el-col :span="8">
-                    <el-statistic title="活跃寝室" :value="89" />
+                    <el-statistic title="活跃寝室" :value="statistics.activeRooms" />
                   </el-col>
                 </el-row>
                 <div class="quick-actions">
@@ -157,10 +157,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { logout as authLogout } from '../utils/auth'
+import { statisticsApi } from '../api'
 import {
   House,
   Document,
@@ -178,6 +179,38 @@ import {
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+
+// 统计数据
+const statistics = ref({
+  totalUsers: 0,
+  totalExpenses: 0,
+  activeRooms: 0
+})
+
+// 加载统计数据
+const loadStatistics = async () => {
+  try {
+    console.log('开始加载系统统计数据')
+    const response = await statisticsApi.getSystemOverview()
+    console.log('统计数据响应:', response)
+    
+    // 处理后端返回的数据结构 {success: true, data: {...}}
+    if (response.success && response.data) {
+      statistics.value = {
+        totalUsers: response.data.totalUsers || 0,
+        totalExpenses: response.data.totalExpenses || 0,
+        activeRooms: response.data.activeRooms || 0
+      }
+      console.log('统计数据已更新:', statistics.value)
+    } else {
+      console.error('统计数据响应格式错误:', response)
+      ElMessage.error('统计数据格式错误')
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+    ElMessage.error('加载统计数据失败')
+  }
+}
 
 const logout = () => {
   ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -214,6 +247,11 @@ const navigateToDataStatistics = () => {
 const navigateToSystemSettings = () => {
   router.push('/config/system')
 }
+
+// 组件挂载时加载统计数据
+onMounted(() => {
+  loadStatistics()
+})
 </script>
 
 <style scoped>

@@ -901,15 +901,22 @@ const uploadReceipt = async (event) => {
   try {
     uploading.value = true;
     
-    // 模拟上传成功
-    setTimeout(() => {
-      // 创建一个本地URL来预览图片
-      const localUrl = URL.createObjectURL(file);
-      form.value.receipt = localUrl;
-      form.value.receipt_url = localUrl;
+    // 调用真实的上传API
+    const formData = new FormData();
+    formData.append('receipt', file);
+    
+    const response = await billAPI.uploadReceipt(formData);
+    
+    if (response && response.success) {
+      // 使用后端返回的URL
+      form.value.receipt_url = response.data.url;
+      form.value.receipt = response.data.url; // 同时设置预览URL
       uploading.value = false;
       ElMessage.success('收据上传成功');
-    }, 1000);
+    } else {
+      ElMessage.error(response?.message || '上传收据失败');
+      uploading.value = false;
+    }
     
   } catch (error) {
     console.error('上传收据失败:', error);

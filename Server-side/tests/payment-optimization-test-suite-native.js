@@ -78,7 +78,7 @@ const cleanupTestData = async () => {
   await pool.query('DELETE FROM offline_payments WHERE bill_id IN (SELECT id FROM bills WHERE title LIKE \'测试%\')');
   await pool.query('DELETE FROM payments WHERE bill_id IN (SELECT id FROM bills WHERE title LIKE \'测试%\')');
   await pool.query('DELETE FROM bills WHERE title LIKE \'测试%\'');
-  await pool.query('DELETE FROM user_room_relations WHERE user_id IN (SELECT id FROM users WHERE username LIKE \'test%\')');
+  await pool.query('DELETE FROM room_members WHERE user_id IN (SELECT id FROM users WHERE username LIKE \'test%\')');
   await pool.query('DELETE FROM users WHERE username LIKE \'test%\'');
   await pool.query('DELETE FROM rooms WHERE name LIKE \'测试%\'');
 };

@@ -92,7 +92,7 @@ class RoomService extends BaseService {
     if (existingMember) {
       // 如果已经是成员，只更新关系类型和状态
       const sql = `
-        UPDATE user_room_relations 
+        UPDATE room_members 
         SET relation_type = $1, is_active = $2, updated_at = CURRENT_TIMESTAMP
         WHERE room_id = $3 AND user_id = $4
         RETURNING *
@@ -102,7 +102,7 @@ class RoomService extends BaseService {
     } else {
       // 如果不是成员，创建新记录
       const sql = `
-        INSERT INTO user_room_relations (id, room_id, user_id, relation_type, is_active, join_date, created_at, updated_at)
+        INSERT INTO room_members (id, room_id, user_id, relation_type, is_active, join_date, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING *
       `;
@@ -119,7 +119,7 @@ class RoomService extends BaseService {
    */
   async getRoomMember(roomId, userId) {
     const sql = `
-      SELECT * FROM user_room_relations 
+      SELECT * FROM room_members 
       WHERE room_id = $1 AND user_id = $2 AND is_active = $3
     `;
     const result = await this.query(sql, [roomId, userId, true]);
@@ -133,11 +133,11 @@ class RoomService extends BaseService {
    */
   async getRoomMembers(roomId) {
     const sql = `
-      SELECT u.*, urr.relation_type, urr.join_date
+      SELECT u.*, rm.relation_type, rm.join_date
       FROM users u
-      JOIN user_room_relations urr ON u.id = urr.user_id
-      WHERE urr.room_id = $1 AND urr.is_active = $2 AND u.is_active = $2
-      ORDER BY urr.join_date ASC
+      JOIN room_members rm ON u.id = rm.user_id
+      WHERE rm.room_id = $1 AND rm.is_active = $2 AND u.is_active = $2
+      ORDER BY rm.join_date ASC
     `;
     const result = await this.query(sql, [roomId, true]);
     return result.rows;
@@ -151,7 +151,7 @@ class RoomService extends BaseService {
    */
   async removeRoomMember(roomId, userId) {
     const sql = `
-      UPDATE user_room_relations 
+      UPDATE room_members 
       SET is_active = $1, updated_at = CURRENT_TIMESTAMP
       WHERE room_id = $2 AND user_id = $3
     `;
@@ -168,7 +168,7 @@ class RoomService extends BaseService {
    */
   async updateMemberRelation(roomId, userId, relationType) {
     const sql = `
-      UPDATE user_room_relations 
+      UPDATE room_members 
       SET relation_type = $1, updated_at = CURRENT_TIMESTAMP
       WHERE room_id = $2 AND user_id = $3 AND is_active = $4
       RETURNING *
@@ -196,7 +196,7 @@ class RoomService extends BaseService {
    */
   async hasRoomPermission(roomId, userId) {
     const sql = `
-      SELECT * FROM user_room_relations 
+      SELECT * FROM room_members 
       WHERE room_id = $1 AND user_id = $2 AND is_active = $3 
       AND relation_type IN ($4, $5)
     `;

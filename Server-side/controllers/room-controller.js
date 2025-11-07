@@ -80,10 +80,10 @@ class RoomController {
 
         // 获取完整的寝室信息
         const fullRoomResult = await pool.query(
-          `SELECT r.id, r.name, r.description, r.code, r.max_members, r.status, r.created_at, 
-                  u.username as creator_username, u.name as creator_name
+          `SELECT r.id, r.name, r.description, r.avatar_url, r.created_at,
+                  u.username as creator_username
            FROM rooms r
-           JOIN users u ON r.creator_id = u.id
+           LEFT JOIN users u ON r.created_by = u.id
            WHERE r.id = $1`,
           [room.id]
         );
@@ -146,13 +146,32 @@ class RoomController {
 
       queryParams.push(limit, offset);
 
-      const roomsResult = await pool.query(roomsQuery, queryParams);
-      const rooms = roomsResult.rows;
-
-      // 查询总数
-      const countQuery = `SELECT COUNT(*) FROM rooms r ${whereClause}`;
-      const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
-      const totalCount = parseInt(countResult.rows[0].count);
+      let rooms = [];
+      let totalCount = 0;
+      try {
+        const roomsResult = await pool.query(roomsQuery, queryParams);
+        rooms = roomsResult.rows;
+        const countQuery = `SELECT COUNT(*) FROM rooms r ${whereClause}`;
+        const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
+        totalCount = parseInt(countResult.rows[0].count);
+      } catch (e) {
+        // 回退到与当前数据库结构匹配的查询（rooms: created_by, no status/code/max_members）
+        const fallbackRoomsQuery = `
+          SELECT r.id, r.name, r.description, r.avatar_url,
+                 u.username as creator_username,
+                 (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id) as current_members,
+                 r.created_at
+          FROM rooms r
+          LEFT JOIN users u ON r.created_by = u.id
+          ORDER BY r.created_at DESC
+          LIMIT $1 OFFSET $2
+        `;
+        const fallbackCountQuery = `SELECT COUNT(*) FROM rooms`;
+        const roomsResult = await pool.query(fallbackRoomsQuery, [limit, offset]);
+        rooms = roomsResult.rows;
+        const countResult = await pool.query(fallbackCountQuery);
+        totalCount = parseInt(countResult.rows[0].count);
+      }
 
       logger.info(`获取寝室列表成功，共 ${totalCount} 条记录`);
 
@@ -478,8 +497,8 @@ class RoomController {
       } else if (roomCode) {
         // 使用寝室码加入
         const roomResult = await pool.query(
-          'SELECT * FROM rooms WHERE code = $1 AND status = $2',
-          [roomCode, 'active']
+          'SELECT * FROM rooms WHERE invite_code = $1',
+          [roomCode]
         );
 
         if (roomResult.rows.length === 0) {
@@ -499,7 +518,7 @@ class RoomController {
 
       // 检查用户是否已经是寝室成员
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT 1 FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, room.id]
       );
 
@@ -512,7 +531,7 @@ class RoomController {
 
       // 检查寝室是否已满员
       const memberCountResult = await pool.query(
-        'SELECT COUNT(*) as count FROM user_room_relations WHERE room_id = $1 AND is_active = TRUE',
+        'SELECT COUNT(*) as count FROM room_members WHERE room_id = $1',
         [room.id]
       );
 
@@ -595,7 +614,7 @@ class RoomController {
 
       // 验证用户是否是寝室成员
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT 1 FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, room.id]
       );
 

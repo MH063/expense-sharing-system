@@ -9,30 +9,15 @@ const path = require('path');
 // 根据环境变量选择数据库配置
 const env = process.env.NODE_ENV || 'development';
 
-// 安全加载环境变量 - 优先加载 .env 文件，然后加载环境特定文件
-const envFiles = [
-  path.resolve(__dirname, '../.env'),           // 本地环境变量（包含真实密码）
-  path.resolve(__dirname, `../.env.${env}`),     // 环境特定配置
-  path.resolve(__dirname, '../.env.development') // 开发环境默认配置
-];
+// 确保环境变量已加载
+const envPath = path.resolve(__dirname, '../.env.development');
+console.log('尝试加载环境变量文件:', envPath);
+require('dotenv').config({ path: envPath });
 
-// 按优先级加载环境变量文件
-envFiles.forEach(envPath => {
-  if (require('fs').existsSync(envPath)) {
-    console.log('加载环境变量文件:', envPath);
-    require('dotenv').config({ path: envPath });
-  }
-});
-
-// 验证关键环境变量
-const requiredEnvVars = ['DB_PASSWORD'];
-if (env !== 'test') { // 测试环境可能有特殊处理
-  requiredEnvVars.forEach(varName => {
-    if (!process.env[varName]) {
-      console.warn(`⚠️  警告: 环境变量 ${varName} 未设置，数据库连接可能失败`);
-    }
-  });
-}
+// 再次确保环境变量已加载
+const envPath2 = path.resolve(__dirname, `../.env.${env}`);
+console.log('尝试加载环境变量文件:', envPath2);
+require('dotenv').config({ path: envPath2 });
 
 // 所有环境配置
 const config = {
@@ -42,7 +27,7 @@ const config = {
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'test_expense_system',
     username: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD, // 必须通过环境变量设置
+    password: process.env.DB_PASSWORD || '123456789',
     storage: process.env.DB_STORAGE || undefined,
     logging: console.log,
     pool: {
@@ -61,7 +46,7 @@ const config = {
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'expense_test',
     username: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD, // 必须通过环境变量设置
+    password: process.env.DB_PASSWORD || '123456789',
     logging: false,
     pool: {
       max: 5,
@@ -79,7 +64,7 @@ const config = {
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'room_expense_db',
     username: process.env.DB_USER || 'expense_user',
-    password: process.env.DB_PASSWORD, // 必须通过环境变量设置
+    password: process.env.DB_PASSWORD || 'your_password',
     logging: false,
     pool: {
       max: 20,

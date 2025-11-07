@@ -4,7 +4,11 @@ const { logger } = require('../config/logger');
 
 // 根据环境变量加载对应的环境配置文件
 const env = process.env.NODE_ENV || 'development';
-require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
+// 优先加载.env文件，如果不存在则加载.env.{env}文件
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+if (!process.env.DB_PASSWORD) {
+  require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
+}
 
 // PostgreSQL数据库连接配置（仅从环境变量读取，避免默认弱口令）
 const dbConfig = {

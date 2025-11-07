@@ -314,7 +314,10 @@ class BillController {
   async getBills(req, res) {
     const client = await pool.connect();
     try {
-      const user_id = req.user.id;
+      const user_id = (req.user && (req.user.sub || req.user.id)) || null;
+      if (!user_id) {
+        return res.status(401).json({ success: false, message: '未认证的用户' });
+      }
       const { 
         room_id, 
         status, 
@@ -327,10 +330,12 @@ class BillController {
         limit = 10 
       } = req.query;
       
+      // 简化：直接从 bills 表读取核心字段，并通过 room_members 约束用户可见范围
       let query = `
-        SELECT b.*, u.username as creator_name, r.name as room_name
+        SELECT b.id, b.title, b.amount, b.category, b.due_date, b.status, b.created_at, b.updated_at, b.room_id,
+               u.username as creator_name, r.name as room_name
         FROM bills b
-        JOIN users u ON b.creator_id = u.id
+        JOIN users u ON b.created_by = u.id
         JOIN rooms r ON b.room_id = r.id
         JOIN room_members rm ON b.room_id = rm.room_id
         WHERE rm.user_id = $1
@@ -346,8 +351,11 @@ class BillController {
       }
       
       if (status) {
+        // map frontend 'pending' to db 'open', 'completed' to 'settled' etc.
+        const statusMap = { pending: 'open', approved: 'open', completed: 'settled', canceled: 'canceled', settling: 'settling', open: 'open' };
+        const dbStatus = statusMap[status.toLowerCase?.() ? status.toLowerCase() : status] || status;
         query += ` AND b.status = $${paramIndex++}`;
-        params.push(status);
+        params.push(dbStatus);
       }
       
       if (category) {
@@ -366,12 +374,12 @@ class BillController {
       }
       
       if (min_amount) {
-        query += ` AND b.total_amount >= $${paramIndex++}`;
+        query += ` AND b.amount >= $${paramIndex++}`;
         params.push(min_amount);
       }
       
       if (max_amount) {
-        query += ` AND b.total_amount <= $${paramIndex++}`;
+        query += ` AND b.amount <= $${paramIndex++}`;
         params.push(max_amount);
       }
       
@@ -438,18 +446,18 @@ class BillController {
       const billsWithSplits = await Promise.all(
         result.rows.map(async (bill) => {
           const splitsQuery = `
-            SELECT bs.*, u.username as user_name
-            FROM bill_splits bs
-            JOIN users u ON bs.user_id = u.id
-            WHERE bs.bill_id = $1
+            SELECT bp.*, u.username as user_name
+            FROM bill_participants bp
+            JOIN users u ON bp.user_id = u.id
+            WHERE bp.bill_id = $1
           `;
           
           const splitsResult = await client.query(splitsQuery, [bill.id]);
-          bill.splits = splitsResult.rows;
+          bill.participants = splitsResult.rows;
           
-          // 计算支付状态
+          // 计算支付状态（基于 bill_participants.paid_status）
           const totalSplits = splitsResult.rows.length;
-          const paidSplits = splitsResult.rows.filter(s => s.status === 'PAID').length;
+          const paidSplits = splitsResult.rows.filter(s => s.paid_status === 'confirmed').length;
           
           if (totalSplits === paidSplits && totalSplits > 0) {
             bill.payment_status = 'paid';
@@ -462,8 +470,8 @@ class BillController {
           // 检查是否逾期
           const dueDate = new Date(bill.due_date);
           const today = new Date();
-          if (dueDate < today && bill.payment_status !== 'paid') {
-            bill.status = 'overdue';
+          if (dueDate < today && bill.payment_status !== 'paid' && bill.status === 'open') {
+            bill.status = 'open';
           }
           
           return bill;

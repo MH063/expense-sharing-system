@@ -10,20 +10,25 @@ require('dotenv').config();
 // 加载环境特定的配置文件
 function loadEnvironmentConfig() {
   const env = process.env.NODE_ENV || 'development';
-  const envFile = path.resolve(__dirname, '..', `.env.${env}`).trim();
   
-  console.log(`检查环境配置文件: ${envFile}`);
-  
-  try {
-    // 尝试直接读取文件
-    const stats = fs.statSync(envFile);
-    console.log(`文件存在，大小: ${stats.size} 字节`);
-    console.log(`加载${env}环境配置文件: .env.${env}`);
-    require('dotenv').config({ path: envFile, override: true });
-  } catch (error) {
-    console.warn(`警告: 未找到${env}环境配置文件: .env.${env}`);
-    console.warn(`错误信息: ${error.message}`);
-  }
+  // 按优先级加载环境变量文件
+  const envFiles = [
+    path.resolve(__dirname, '..', '.env'),           // 本地环境变量（包含真实密码）
+    path.resolve(__dirname, '..', `.env.${env}`),     // 环境特定配置
+    path.resolve(__dirname, '..', '.env.development') // 开发环境默认配置
+  ];
+
+  // 按优先级加载环境变量文件
+  envFiles.forEach(envPath => {
+    try {
+      if (fs.existsSync(envPath)) {
+        console.log(`加载环境变量文件: ${envPath}`);
+        require('dotenv').config({ path: envPath, override: false });
+      }
+    } catch (error) {
+      console.warn(`警告: 加载环境变量文件失败: ${envPath}`, error.message);
+    }
+  });
 }
 
 // 获取环境配置

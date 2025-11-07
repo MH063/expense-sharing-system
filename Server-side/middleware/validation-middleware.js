@@ -241,18 +241,21 @@ const paymentTransferValidationRules = {
 const billValidationRules = {
   create: [
     body('title').exists({ checkFalsy: true }).withMessage('title 为必填项').isString(),
-    body('amount').exists().isFloat({ gt: 0 }).withMessage('amount 必须为正数'),
-    body('roomId').exists().isInt().withMessage('roomId 必须为整数')
+    body('total_amount').exists().isFloat({ gt: 0 }).withMessage('total_amount 必须为正数'),
+    body('room_id').exists().isInt().withMessage('room_id 必须为整数'),
+    body('due_date').exists().isISO8601().withMessage('due_date 需为 ISO 日期'),
+    body('split_type').optional().isIn(['EQUAL','CUSTOM','PERCENTAGE']).withMessage('split_type 非法')
   ],
   update: [
     param('id').exists().isInt().withMessage('id 必须为整数'),
     body('title').optional().isString(),
-    body('amount').optional().isFloat({ gt: 0 }),
-    body('status').optional().isString()
+    body('total_amount').optional().isFloat({ gt: 0 }),
+    body('due_date').optional().isISO8601(),
+    body('category').optional().isString()
   ],
   review: [
     param('id').exists().isInt().withMessage('id 必须为整数'),
-    body('approved').exists().isBoolean().withMessage('approved 为必填项'),
+    body('action').exists().isIn(['APPROVE','REJECT']).withMessage('action 必须为 APPROVE/REJECT'),
     body('comment').optional().isString()
   ]
 };

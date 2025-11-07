@@ -18,19 +18,17 @@ function authenticateToken(req, res, next) {
     });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) {
-      console.log('认证中间件 - JWT验证错误:', err.message);
-      return res.status(403).json({
-        success: false,
-        message: '访问令牌无效或已过期'
-      });
+  try {
+    const { TokenManager } = require('./tokenManager');
+    const decoded = TokenManager.verifyAccessToken(token);
+    if (!decoded) {
+      return res.status(401).json({ success: false, message: '访问令牌无效或已过期' });
     }
-
-    console.log('认证中间件 - JWT验证成功，用户信息:', user);
-    req.user = user;
+    req.user = decoded;
     next();
-  });
+  } catch (err) {
+    return res.status(401).json({ success: false, message: '访问令牌无效或已过期' });
+  }
 }
 
 /**

@@ -4,6 +4,14 @@
  */
 
 const winston = require('winston');
+const fs = require('fs');
+const path = require('path');
+
+// 确保日志目录存在
+const logDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
 
 // 定义日志级别
 const levels = {
@@ -39,13 +47,17 @@ const format = winston.format.combine(
 const transports = [
   // 控制台输出
   new winston.transports.Console(),
-  // 错误日志文件
+  // 错误日志文件 - 使用UTF-8编码
   new winston.transports.File({
     filename: 'logs/error.log',
     level: 'error',
+    options: { flags: 'w', encoding: 'utf8' }
   }),
-  // 所有日志文件
-  new winston.transports.File({ filename: 'logs/all.log' }),
+  // 所有日志文件 - 使用UTF-8编码
+  new winston.transports.File({ 
+    filename: 'logs/all.log',
+    options: { flags: 'w', encoding: 'utf8' }
+  }),
 ];
 
 // 创建logger实例

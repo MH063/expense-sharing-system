@@ -1,25 +1,4 @@
-const pool = require('./config/database');
-const bcrypt = require('bcrypt');
+// Deprecated: 此脚本已被集中密码服务替代，避免明文与同步API示例泄露风险。
+// 若需手动校验密码，请使用 password-service 并在独立脚本中通过环境变量安全注入参数。
 
-async function checkPassword() {
-  try {
-    const password = 'password123';
-    const hash = bcrypt.hashSync(password, 10);
-    console.log('Generated hash:', hash);
-    
-    const result = await pool.query('SELECT password FROM users WHERE username = $1', ['testuser2']);
-    
-    if (result.rows.length > 0) {
-      console.log('Stored hash:', result.rows[0].password);
-      console.log('Password matches:', bcrypt.compareSync(password, result.rows[0].password));
-    } else {
-      console.log('User not found');
-    }
-    
-    await pool.end();
-  } catch (error) {
-    console.error('Error:', error);
-  }
-}
-
-checkPassword();
+console.log('This script has been deprecated. Use password-service instead.');

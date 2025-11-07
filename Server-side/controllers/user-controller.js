@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const winston = require('winston');
 const { TokenManager } = require('../middleware/tokenManager');
 const crypto = require('crypto');
+const { recordFailedLoginAttempt, resetFailedLoginAttempts, isAccountLocked } = require('../middleware/securityEnhancements');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -213,17 +214,31 @@ class UserController {
 
       const user = users[0];
 
+      // 检查账户是否被锁定
+      const lockStatus = await isAccountLocked(user.id);
+      if (lockStatus.locked) {
+        logger.warn(`账户被锁定，用户: ${username}`);
+        return res.status(423).json({
+          success: false,
+          message: '账户已被锁定，请稍后再试'
+        });
+      }
+
       // 若启用 MFA，需要校验一次 TOTP
       if (user.mfa_enabled) {
         const mfaCode = req.body && req.body.mfa_code;
         if (!mfaCode) {
           if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+          // 记录登录失败尝试
+          await recordFailedLoginAttempt(user.id);
           return res.status(401).json({ success: false, message: '需要多因素验证码' });
         }
         const { totpVerify } = require('../utils/totp');
         const ok = totpVerify(String(mfaCode), user.mfa_secret, { window: 1 });
         if (!ok) {
           if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+          // 记录登录失败尝试
+          await recordFailedLoginAttempt(user.id);
           return res.status(401).json({ success: false, message: '多因素验证码错误' });
         }
       }
@@ -233,8 +248,13 @@ class UserController {
 
       if (!isPasswordValid) {
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+        // 记录登录失败尝试
+        await recordFailedLoginAttempt(user.id);
         return res.status(401).json({ success: false, message: '登录信息不正确' });
       }
+
+      // 重置登录失败计数
+      await resetFailedLoginAttempts(user.id);
 
       // 移除密码字段
       const { password_hash: userPassword, ...userWithoutPassword } = user;
@@ -403,7 +423,7 @@ class UserController {
       
       // 查询用户信息
       const userResult = await pool.query(
-        'SELECT id, username, email, name, phone, avatar_url, role, status, created_at, updated_at FROM users WHERE id = $1',
+        'SELECT id, username, email, display_name as name, avatar_url, is_active as status, created_at, updated_at FROM users WHERE id = $1',
         [id]
       );
       

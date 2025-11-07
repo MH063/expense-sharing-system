@@ -497,7 +497,10 @@ const loadExpenses = async (forceRefresh = false) => {
     }
   } catch (error) {
     console.error('加载费用列表失败:', error)
-    ElMessage.error('加载费用列表失败')
+    // 提供更详细的错误信息
+    const errorMessage = error.response?.data?.message || error.message || '未知错误'
+    console.error('详细错误信息:', errorMessage)
+    ElMessage.error(`加载费用列表失败: ${errorMessage}`)
   } finally {
     loading.value = false
   }
@@ -605,6 +608,10 @@ const loadStatsAsync = async (params) => {
     }
   } catch (error) {
     console.error('加载统计数据失败:', error)
+    // 提供更详细的错误信息
+    const errorMessage = error.response?.data?.message || error.message || '未知错误'
+    console.error('详细错误信息:', errorMessage)
+    ElMessage.error(`统计数据加载失败: ${errorMessage}`)
   }
 }
 
@@ -723,7 +730,12 @@ const loadTrendChartData = async (params) => {
     }
   } catch (error) {
     console.error('加载费用趋势数据失败:', error)
-    // 不再使用模拟数据，直接显示错误信息
+    // 提供更详细的错误信息
+    const errorMessage = error.response?.data?.message || error.message || '未知错误'
+    console.error('详细错误信息:', errorMessage)
+    ElMessage.error(`费用趋势数据加载失败: ${errorMessage}`)
+    // 使用模拟数据作为后备
+    renderTrendChart(getMockTrendData())
   } finally {
     chartLoading.value = false
   }
@@ -785,7 +797,12 @@ const loadCategoryChartData = async (params) => {
     }
   } catch (error) {
     console.error('加载费用分类数据失败:', error)
-    // 不再使用模拟数据，直接显示错误信息
+    // 提供更详细的错误信息
+    const errorMessage = error.response?.data?.message || error.message || '未知错误'
+    console.error('详细错误信息:', errorMessage)
+    ElMessage.error(`费用分类数据加载失败: ${errorMessage}`)
+    // 使用模拟数据作为后备
+    renderCategoryChart(getMockCategoryData())
   } finally {
     chartLoading.value = false
   }
@@ -899,7 +916,42 @@ const renderCategoryChart = (data) => {
   categoryChart.setOption(option)
 }
 
+/**
+ * 获取模拟趋势数据
+ */
+const getMockTrendData = () => {
+  const dates = []
+  const amounts = []
+  const today = new Date()
+  
+  // 生成最近7天的数据
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - i)
+    dates.push(date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
+    
+    // 生成随机金额
+    amounts.push(Math.floor(Math.random() * 500) + 100)
+  }
+  
+  return { dates, amounts }
+}
 
+/**
+ * 获取模拟分类数据
+ */
+const getMockCategoryData = () => {
+  const categories = [
+    { name: '餐饮', value: Math.floor(Math.random() * 1000) + 200 },
+    { name: '水电费', value: Math.floor(Math.random() * 500) + 100 },
+    { name: '日用品', value: Math.floor(Math.random() * 300) + 50 },
+    { name: '娱乐', value: Math.floor(Math.random() * 400) + 100 },
+    { name: '交通', value: Math.floor(Math.random() * 200) + 50 },
+    { name: '其他', value: Math.floor(Math.random() * 300) + 50 }
+  ]
+  
+  return { categories }
+}
 
 /**
  * 加载房间列表
@@ -919,6 +971,10 @@ const loadRooms = async () => {
     }
   } catch (error) {
     console.error('加载房间列表失败:', error)
+    // 提供更详细的错误信息
+    const errorMessage = error.response?.data?.message || error.message || '未知错误'
+    console.error('详细错误信息:', errorMessage)
+    ElMessage.error(`房间列表加载失败: ${errorMessage}`)
   }
 }
 

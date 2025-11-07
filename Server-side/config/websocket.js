@@ -21,47 +21,86 @@ class WebSocketManager {
 
   // 初始化WebSocket服务器
   init(server) {
+    const MAX_CONNECTIONS = Number(process.env.WS_MAX_CONNECTIONS || 1000);
+    const MAX_CONNECTIONS_PER_IP = Number(process.env.WS_MAX_CONNECTIONS_PER_IP || 50);
+    const HEARTBEAT_INTERVAL_MS = Number(process.env.WS_HEARTBEAT_INTERVAL_MS || 30000);
+    const IDLE_TIMEOUT_MS = Number(process.env.WS_IDLE_TIMEOUT_MS || 120000);
+
     this.wss = new WebSocket.Server({ server });
-    
+    const ipCounts = new Map();
+
+    const getIp = (req) => (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+
+    const scheduleHeartbeat = () => {
+      this.wss.clients.forEach((client) => {
+        if (client.isAlive === false) {
+          try { client.terminate(); } catch (e) {}
+          return;
+        }
+        client.isAlive = false;
+        try { client.ping(); } catch (e) {}
+      });
+    };
+
+    const heartbeatTimer = setInterval(scheduleHeartbeat, HEARTBEAT_INTERVAL_MS);
+    this.wss.on('close', () => clearInterval(heartbeatTimer));
+
     this.wss.on('connection', (ws, req) => {
+      const currentTotal = this.clients.size;
+      if (currentTotal >= MAX_CONNECTIONS) {
+        ws.close(1013, 'Server overloaded');
+        return;
+      }
+
+      const ip = getIp(req);
+      const perIp = (ipCounts.get(ip) || 0) + 1;
+      if (perIp > MAX_CONNECTIONS_PER_IP) {
+        ws.close(1008, 'Too many connections from this IP');
+        return;
+      }
+      ipCounts.set(ip, perIp);
+
+      ws.isAlive = true;
+      ws.lastActivityAt = Date.now();
+      ws.on('pong', () => { ws.isAlive = true; ws.lastActivityAt = Date.now(); });
+      ws.on('message', () => { ws.lastActivityAt = Date.now(); });
+
       const clientId = this.generateClientId();
       this.clients.set(clientId, ws);
-      
-      this.logger.info(`新的WebSocket连接: ${clientId}, IP: ${req.socket.remoteAddress}`);
-      
-      // 发送连接确认消息
-      ws.send(JSON.stringify({
-        type: 'connection_ack',
-        clientId: clientId,
-        timestamp: new Date().toISOString()
-      }));
-      
-      // 监听客户端消息
+
+      this.logger.info(`新的WebSocket连接: ${clientId}, IP: ${ip}`);
+
+      ws.send(JSON.stringify({ type: 'connection_ack', clientId, timestamp: new Date().toISOString() }));
+
+      const idleTimer = setInterval(() => {
+        if (Date.now() - (ws.lastActivityAt || 0) > IDLE_TIMEOUT_MS) {
+          try { ws.terminate(); } catch (e) {}
+          clearInterval(idleTimer);
+        }
+      }, Math.min(IDLE_TIMEOUT_MS, 60000));
+
       ws.on('message', (message) => {
         try {
           const data = JSON.parse(message);
           this.handleMessage(clientId, data);
         } catch (error) {
           this.logger.error(`处理WebSocket消息错误: ${error.message}`);
-          ws.send(JSON.stringify({
-            type: 'error',
-            message: '消息格式错误'
-          }));
+          ws.send(JSON.stringify({ type: 'error', message: '消息格式错误' }));
         }
       });
-      
-      // 监听连接关闭
+
       ws.on('close', () => {
+        clearInterval(idleTimer);
         this.clients.delete(clientId);
+        ipCounts.set(ip, Math.max(0, (ipCounts.get(ip) || 1) - 1));
         this.logger.info(`WebSocket连接关闭: ${clientId}`);
       });
-      
-      // 监听错误
+
       ws.on('error', (error) => {
         this.logger.error(`WebSocket错误 (${clientId}): ${error.message}`);
       });
     });
-    
+
     this.logger.info('WebSocket服务器初始化完成');
   }
   
@@ -100,50 +139,21 @@ class WebSocketManager {
   handleAuth(clientId, token) {
     const ws = this.clients.get(clientId);
     if (!ws) return;
-    
     try {
-      // 验证JWT token - 使用与TokenManager相同的密钥获取方式
-      const jwt = require('jsonwebtoken');
-      const { getEnvironmentConfig } = require('../config/environment');
-      const envConfig = getEnvironmentConfig();
-      
-      // 使用与TokenManager相同的密钥获取逻辑
-      const accessSecrets = envConfig.jwtKeys.accessSecrets.length ? 
-        envConfig.jwtKeys.accessSecrets : 
-        [(process.env.JWT_SECRET || 'change-me-please-change-me-32chars-minimum')];
-      
-      const jwtSecret = accessSecrets[0];
-      const algorithm = envConfig.jwtKeys.algorithm || 'HS512';
-      
-      const decoded = jwt.verify(token, jwtSecret, { algorithms: [algorithm] });
-      
-      // 存储用户信息到客户端连接
+      const { TokenManager } = require('../middleware/tokenManager');
+      const decoded = TokenManager.verifyAccessToken(token);
+      if (!decoded) {
+        throw new Error('无效或过期的访问令牌');
+      }
       ws.userId = decoded.sub;
       ws.username = decoded.username;
       ws.roles = decoded.roles || [];
       ws.authenticated = true;
-      
       this.logger.info(`WebSocket客户端认证成功: ${clientId}, 用户: ${decoded.username}`);
-      
-      // 发送认证成功响应
-      ws.send(JSON.stringify({
-        type: 'auth',
-        success: true,
-        message: '认证成功',
-        userId: decoded.sub,
-        username: decoded.username,
-        timestamp: new Date().toISOString()
-      }));
+      ws.send(JSON.stringify({ type: 'auth', success: true, message: '认证成功', userId: decoded.sub, username: decoded.username, timestamp: new Date().toISOString() }));
     } catch (error) {
       this.logger.error(`WebSocket认证失败 (${clientId}): ${error.message}`);
-      
-      // 发送认证失败响应
-      ws.send(JSON.stringify({
-        type: 'auth',
-        success: false,
-        message: '认证失败: ' + error.message,
-        timestamp: new Date().toISOString()
-      }));
+      ws.send(JSON.stringify({ type: 'auth', success: false, message: '认证失败: ' + error.message, timestamp: new Date().toISOString() }));
     }
   }
   

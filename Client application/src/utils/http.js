@@ -66,7 +66,7 @@ const shouldSkipCaseConvert = (url) => {
 
 // 创建axios实例
 const http = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://localhost:4000/api',
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' }
 })

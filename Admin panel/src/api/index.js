@@ -7,7 +7,7 @@ export const adminAuthApi = {
   // 管理员登录
   login: (data) => {
     return request({
-      url: '/api/admin/auth/login',
+      url: '/admin/auth/login',  // 移除了 /api 前缀，因为 baseURL 已设置为 /api
       method: 'post',
       data
     })
@@ -21,7 +21,7 @@ export const roleApi = {
   // 获取角色列表
   getRoleList: () => {
     return request({
-      url: '/api/admin/roles',
+      url: '/admin/roles',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -29,7 +29,7 @@ export const roleApi = {
   // 获取角色详情
   getRoleDetail: (id) => {
     return request({
-      url: `/api/admin/roles/${id}`,
+      url: `/admin/roles/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -37,7 +37,7 @@ export const roleApi = {
   // 创建角色
   createRole: (data) => {
     return request({
-      url: '/api/admin/roles',
+      url: '/admin/roles',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -46,7 +46,7 @@ export const roleApi = {
   // 更新角色
   updateRole: (id, data) => {
     return request({
-      url: `/api/admin/roles/${id}`,
+      url: `/admin/roles/${id}`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -55,7 +55,7 @@ export const roleApi = {
   // 删除角色
   deleteRole: (id) => {
     return request({
-      url: `/api/admin/roles/${id}`,
+      url: `/admin/roles/${id}`,  // 移除了 /api 前缀
       method: 'delete'
     })
   },
@@ -63,7 +63,7 @@ export const roleApi = {
   // 获取权限列表
   getPermissionList: () => {
     return request({
-      url: '/api/admin/permissions',
+      url: '/admin/permissions',  // 移除了 /api 前缀
       method: 'get'
     })
   }
@@ -76,7 +76,7 @@ export const userApi = {
   // 获取用户列表
   getUserList: (params) => {
     return request({
-      url: '/api/admin/users',
+      url: '/admin/users',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -85,7 +85,7 @@ export const userApi = {
   // 获取用户详情
   getUserDetail: (id) => {
     return request({
-      url: `/api/admin/users/${id}`,
+      url: `/admin/users/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -93,7 +93,7 @@ export const userApi = {
   // 创建用户
   createUser: (data) => {
     return request({
-      url: '/api/admin/users',
+      url: '/admin/users',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -102,7 +102,7 @@ export const userApi = {
   // 更新用户
   updateUser: (id, data) => {
     return request({
-      url: `/api/admin/users/${id}`,
+      url: `/admin/users/${id}`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -111,7 +111,7 @@ export const userApi = {
   // 更新用户状态
   updateUserStatus: (id, status) => {
     return request({
-      url: `/api/admin/users/${id}/status`,
+      url: `/admin/users/${id}/status`,  // 移除了 /api 前缀
       method: 'put',
       data: { status }
     })
@@ -120,7 +120,7 @@ export const userApi = {
   // 重置用户密码
   resetUserPassword: (id) => {
     return request({
-      url: `/api/admin/users/${id}/reset-password`,
+      url: `/admin/users/${id}/reset-password`,  // 移除了 /api 前缀
       method: 'post'
     })
   },
@@ -128,7 +128,7 @@ export const userApi = {
   // 删除用户
   deleteUser: (id) => {
     return request({
-      url: `/api/admin/users/${id}`,
+      url: `/admin/users/${id}`,  // 移除了 /api 前缀
       method: 'delete'
     })
   },
@@ -136,7 +136,7 @@ export const userApi = {
   // 分配角色
   assignRole: (userId, data) => {
     return request({
-      url: `/api/admin/users/${userId}/roles`,
+      url: `/admin/users/${userId}/roles`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -145,7 +145,7 @@ export const userApi = {
   // 获取用户角色
   getUserRoles: (userId) => {
     return request({
-      url: `/api/admin/users/${userId}/roles`,
+      url: `/admin/users/${userId}/roles`,  // 移除了 /api 前缀
       method: 'get'
     })
   }
@@ -158,7 +158,7 @@ export const billApi = {
   // 获取账单列表
   getBillList: (params) => {
     return request({
-      url: '/api/admin/bills',
+      url: '/admin/bills',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -167,7 +167,7 @@ export const billApi = {
   // 获取账单详情
   getBillDetail: (id) => {
     return request({
-      url: `/api/admin/bills/${id}`,
+      url: `/admin/bills/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -175,7 +175,7 @@ export const billApi = {
   // 更新账单
   updateBill: (id, data) => {
     return request({
-      url: `/api/admin/bills/${id}`,
+      url: `/admin/bills/${id}`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -184,7 +184,7 @@ export const billApi = {
   // 删除账单
   deleteBill: (id) => {
     return request({
-      url: `/api/admin/bills/${id}`,
+      url: `/admin/bills/${id}`,  // 移除了 /api 前缀
       method: 'delete'
     })
   }
@@ -197,7 +197,7 @@ export const expenseApi = {
   // 获取待审核费用列表
   getPendingExpenses: (params) => {
     return request({
-      url: '/api/admin/expenses',
+      url: '/admin/expenses',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -206,7 +206,7 @@ export const expenseApi = {
   // 获取费用详情
   getExpenseDetail: (id) => {
     return request({
-      url: `/api/admin/expenses/${id}`,
+      url: `/admin/expenses/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -214,7 +214,7 @@ export const expenseApi = {
   // 审核费用
   reviewExpense: (id, data) => {
     return request({
-      url: `/api/admin/expenses/${id}/review`,
+      url: `/admin/expenses/${id}/review`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -223,7 +223,7 @@ export const expenseApi = {
   // 获取异常支出列表
   getAbnormalExpenses: (params) => {
     return request({
-      url: '/api/abnormal-expenses',
+      url: '/abnormal-expenses',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -232,7 +232,7 @@ export const expenseApi = {
   // 更新异常支出状态
   updateAbnormalExpenseStatus: (id, data) => {
     return request({
-      url: `/api/abnormal-expenses/${id}/status`,
+      url: `/abnormal-expenses/${id}/status`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -241,7 +241,7 @@ export const expenseApi = {
   // 获取异常支出统计
   getAbnormalExpenseStats: (params) => {
     return request({
-      url: '/api/abnormal-expenses/stats',
+      url: '/abnormal-expenses/stats',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -255,7 +255,7 @@ export const statisticsApi = {
   // 获取系统概览数据
   getSystemOverview: () => {
     return request({
-      url: '/api/stats/system',
+      url: '/stats/system',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -263,7 +263,7 @@ export const statisticsApi = {
   // 获取用户统计数据
   getUserStatistics: (params) => {
     return request({
-      url: '/api/stats/user',
+      url: '/stats/user',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -272,7 +272,7 @@ export const statisticsApi = {
   // 获取寝室统计数据
   getDormStatistics: (params) => {
     return request({
-      url: '/api/stats/room',
+      url: '/stats/room',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -281,7 +281,7 @@ export const statisticsApi = {
   // 获取预测数据
   getForecastData: (params) => {
     return request({
-      url: '/api/stats/forecast',
+      url: '/stats/forecast',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -295,7 +295,7 @@ export const systemApi = {
   // 获取系统配置
   getSystemConfig: () => {
     return request({
-      url: '/api/admin/system/config',
+      url: '/admin/system/config',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -303,7 +303,7 @@ export const systemApi = {
   // 更新系统配置
   updateSystemConfig: (data) => {
     return request({
-      url: '/api/admin/system/config',
+      url: '/admin/system/config',  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -312,7 +312,7 @@ export const systemApi = {
   // 获取功能开关
   getFeatureFlags: () => {
     return request({
-      url: '/api/admin/feature-flags',
+      url: '/admin/feature-flags',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -320,7 +320,7 @@ export const systemApi = {
   // 更新功能开关
   updateFeatureFlag: (id, data) => {
     return request({
-      url: `/api/admin/feature-flags/${id}`,
+      url: `/admin/feature-flags/${id}`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -329,7 +329,7 @@ export const systemApi = {
   // 获取维护窗口
   getMaintenanceWindows: () => {
     return request({
-      url: '/api/admin/maintenance-windows',
+      url: '/admin/maintenance-windows',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -337,7 +337,7 @@ export const systemApi = {
   // 创建维护窗口
   createMaintenanceWindow: (data) => {
     return request({
-      url: '/api/admin/maintenance-windows',
+      url: '/admin/maintenance-windows',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -346,7 +346,7 @@ export const systemApi = {
   // 获取公告列表
   getAnnouncements: () => {
     return request({
-      url: '/api/admin/announcements',
+      url: '/admin/announcements',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -354,7 +354,7 @@ export const systemApi = {
   // 创建公告
   createAnnouncement: (data) => {
     return request({
-      url: '/api/admin/announcements',
+      url: '/admin/announcements',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -368,7 +368,7 @@ export const auditLogApi = {
   // 获取操作日志
   getOperationLogs: (params) => {
     return request({
-      url: '/api/admin/operation-logs',
+      url: '/admin/operation-logs',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -377,7 +377,7 @@ export const auditLogApi = {
   // 获取数据变更审计日志
   getDataChangeAudits: (params) => {
     return request({
-      url: '/api/admin/data-change-audits',
+      url: '/admin/data-change-audits',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -391,7 +391,7 @@ export const batchJobApi = {
   // 获取批量任务列表
   getBatchJobs: (params) => {
     return request({
-      url: '/api/admin/batch-jobs',
+      url: '/admin/batch-jobs',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -400,7 +400,7 @@ export const batchJobApi = {
   // 创建批量任务
   createBatchJob: (data) => {
     return request({
-      url: '/api/admin/batch-jobs',
+      url: '/admin/batch-jobs',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -409,7 +409,7 @@ export const batchJobApi = {
   // 获取任务详情
   getBatchJobDetail: (id) => {
     return request({
-      url: `/api/admin/batch-jobs/${id}`,
+      url: `/admin/batch-jobs/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -417,7 +417,7 @@ export const batchJobApi = {
   // 获取报表定义列表
   getReportDefinitions: () => {
     return request({
-      url: '/api/admin/reports',
+      url: '/admin/reports',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -425,7 +425,7 @@ export const batchJobApi = {
   // 创建报表定义
   createReportDefinition: (data) => {
     return request({
-      url: '/api/admin/reports',
+      url: '/admin/reports',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -434,7 +434,7 @@ export const batchJobApi = {
   // 获取报表快照
   getReportSnapshots: (id) => {
     return request({
-      url: `/api/admin/reports/${id}/snapshots`,
+      url: `/admin/reports/${id}/snapshots`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -442,7 +442,7 @@ export const batchJobApi = {
   // 生成报表
   generateReport: (id) => {
     return request({
-      url: `/api/admin/reports/${id}/generate`,
+      url: `/admin/reports/${id}/generate`,  // 移除了 /api 前缀
       method: 'post'
     })
   },
@@ -450,7 +450,7 @@ export const batchJobApi = {
   // 获取导出任务列表
   getExportTasks: (params) => {
     return request({
-      url: '/api/admin/exports',
+      url: '/admin/exports',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -459,7 +459,7 @@ export const batchJobApi = {
   // 创建导出任务
   createExportTask: (data) => {
     return request({
-      url: '/api/admin/exports',
+      url: '/admin/exports',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -473,7 +473,7 @@ export const moderationApi = {
   // 获取审核队列
   getModerationQueue: (params) => {
     return request({
-      url: '/api/admin/moderation-queue',
+      url: '/admin/moderation-queue',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -482,7 +482,7 @@ export const moderationApi = {
   // 处理审核
   processModeration: (id, data) => {
     return request({
-      url: `/api/admin/moderation/${id}/process`,
+      url: `/admin/moderation/${id}/process`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -491,7 +491,7 @@ export const moderationApi = {
   // 获取工单列表
   getTickets: (params) => {
     return request({
-      url: '/api/admin/tickets',
+      url: '/admin/tickets',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -500,7 +500,7 @@ export const moderationApi = {
   // 获取工单详情
   getTicketDetail: (id) => {
     return request({
-      url: `/api/admin/tickets/${id}`,
+      url: `/admin/tickets/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -508,7 +508,7 @@ export const moderationApi = {
   // 更新工单状态
   updateTicketStatus: (id, data) => {
     return request({
-      url: `/api/admin/tickets/${id}/status`,
+      url: `/admin/tickets/${id}/status`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -517,7 +517,7 @@ export const moderationApi = {
   // 添加工单备注
   addTicketComment: (id, data) => {
     return request({
-      url: `/api/admin/tickets/${id}/comments`,
+      url: `/admin/tickets/${id}/comments`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -531,15 +531,15 @@ export const webhookApi = {
   // 获取Webhook列表
   getWebhooks: () => {
     return request({
-      url: '/api/admin/webhooks',
+      url: '/admin/webhooks',  // 移除了 /api 前缀
       method: 'get'
-    })
+       })
   },
   
   // 创建Webhook
   createWebhook: (data) => {
     return request({
-      url: '/api/admin/webhooks',
+      url: '/admin/webhooks',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -548,7 +548,7 @@ export const webhookApi = {
   // 获取Webhook事件
   getWebhookEvents: (id) => {
     return request({
-      url: `/api/admin/webhooks/${id}/events`,
+      url: `/admin/webhooks/${id}/events`,  // 移除了 /api 前缀
       method: 'get'
     })
   }
@@ -561,7 +561,7 @@ export const disputeApi = {
   // 获取争议列表
   getDisputeList: (params) => {
     return request({
-      url: '/api/admin/disputes',
+      url: '/admin/disputes',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -570,7 +570,7 @@ export const disputeApi = {
   // 获取争议详情
   getDisputeDetail: (id) => {
     return request({
-      url: `/api/admin/disputes/${id}`,
+      url: `/admin/disputes/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -578,7 +578,7 @@ export const disputeApi = {
   // 创建争议
   createDispute: (data) => {
     return request({
-      url: '/api/admin/disputes',
+      url: '/admin/disputes',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -587,7 +587,7 @@ export const disputeApi = {
   // 更新争议
   updateDispute: (id, data) => {
     return request({
-      url: `/api/admin/disputes/${id}`,
+      url: `/admin/disputes/${id}`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -596,7 +596,7 @@ export const disputeApi = {
   // 删除争议
   deleteDispute: (id) => {
     return request({
-      url: `/api/admin/disputes/${id}`,
+      url: `/admin/disputes/${id}`,  // 移除了 /api 前缀
       method: 'delete'
     })
   },
@@ -604,7 +604,7 @@ export const disputeApi = {
   // 分配处理人
   assignHandler: (id, data) => {
     return request({
-      url: `/api/admin/disputes/${id}/assign`,
+      url: `/admin/disputes/${id}/assign`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -613,7 +613,7 @@ export const disputeApi = {
   // 处理争议
   handleDispute: (id, data) => {
     return request({
-      url: `/api/admin/disputes/${id}/handle`,
+      url: `/admin/disputes/${id}/handle`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -622,7 +622,7 @@ export const disputeApi = {
   // 解决争议
   resolveDispute: (id, data) => {
     return request({
-      url: `/api/admin/disputes/${id}/resolve`,
+      url: `/admin/disputes/${id}/resolve`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -631,7 +631,7 @@ export const disputeApi = {
   // 获取可分配的处理人列表
   getAvailableHandlers: () => {
     return request({
-      url: '/api/admin/disputes/handlers',
+      url: '/admin/disputes/handlers',  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -639,7 +639,7 @@ export const disputeApi = {
   // 获取争议统计数据
   getDisputeStats: () => {
     return request({
-      url: '/api/admin/disputes/stats',
+      url: '/admin/disputes/stats',  // 移除了 /api 前缀
       method: 'get'
     })
   }
@@ -652,7 +652,7 @@ export const dormApi = {
   // 获取寝室列表
   getDormList: (params) => {
     return request({
-      url: '/api/admin/dorms',
+      url: '/admin/dorms',  // 移除了 /api 前缀
       method: 'get',
       params
     })
@@ -661,7 +661,7 @@ export const dormApi = {
   // 获取寝室详情
   getDormDetail: (id) => {
     return request({
-      url: `/api/admin/dorms/${id}`,
+      url: `/admin/dorms/${id}`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -669,7 +669,7 @@ export const dormApi = {
   // 创建寝室
   createDorm: (data) => {
     return request({
-      url: '/api/admin/dorms',
+      url: '/admin/dorms',  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -678,7 +678,7 @@ export const dormApi = {
   // 更新寝室
   updateDorm: (id, data) => {
     return request({
-      url: `/api/admin/dorms/${id}`,
+      url: `/admin/dorms/${id}`,  // 移除了 /api 前缀
       method: 'put',
       data
     })
@@ -687,7 +687,7 @@ export const dormApi = {
   // 删除寝室
   deleteDorm: (id) => {
     return request({
-      url: `/api/admin/dorms/${id}`,
+      url: `/admin/dorms/${id}`,  // 移除了 /api 前缀
       method: 'delete'
     })
   },
@@ -695,7 +695,7 @@ export const dormApi = {
   // 获取寝室成员列表
   getDormMembers: (id) => {
     return request({
-      url: `/api/admin/dorms/${id}/members`,
+      url: `/admin/dorms/${id}/members`,  // 移除了 /api 前缀
       method: 'get'
     })
   },
@@ -703,7 +703,7 @@ export const dormApi = {
   // 添加寝室成员
   addDormMember: (id, data) => {
     return request({
-      url: `/api/admin/dorms/${id}/members`,
+      url: `/admin/dorms/${id}/members`,  // 移除了 /api 前缀
       method: 'post',
       data
     })
@@ -712,7 +712,7 @@ export const dormApi = {
   // 移除寝室成员
   removeDormMember: (id, memberId) => {
     return request({
-      url: `/api/admin/dorms/${id}/members/${memberId}`,
+      url: `/admin/dorms/${id}/members/${memberId}`,  // 移除了 /api 前缀
       method: 'delete'
     })
   },
@@ -720,7 +720,7 @@ export const dormApi = {
   // 设置寝室长
   setDormLeader: (id, memberId) => {
     return request({
-      url: `/api/admin/dorms/${id}/leader`,
+      url: `/admin/dorms/${id}/leader`,  // 移除了 /api 前缀
       method: 'put',
       data: { memberId }
     })
@@ -729,7 +729,7 @@ export const dormApi = {
   // 获取可分配用户列表
   getAvailableUsers: () => {
     return request({
-      url: '/api/admin/users/available',
+      url: '/admin/users/available',  // 移除了 /api 前缀
       method: 'get'
     })
   }

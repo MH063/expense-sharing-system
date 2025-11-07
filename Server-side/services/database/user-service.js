@@ -41,16 +41,22 @@ class UserService extends BaseService {
   async createUser(userData) {
     const id = uuidv4();
     const { username, email, password, name, avatar, phone } = userData;
+
+    // 统一使用 password-service 进行哈希
+    const { hashPassword } = require('../../password-service');
+    const passwordHash = await hashPassword(password);
     
     const sql = `
-      INSERT INTO users (id, username, email, password, name, avatar, phone, is_active, created_at, updated_at)
+      INSERT INTO users (id, username, email, password_hash, name, avatar, phone, is_active, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *
     `;
     
-    const values = [id, username, email, password, name, avatar, phone, true];
+    const values = [id, username, email, passwordHash, name, avatar, phone, true];
     const result = await this.query(sql, values);
-    return result.rows[0];
+    const user = result.rows[0];
+    delete user.password_hash;
+    return user;
   }
 
   /**
@@ -68,16 +74,15 @@ class UserService extends BaseService {
     }
     
     const user = result.rows[0];
-    // 注意：这里假设密码已经通过bcrypt加密，实际使用时需要比较哈希值
-    const bcrypt = require('bcryptjs');
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const { verifyPassword } = require('../../password-service');
+    const isValidPassword = await verifyPassword(password, user.password_hash);
     
     if (!isValidPassword) {
       return null;
     }
     
-    // 返回用户信息，但不包含密码
-    delete user.password;
+    // 返回用户信息，但不包含密码哈希
+    delete user.password_hash;
     return user;
   }
 

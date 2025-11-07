@@ -350,29 +350,21 @@ class TokenManager {
         [userId]
       );
       
-      if (roleResult.rows.length === 0) {
-        // 如果用户没有角色，返回默认权限
-        return ['read', 'write'];
+      let userRole = 'user'; // 默认角色
+      if (roleResult.rows.length > 0) {
+        userRole = roleResult.rows[0].role;
       }
       
-      const userRole = roleResult.rows[0].role;
+      // 根据角色返回预定义的权限
+      const rolePermissions = {
+        'system_admin': ['read', 'write', 'delete', 'manage_users', 'manage_system'],
+        'admin': ['read', 'write', 'manage_users'],
+        '寝室长': ['read', 'write', 'manage_room'],
+        'payer': ['read', 'write', 'make_payments'],
+        'user': ['read', 'write']
+      };
       
-      // 根据角色获取权限
-      const permissionResult = await pool.query(
-        `SELECT p.code as permission 
-         FROM role_permissions rp 
-         JOIN permissions p ON rp.permission_id = p.id 
-         JOIN roles r ON rp.role_id = r.id 
-         WHERE r.name = $1`,
-        [userRole]
-      );
-      
-      if (permissionResult.rows.length === 0) {
-        // 如果角色没有权限，返回默认权限
-        return ['read', 'write'];
-      }
-      
-      return permissionResult.rows.map(row => row.permission);
+      return rolePermissions[userRole] || ['read', 'write'];
     } catch (error) {
       logger.error('获取用户权限失败:', error);
       // 出错时返回默认权限
@@ -464,18 +456,28 @@ function authenticateToken(req, res, next) {
  * @param {Array} allowedRoles - 允许访问的角色列表
  */
 function checkRole(allowedRoles) {
-  return (req, res, next) => {
-    // 这里应该从数据库获取用户角色，暂时从token中获取
-    const userRole = req.user.roles && req.user.roles[0]; // 简化处理，实际应该从数据库获取
-
-    if (!allowedRoles.includes(userRole)) {
-      return res.status(403).json({
+  return async (req, res, next) => {
+    try {
+      // 从数据库动态获取用户角色
+      const userRole = await TokenManager.getUserRole(req.user.sub);
+      
+      if (!allowedRoles.includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          message: '权限不足'
+        });
+      }
+      
+      // 更新req.user中的角色信息
+      req.user.roles = [userRole];
+      next();
+    } catch (error) {
+      logger.error('角色检查失败:', error);
+      return res.status(500).json({
         success: false,
-        message: '权限不足'
+        message: '服务器内部错误'
       });
     }
-
-    next();
   };
 }
 
@@ -484,23 +486,33 @@ function checkRole(allowedRoles) {
  * @param {Array} requiredPermissions - 需要的权限列表
  */
 function checkPermission(requiredPermissions) {
-  return (req, res, next) => {
-    // 这里应该从数据库获取用户权限，暂时从token中获取
-    const userPermissions = req.user.permissions || []; // 简化处理，实际应该从数据库获取
-
-    // 检查用户是否拥有所有需要的权限
-    const hasAllPermissions = requiredPermissions.every(permission => 
-      userPermissions.includes(permission)
-    );
-
-    if (!hasAllPermissions) {
-      return res.status(403).json({
+  return async (req, res, next) => {
+    try {
+      // 从数据库动态获取用户权限
+      const userPermissions = await TokenManager.getUserPermissions(req.user.sub);
+      
+      // 检查用户是否拥有所有需要的权限
+      const hasAllPermissions = requiredPermissions.every(permission => 
+        userPermissions.includes(permission)
+      );
+      
+      if (!hasAllPermissions) {
+        return res.status(403).json({
+          success: false,
+          message: '权限不足'
+        });
+      }
+      
+      // 更新req.user中的权限信息
+      req.user.permissions = userPermissions;
+      next();
+    } catch (error) {
+      logger.error('权限检查失败:', error);
+      return res.status(500).json({
         success: false,
-        message: '权限不足'
+        message: '服务器内部错误'
       });
     }
-
-    next();
   };
 }
 

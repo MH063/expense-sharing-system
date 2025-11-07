@@ -81,18 +81,25 @@ function getEnvironmentConfig() {
 
 // 初始化环境配置
 function initializeEnvironment() {
-  // 加载基础配置
   console.log('加载基础环境配置: .env');
-  
-  // 加载环境特定配置
   loadEnvironmentConfig();
-  
-  // 获取并返回配置
   const config = getEnvironmentConfig();
   console.log(`当前环境: ${config.nodeEnv}`);
   console.log(`应用端口: ${config.port}`);
   console.log(`数据库: ${config.db.host}:${config.db.port}/${config.db.name}`);
-  
+
+  // 基础配置校验（生产环境严格）
+  const isProd = (config.nodeEnv === 'production');
+  const missing = [];
+  if (!config.db.password && isProd) missing.push('DB_PASSWORD');
+  if ((!config.jwtKeys.accessSecrets || config.jwtKeys.accessSecrets.length === 0) && isProd) missing.push('JWT_SECRETS');
+  if ((!config.jwtKeys.refreshSecrets || config.jwtKeys.refreshSecrets.length === 0) && isProd) missing.push('JWT_REFRESH_SECRETS');
+  if (missing.length) {
+    const msg = `关键环境变量缺失: ${missing.join(', ')}`;
+    console.error(msg);
+    throw new Error(msg);
+  }
+
   return config;
 }
 

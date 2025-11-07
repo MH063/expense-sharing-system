@@ -36,37 +36,61 @@ const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: customFormat,
   transports: [
-    // 错误日志文件
+    // 错误日志文件 - 使用UTF-8编码
     new winston.transports.File({
       filename: path.join(logDir, 'error.log'),
       level: 'error',
       maxsize: 5242880, // 5MB
       maxFiles: 5,
+      options: { flags: 'w', encoding: 'utf8' },
+      // 确保写入UTF-8编码
+      eol: '\n'
     }),
-    // 组合日志文件
+    // 组合日志文件 - 使用UTF-8编码
     new winston.transports.File({
       filename: path.join(logDir, 'combined.log'),
       maxsize: 5242880, // 5MB
       maxFiles: 5,
+      options: { flags: 'w', encoding: 'utf8' },
+      // 确保写入UTF-8编码
+      eol: '\n'
     }),
-    // 访问日志文件
+    // 访问日志文件 - 使用UTF-8编码
     new winston.transports.File({
       filename: path.join(logDir, 'access.log'),
       level: 'http',
       maxsize: 5242880, // 5MB
       maxFiles: 5,
+      options: { flags: 'w', encoding: 'utf8' },
+      // 确保写入UTF-8编码
+      eol: '\n'
+    }),
+    // 用户控制器日志文件 - 使用UTF-8编码
+    new winston.transports.File({
+      filename: path.join(logDir, 'user-controller.log'),
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+      options: { flags: 'w', encoding: 'utf8' },
+      // 确保写入UTF-8编码
+      eol: '\n'
     })
   ],
-  // 异常处理
+  // 异常处理 - 使用UTF-8编码
   exceptionHandlers: [
     new winston.transports.File({
-      filename: path.join(logDir, 'exceptions.log')
+      filename: path.join(logDir, 'exceptions.log'),
+      options: { flags: 'w', encoding: 'utf8' },
+      // 确保写入UTF-8编码
+      eol: '\n'
     })
   ],
-  // 拒绝处理
+  // 拒绝处理 - 使用UTF-8编码
   rejectionHandlers: [
     new winston.transports.File({
-      filename: path.join(logDir, 'rejections.log')
+      filename: path.join(logDir, 'rejections.log'),
+      options: { flags: 'w', encoding: 'utf8' },
+      // 确保写入UTF-8编码
+      eol: '\n'
     })
   ]
 });

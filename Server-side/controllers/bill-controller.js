@@ -1,22 +1,8 @@
 const { pool } = require('../config/db');
-const winston = require('winston');
+const { logger } = require('../config/logger');
 const { authenticateToken, requireRole } = require('../middleware/auth-middleware');
 const fs = require('fs');
 const path = require('path');
-
-// 创建日志记录器
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/bill-error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/bill-combined.log' })
-  ]
-});
 
 /**
  * 账单控制器

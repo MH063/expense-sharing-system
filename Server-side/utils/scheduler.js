@@ -145,38 +145,50 @@ const tasks = {
 /**
  * 启动所有定时任务
  */
+// 并发保护 + 超时执行包装
+async function runWithLock(taskKey, fn, timeoutMs) {
+  const t = tasks[taskKey];
+  if (!t) return;
+  if (t._running) {
+    return { success: false, message: `任务 ${taskKey} 正在运行，跳过本次触发` };
+  }
+  t._running = true;
+  const timeout = Number(timeoutMs || process.env.SCHED_TASK_TIMEOUT_MS || 5 * 60 * 1000);
+  try {
+    const result = await Promise.race([
+      Promise.resolve().then(() => fn()),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('任务执行超时')), timeout))
+    ]);
+    return result;
+  } catch (error) {
+    return { success: false, message: `任务 ${taskKey} 执行失败: ${error.message}` };
+  } finally {
+    t._running = false;
+  }
+}
+
 const startAllTasks = () => {
   const isTest = process.env.NODE_ENV === 'test';
-  // 仅在非测试环境启动 cron，测试环境只标记运行状态
   if (!isTest) {
-    // 支付提醒：每小时第 0 分
     if (!scheduledTasks.paymentReminder) {
-      const t = cron.schedule('0 * * * *', () => tasks.paymentReminderCheck.task(), { scheduled: true });
+      const t = cron.schedule('0 * * * *', () => runWithLock('paymentReminderCheck', tasks.paymentReminderCheck.task), { scheduled: true });
       scheduledTasks.paymentReminder = t;
     }
-    // 离线支付同步：每 30 分钟
     if (!scheduledTasks.offlinePaymentSync) {
-      const t = cron.schedule('*/30 * * * *', () => tasks.offlinePaymentSync.task(), { scheduled: true });
+      const t = cron.schedule('*/30 * * * *', () => runWithLock('offlinePaymentSync', tasks.offlinePaymentSync.task), { scheduled: true });
       scheduledTasks.offlinePaymentSync = t;
     }
-    // 过期提醒清理：每日 2 点
     if (!scheduledTasks.cleanupExpiredReminders) {
-      const t = cron.schedule('0 2 * * *', () => tasks.cleanupExpiredReminders.task(), { scheduled: true });
+      const t = cron.schedule('0 2 * * *', () => runWithLock('cleanupExpiredReminders', tasks.cleanupExpiredReminders.task), { scheduled: true });
       scheduledTasks.cleanupExpiredReminders = t;
     }
-    // 支付统计：每日 3 点
     if (!scheduledTasks.generatePaymentStats) {
-      const t = cron.schedule('0 3 * * *', () => tasks.generatePaymentStats.task(), { scheduled: true });
+      const t = cron.schedule('0 3 * * *', () => runWithLock('generatePaymentStats', tasks.generatePaymentStats.task), { scheduled: true });
       scheduledTasks.generatePaymentStats = t;
     }
   }
-  // 标记任务为运行中（无论测试与否）
   Object.keys(tasks).forEach((k) => { tasks[k].running = true; });
-  return {
-    success: true,
-    message: '所有定时任务已启动',
-    tasks: Object.keys(tasks)
-  };
+  return { success: true, message: '所有定时任务已启动', tasks: Object.keys(tasks) };
 };
 
 /**
@@ -203,7 +215,7 @@ const triggerTask = async (taskName) => {
     return { success: false, message: `任务 ${taskName} 不存在` };
   }
   try {
-    const result = await t.task();
+    const result = await runWithLock(taskName, t.task);
     return { success: true, message: `任务 ${taskName} 触发成功`, result };
   } catch (error) {
     return { success: false, message: `任务 ${taskName} 执行失败: ${error.message}` };

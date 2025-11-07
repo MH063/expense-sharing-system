@@ -9,7 +9,7 @@ export const roomsApi = {
    * @returns {Promise} 房间列表
    */
   getUserRooms() {
-    return http.get('/rooms');
+    return http.get('/rooms/my-rooms');
   },
 
   /**

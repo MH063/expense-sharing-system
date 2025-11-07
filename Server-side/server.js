@@ -1,5 +1,9 @@
 console.log('===== 开始加载server.js =====');
 
+// 设置控制台编码为UTF-8
+process.stdout.setEncoding('utf8');
+process.stderr.setEncoding('utf8');
+
 // 添加全局错误处理器，以便捕获模块加载阶段的错误
 process.on('uncaughtException', (error) => {
   console.error('未捕获的异常:', error);
@@ -25,9 +29,21 @@ const config = initializeEnvironment();
 console.log('环境配置初始化完成:', config.nodeEnv);
 
 // 导入日志配置
-console.log('即将加载日志配置...');
+// 统一日志输出到 winston
 const { logger, httpLogger } = require('./config/logger');
-console.log('日志配置加载完成');
+(function bindConsoleToLogger() {
+  try {
+    const original = { ...console };
+    console.log = (...args) => logger.info(args.map(String).join(' '));
+    console.info = (...args) => logger.info(args.map(String).join(' '));
+    console.warn = (...args) => logger.warn(args.map(String).join(' '));
+    console.error = (...args) => logger.error(args.map(String).join(' '));
+    console.debug = (...args) => logger.debug(args.map(String).join(' '));
+    // 保留原始引用以便必要时恢复
+    global.__originalConsole = original;
+  } catch (_) {}
+})();
+logger.info('日志配置加载完成');
 
 // 导入安全配置
 console.log('即将加载安全配置...');
@@ -46,7 +62,7 @@ console.log('指标中间件加载完成');
 
 // 导入安全增强中间件
 console.log('即将加载安全增强中间件...');
-const { verifyRequestSignature, ipWhitelist } = require('./middleware/securityEnhancements');
+const { accountLockCheck, sensitiveOperationMFA } = require('./middleware/securityEnhancements');
 console.log('安全增强中间件加载完成');
 
 // 导入CORS配置
@@ -71,7 +87,7 @@ const crypto = require('crypto');
 
 // 导入数据库配置
 console.log('即将加载数据库配置...');
-const { pool, testConnection, ensureMfaColumns } = require('./config/db');
+const { createSequelizeInstance } = require('./config/database');
 console.log('数据库配置加载完成');
 
 // 导入WebSocket管理器
@@ -148,8 +164,8 @@ setupCors(app);
 app.use(metricsMiddleware);
 
 // 请求签名与 IP 白名单（如启用）
-app.use(verifyRequestSignature);
-app.use(ipWhitelist);
+// app.use(verifyRequestSignature);
+// app.use(ipWhitelist);
 
 // 安全中间件
 setupSecurityHeaders(app);
@@ -172,8 +188,19 @@ app.use('/api/ai', aiTokenHandler);
 // HTTP请求日志中间件
 app.use(httpLogger);
 
-// 静态文件服务 - 用于部署前端应用
+// 静态文件服务 - 用于部署前端应用与上传文件
 app.use(express.static('public'));
+// 暴露 /uploads 目录供收据访问（确保与 multer 配置一致）
+try {
+  const uploadsDir = path.join(__dirname, 'uploads');
+  if (fs.existsSync(uploadsDir)) {
+    app.use('/uploads', express.static(uploadsDir));
+  } else {
+    logger.warn(`未找到 uploads 目录: ${uploadsDir}，如需上传请创建该目录`);
+  }
+} catch (e) {
+  logger.error(`挂载 uploads 目录失败: ${e.message}`);
+}
 
 // API路由
 app.use('/api/disputes', disputeRoutes);
@@ -228,6 +255,12 @@ try {
 }
 
 
+
+// 404错误处理中间件（必须在所有路由之后）
+app.use(notFoundHandler);
+
+// 全局错误处理中间件（必须在所有其他中间件和路由之后）
+app.use(errorHandler);
 
 // 健康检查端点
 app.get('/health', async (req, res) => {
@@ -2175,10 +2208,16 @@ app.get('/', (req, res) => {
 async function startServer() {
   try {
     console.log('进入startServer函数...');
-    console.log('开始测试数据库连接...');
+    console.log('开始创建数据库连接...');
+    
+    // 创建数据库连接实例
+    const sequelize = await createSequelizeInstance();
+    console.log('数据库实例创建完成');
+    
     // 测试数据库连接
-    const dbConnected = await testConnection();
-    console.log('数据库连接结果:', dbConnected);
+    console.log('开始测试数据库连接...');
+    const dbConnected = await sequelize.authenticate();
+    console.log('数据库连接结果:', dbConnected ? '成功' : '失败');
     
     if (!dbConnected) {
       if (config.nodeEnv === 'development') {
@@ -2190,19 +2229,7 @@ async function startServer() {
     }
     
     console.log('准备启动HTTP服务器...');
-    // 确保数据库MFA列
-    try {
-      console.log('正在检查/创建MFA列...');
-      await ensureMfaColumns();
-      console.log('MFA列检查/创建完成');
-    } catch (error) {
-      console.error('MFA列检查/创建失败:', error);
-      // 在开发环境中继续启动，生产环境中退出
-      if (config.nodeEnv !== 'development') {
-        throw error;
-      }
-    }
-
+    
     // 启动服务器
     console.log('即将调用server.listen...');
     server.listen(PORT, () => {
@@ -2281,7 +2308,14 @@ process.on('SIGINT', async () => {
   // 停止定时任务
   scheduler.stopAllTasks();
   
-  await pool.end();
-  console.log('数据库连接已关闭');
+  // 关闭数据库连接
+  try {
+    const sequelize = await createSequelizeInstance();
+    await sequelize.close();
+    console.log('数据库连接已关闭');
+  } catch (error) {
+    console.error('关闭数据库连接时出错:', error);
+  }
+  
   process.exit(0);
 });

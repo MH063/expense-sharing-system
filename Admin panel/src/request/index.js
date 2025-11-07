@@ -61,7 +61,7 @@ const shouldSkipCaseConvert = (url) => {
 
 // 创建axios实例
 const request = axios.create({
-  baseURL: '',
+  baseURL: '/api', // 统一设置 baseURL 为 /api
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' }
 })
@@ -73,6 +73,11 @@ request.interceptors.request.use(
     const token = localStorage.getItem('admin-token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+
+    // 路径去重：若 baseURL 已含 /api，且 url 以 /api/ 开头则去掉前缀
+    if (typeof config.url === 'string' && config.url.startsWith('/api/')) {
+      config.url = config.url.replace(/^\/api\//, '/')
     }
 
     // 出站：统一转换为 snake_case，并过滤空值

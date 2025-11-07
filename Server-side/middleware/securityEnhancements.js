@@ -1,81 +1,245 @@
-const crypto = require('crypto');
-const { getEnvironmentConfig } = require('../config/environment');
+const { pool } = require('../config/db');
 const { logger } = require('../config/logger');
+const { totpVerify } = require('../utils/totp');
 
-const config = getEnvironmentConfig();
+/**
+ * 安全增强中间件
+ * 实现登录失败计数和账户锁定机制，以及敏感操作的二次身份验证
+ */
 
-function getClientIp(req) {
-  const xfwd = req.headers['x-forwarded-for'];
-  if (xfwd) {
-    const parts = Array.isArray(xfwd) ? xfwd : String(xfwd).split(',');
-    return parts[0].trim();
+// 登录失败尝试限制配置
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 30 * 60 * 1000; // 30分钟
+
+/**
+ * 记录登录失败尝试
+ * @param {string} userId - 用户ID
+ */
+async function recordFailedLoginAttempt(userId) {
+  try {
+    // 更新用户表中的登录失败计数和锁定时间
+    await pool.query(
+      `UPDATE users 
+       SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1,
+           locked_until = CASE 
+             WHEN COALESCE(failed_login_attempts, 0) + 1 >= $2 
+             THEN NOW() + INTERVAL '${LOCKOUT_DURATION} milliseconds' 
+             ELSE locked_until 
+           END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [userId, MAX_LOGIN_ATTEMPTS]
+    );
+  } catch (error) {
+    logger.error('记录登录失败尝试失败:', error);
   }
-  return req.ip;
 }
 
-function verifyRequestSignature(req, res, next) {
-  // 跳过健康检查和非 API 端点的签名验证
-  if (!config.security.enableRequestSignature || !req.path.startsWith('/api/')) {
-    return next();
+/**
+ * 重置登录失败计数
+ * @param {string} userId - 用户ID
+ */
+async function resetFailedLoginAttempts(userId) {
+  try {
+    await pool.query(
+      `UPDATE users 
+       SET failed_login_attempts = 0, 
+           locked_until = NULL, 
+           updated_at = NOW() 
+       WHERE id = $1`,
+      [userId]
+    );
+  } catch (error) {
+    logger.error('重置登录失败计数失败:', error);
   }
-
-  const secret = config.security.apiSigningSecret;
-  if (!secret) {
-    logger.error('请求签名启用但缺少 API_SIGNING_SECRET');
-    return res.status(500).json({ success: false, message: '服务器签名配置错误' });
-  }
-
-  const signature = req.get('X-Signature');
-  const timestamp = req.get('X-Timestamp');
-  if (!signature || !timestamp) {
-    return res.status(401).json({ success: false, message: '缺少签名或时间戳' });
-  }
-
-  const ts = parseInt(timestamp, 10);
-  if (!Number.isFinite(ts)) {
-    return res.status(400).json({ success: false, message: '无效的时间戳' });
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - ts) > config.security.signatureSkewSeconds) {
-    return res.status(401).json({ success: false, message: '请求已过期或时间偏差过大' });
-  }
-
-  // 构造签名串：method\npath\nquery\nbody\nts
-  const method = req.method.toUpperCase();
-  const path = req.path;
-  const queryRaw = req.originalUrl.includes('?') ? req.originalUrl.split('?')[1] : '';
-  const bodyRaw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
-  const payload = `${method}\n${path}\n${queryRaw}\n${bodyRaw}\n${ts}`;
-
-  const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  const expected = `v1=${hmac}`;
-
-  if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) {
-    logger.warn('请求签名校验失败', { ip: getClientIp(req), path: req.path });
-    return res.status(401).json({ success: false, message: '签名验证失败' });
-  }
-
-  return next();
 }
 
-function ipWhitelist(req, res, next) {
-  if (!config.security.enableIpWhitelist || !req.path.startsWith('/api/')) {
-    return next();
+/**
+ * 检查账户是否被锁定
+ * @param {string} userId - 用户ID
+ * @returns {Promise<Object>} 锁定状态和剩余时间
+ */
+async function isAccountLocked(userId) {
+  try {
+    const result = await pool.query(
+      `SELECT locked_until, failed_login_attempts 
+       FROM users 
+       WHERE id = $1`,
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return { locked: false };
+    }
+    
+    const user = result.rows[0];
+    const now = new Date();
+    
+    // 检查账户是否被锁定
+    if (user.locked_until && new Date(user.locked_until) > now) {
+      const lockoutTime = new Date(user.locked_until);
+      const remainingTime = lockoutTime.getTime() - now.getTime();
+      return { 
+        locked: true, 
+        remainingTime,
+        failedAttempts: user.failed_login_attempts
+      };
+    }
+    
+    return { locked: false, failedAttempts: user.failed_login_attempts };
+  } catch (error) {
+    logger.error('检查账户锁定状态失败:', error);
+    return { locked: false };
   }
-
-  const whitelist = config.security.ipWhitelist;
-  if (!Array.isArray(whitelist) || whitelist.length === 0) {
-    logger.error('IP 白名单启用但未配置 IP_WHITELIST');
-    return res.status(500).json({ success: false, message: '服务器白名单配置错误' });
-  }
-
-  const ip = getClientIp(req);
-  if (!whitelist.includes(ip)) {
-    logger.warn('IP 不在白名单', { ip, path: req.path });
-    return res.status(403).json({ success: false, message: 'IP 不在白名单' });
-  }
-  return next();
 }
 
-module.exports = { verifyRequestSignature, ipWhitelist };
+/**
+ * 账户锁定检查中间件
+ * 在登录前检查账户是否被锁定
+ */
+async function accountLockCheck(req, res, next) {
+  try {
+    const { username } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message: '用户名为必填项'
+      });
+    }
+    
+    // 查找用户
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE username = $1 OR email = $1',
+      [username]
+    );
+    
+    if (userResult.rows.length === 0) {
+      // 用户不存在，但仍需防止用户名枚举攻击
+      return res.status(401).json({
+        success: false,
+        message: '用户名或密码错误'
+      });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // 检查账户是否被锁定
+    const lockStatus = await isAccountLocked(userId);
+    
+    if (lockStatus.locked) {
+      logger.warn(`账户被锁定，用户ID: ${userId}`);
+      return res.status(423).json({
+        success: false,
+        message: '账户已被锁定，请稍后再试',
+        remainingTime: lockStatus.remainingTime
+      });
+    }
+    
+    // 将用户ID添加到请求对象中，供后续使用
+    req.userId = userId;
+    next();
+  } catch (error) {
+    logger.error('账户锁定检查失败:', error);
+    return res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+}
+
+/**
+ * 敏感操作二次身份验证中间件
+ * 验证用户的TOTP代码
+ */
+async function sensitiveOperationMFA(req, res, next) {
+  try {
+    // 确保用户已通过认证
+    if (!req.user || !req.user.sub) {
+      return res.status(401).json({
+        success: false,
+        message: '用户未认证'
+      });
+    }
+    
+    const userId = req.user.sub;
+    const mfaCode = req.body.mfa_code || req.headers['x-mfa-code'];
+    
+    if (!mfaCode) {
+      return res.status(400).json({
+        success: false,
+        message: '需要提供二次验证代码'
+      });
+    }
+    
+    // 获取用户的MFA设置
+    const userResult = await pool.query(
+      'SELECT mfa_secret, mfa_enabled FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // 检查MFA是否已启用
+    if (!user.mfa_enabled) {
+      return res.status(400).json({
+        success: false,
+        message: '用户未启用二次验证'
+      });
+    }
+    
+    // 验证TOTP代码
+    const isValid = totpVerify(String(mfaCode), user.mfa_secret, { window: 1 });
+    
+    if (!isValid) {
+      return res.status(401).json({
+        success: false,
+        message: '二次验证代码无效'
+      });
+    }
+    
+    next();
+  } catch (error) {
+    logger.error('敏感操作二次身份验证失败:', error);
+    return res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+}
+
+/**
+ * 更新数据库表结构，添加账户锁定相关字段
+ */
+async function updateDatabaseSchema() {
+  try {
+    // 添加登录失败计数和锁定时间字段
+    await pool.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ
+    `);
+    
+    logger.info('数据库表结构更新成功');
+  } catch (error) {
+    logger.error('更新数据库表结构失败:', error);
+  }
+}
+
+// 在模块加载时更新数据库结构
+updateDatabaseSchema().catch(console.error);
+
+module.exports = {
+  recordFailedLoginAttempt,
+  resetFailedLoginAttempts,
+  isAccountLocked,
+  accountLockCheck,
+  sensitiveOperationMFA
+};

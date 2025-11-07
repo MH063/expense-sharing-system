@@ -30,8 +30,6 @@ const corsOptions = {
     const allowedOrigins = [
       process.env.CLIENT_ORIGIN || '',
       process.env.ADMIN_ORIGIN || '',
-      'http://localhost:3000',
-      'http://localhost:3001',
       'http://localhost:4000',
       'http://localhost:8080'
     ].filter(Boolean);

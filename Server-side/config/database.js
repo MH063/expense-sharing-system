@@ -5,6 +5,7 @@
 
 const { Sequelize } = require('sequelize');
 const path = require('path');
+const { getDatabasePassword } = require('../utils/password-input');
 
 // 根据环境变量选择数据库配置
 const env = process.env.NODE_ENV || 'development';
@@ -78,43 +79,53 @@ const config = {
   }
 };
 
-// 创建Sequelize实例
-// 添加调试信息
-console.log('当前环境:', env);
-console.log('配置对象:', config);
-console.log('环境变量:', {
-  DB_DIALECT: process.env.DB_DIALECT,
-  DB_STORAGE: process.env.DB_STORAGE,
-  DB_HOST: process.env.DB_HOST,
-  DB_PORT: process.env.DB_PORT,
-  DB_NAME: process.env.DB_NAME,
-  DB_USER: process.env.DB_USER,
-  DB_PASSWORD: process.env.DB_PASSWORD ? '已设置' : '未设置'
-});
+// 创建Sequelize实例 - 使用异步函数获取密码
+async function createSequelizeInstance() {
+  // 获取数据库密码
+  const dbPassword = await getDatabasePassword();
+  
+  // 添加调试信息
+  console.log('当前环境:', env);
+  console.log('环境变量:', {
+    DB_DIALECT: process.env.DB_DIALECT,
+    DB_STORAGE: process.env.DB_STORAGE,
+    DB_HOST: process.env.DB_HOST,
+    DB_PORT: process.env.DB_PORT,
+    DB_NAME: process.env.DB_NAME,
+    DB_USER: process.env.DB_USER,
+    DB_PASSWORD: dbPassword ? '已设置' : '未设置'
+  });
 
-// 确保配置存在
-const dbConfig = config[env] || config.development;
+  // 确保配置存在
+  const dbConfig = config[env] || config.development;
+  
+  // 创建Sequelize实例
+  const sequelize = new Sequelize({
+    dialect: dbConfig.dialect,
+    host: dbConfig.host,
+    port: dbConfig.port,
+    database: dbConfig.database,
+    username: dbConfig.username,
+    password: dbPassword, // 使用从安全输入获取的密码
+    storage: dbConfig.storage,
+    logging: dbConfig.logging,
+    pool: dbConfig.pool,
+    define: {
+      freezeTableName: true
+    },
+    dialectOptions: {
+      // 添加SSL选项
+      ssl: process.env.DB_SSL === 'true' ? {
+        require: true,
+        rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
+      } : false
+    }
+  });
+  
+  return sequelize;
+}
 
-const sequelize = new Sequelize({
-  dialect: dbConfig.dialect,
-  host: dbConfig.host,
-  port: dbConfig.port,
-  database: dbConfig.database,
-  username: dbConfig.username,
-  password: dbConfig.password ? String(dbConfig.password) : undefined, // 确保密码是字符串类型
-  storage: dbConfig.storage,
-  logging: dbConfig.logging,
-  pool: dbConfig.pool,
-  define: {
-    freezeTableName: true
-  },
-  dialectOptions: {
-    // 添加SSL选项
-    ssl: process.env.DB_SSL === 'true' ? {
-      require: true,
-      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true'
-    } : false
-  }
-});
-
+// 导出异步函数和同步实例（向后兼容）
+const sequelize = createSequelizeInstance();
 module.exports = sequelize;
+module.exports.createSequelizeInstance = createSequelizeInstance;

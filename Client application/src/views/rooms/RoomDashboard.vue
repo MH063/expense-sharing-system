@@ -268,7 +268,244 @@ const stats = reactive({
   pendingInvites: 0
 })
 
-// ... existing code ...
+// 加载房间数据
+const loadRooms = async () => {
+  loading.value = true
+  try {
+    console.log('开始加载房间数据...')
+    
+    // 调用API获取房间列表
+    const response = await roomsApi.getUserRooms()
+    console.log('房间API响应:', response)
+    
+    if (response && response.success) {
+      // 后端直接返回房间数组，不是嵌套结构
+      const roomsData = response.data || []
+      rooms.value = roomsData
+      totalRooms.value = roomsData.length
+      
+      // 更新统计数据
+      stats.totalRooms = roomsData.length
+      stats.myRooms = roomsData.length // 用户房间列表中的所有房间都是用户的房间
+      stats.activeRooms = roomsData.filter(room => room.status === 'active').length
+      stats.pendingInvites = 0 // 当前API不返回待处理邀请数
+      
+      // 应用过滤器
+      applyFilters()
+      
+      console.log('房间数据加载成功:', rooms.value.length)
+    } else {
+      console.error('房间API响应格式不正确:', response)
+      ElMessage.error('获取房间数据失败')
+      // 使用模拟数据作为后备
+      loadMockData()
+    }
+  } catch (error) {
+    console.error('加载房间数据失败:', error)
+    ElMessage.error('获取房间数据失败: ' + (error.message || '未知错误'))
+    // 使用模拟数据作为后备
+    loadMockData()
+  } finally {
+    loading.value = false
+  }
+}
+
+// 应用过滤器
+const applyFilters = () => {
+  let filteredRooms = [...rooms.value]
+  
+  // 应用状态过滤
+  if (filterForm.status) {
+    filteredRooms = filteredRooms.filter(room => room.status === filterForm.status)
+  }
+  
+  // 应用成员数量过滤
+  if (filterForm.memberCount) {
+    switch (filterForm.memberCount) {
+      case '1-2':
+        filteredRooms = filteredRooms.filter(room => room.memberCount >= 1 && room.memberCount <= 2)
+        break
+      case '3-4':
+        filteredRooms = filteredRooms.filter(room => room.memberCount >= 3 && room.memberCount <= 4)
+        break
+      case '5+':
+        filteredRooms = filteredRooms.filter(room => room.memberCount >= 5)
+        break
+    }
+  }
+  
+  // 更新显示的房间列表
+  rooms.value = filteredRooms
+  totalRooms.value = filteredRooms.length
+}
+
+// 加载模拟数据作为后备
+const loadMockData = () => {
+  console.log('使用模拟房间数据')
+  rooms.value = [
+    {
+      id: 1,
+      name: '主卧室',
+      description: '主卧室房间，用于日常记账',
+      memberCount: 2,
+      status: 'active',
+      creatorName: '张三',
+      createdAt: '2023-01-15'
+    },
+    {
+      id: 2,
+      name: '客厅',
+      description: '客厅公共区域，共享记账',
+      memberCount: 4,
+      status: 'active',
+      creatorName: '李四',
+      createdAt: '2023-02-20'
+    },
+    {
+      id: 3,
+      name: '厨房',
+      description: '厨房用品记账',
+      memberCount: 1,
+      status: 'inactive',
+      creatorName: '王五',
+      createdAt: '2023-03-10'
+    }
+  ]
+  
+  totalRooms.value = rooms.value.length
+  stats.totalRooms = 3
+  stats.myRooms = 1
+  stats.activeRooms = 2
+  stats.pendingInvites = 0
+}
+
+// 重置过滤器
+const resetFilter = () => {
+  filterForm.status = ''
+  filterForm.memberCount = ''
+  currentPage.value = 1
+  loadRooms()
+}
+
+// 分页处理
+const handleSizeChange = (newSize) => {
+  pageSize.value = newSize
+  currentPage.value = 1
+  loadRooms()
+}
+
+const handleCurrentChange = (newPage) => {
+  currentPage.value = newPage
+  loadRooms()
+}
+
+// 权限检查方法
+const canEdit = (room) => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_EDIT) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN) ||
+         room.creatorId === userStore.currentUser.id
+}
+
+const canJoin = (room) => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_JOIN) && 
+         !room.members?.some(m => m.userId === userStore.currentUser.id)
+}
+
+const canLeave = (room) => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_LEAVE) && 
+         room.members?.some(m => m.userId === userStore.currentUser.id) &&
+         room.creatorId !== userStore.currentUser.id
+}
+
+// 操作方法
+const createRoom = () => {
+  router.push('/rooms/create')
+}
+
+const viewRoom = (roomId) => {
+  router.push(`/rooms/${roomId}`)
+}
+
+const editRoom = (roomId) => {
+  router.push(`/rooms/${roomId}/edit`)
+}
+
+const joinRoom = async (roomId) => {
+  try {
+    // 这里应该使用邀请码，但我们只有房间ID
+    // 在实际应用中，应该有一个获取房间邀请码的API
+    // 暂时使用房间ID作为邀请码的占位符
+    await roomsApi.joinRoom(roomId)
+    ElMessage.success('成功加入房间')
+    loadRooms()
+  } catch (error) {
+    console.error('加入房间失败:', error)
+    ElMessage.error('加入房间失败: ' + (error.message || '未知错误'))
+  }
+}
+
+const leaveRoom = async (roomId) => {
+  try {
+    await ElMessageBox.confirm('确定要退出这个房间吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await roomsApi.leaveRoom(roomId)
+    ElMessage.success('成功退出房间')
+    loadRooms()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('退出房间失败:', error)
+      ElMessage.error('退出房间失败: ' + (error.message || '未知错误'))
+    }
+  }
+}
+
+// 工具方法
+const getStatusTagType = (status) => {
+  switch (status) {
+    case 'active':
+      return 'success'
+    case 'inactive':
+      return 'info'
+    case 'pending':
+      return 'warning'
+    default:
+      return 'info'
+  }
+}
+
+const getStatusText = (status) => {
+  switch (status) {
+    case 'active':
+      return '活跃'
+    case 'inactive':
+      return '非活跃'
+    case 'pending':
+      return '待处理'
+    default:
+      return '未知'
+  }
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN')
+}
+
+const truncateText = (text, length) => {
+  if (!text) return '-'
+  return text.length > length ? text.substring(0, length) + '...' : text
+}
+
+// 组件挂载时加载数据
+onMounted(() => {
+  console.log('RoomDashboard组件挂载，开始加载房间数据')
+  loadRooms()
+})
 </script>
 
 <style scoped>

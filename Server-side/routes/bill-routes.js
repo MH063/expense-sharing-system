@@ -21,9 +21,8 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ 
-  storage: storage,
+  storage,
   fileFilter: function (req, file, cb) {
-    // 检查文件类型
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -31,7 +30,9 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: Number(process.env.MAX_FILE_SIZE_MB || process.env.MAX_FILE_SIZE || 5) * 1024 * 1024,
+    files: 1,
+    fieldSize: 1 * 1024 * 1024
   }
 });
 
@@ -45,6 +46,7 @@ router.post(
 );
 
 // 上传账单收据
+// 进度跟踪与错误捕获在控制器中统一处理
 router.post('/receipt', authenticateToken, upload.single('receipt'), billController.uploadReceipt);
 
 // 获取账单列表

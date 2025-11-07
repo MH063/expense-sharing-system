@@ -166,7 +166,7 @@ async function main() {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || '123456789'
+    password: process.env.DB_PASSWORD
   };
   
   // 要检查的环境

@@ -62,7 +62,7 @@ console.log('指标中间件加载完成');
 
 // 导入安全增强中间件
 console.log('即将加载安全增强中间件...');
-const { accountLockCheck, sensitiveOperationMFA } = require('./middleware/securityEnhancements');
+const { verifyRequestSignature, ipWhitelist } = require('./middleware/securityEnhancements');
 console.log('安全增强中间件加载完成');
 
 // 导入CORS配置
@@ -87,7 +87,7 @@ const crypto = require('crypto');
 
 // 导入数据库配置
 console.log('即将加载数据库配置...');
-const { createSequelizeInstance } = require('./config/database');
+const { pool, testConnection, ensureMfaColumns } = require('./config/db');
 console.log('数据库配置加载完成');
 
 // 导入WebSocket管理器
@@ -164,8 +164,8 @@ setupCors(app);
 app.use(metricsMiddleware);
 
 // 请求签名与 IP 白名单（如启用）
-// app.use(verifyRequestSignature);
-// app.use(ipWhitelist);
+app.use(verifyRequestSignature);
+app.use(ipWhitelist);
 
 // 安全中间件
 setupSecurityHeaders(app);
@@ -2208,16 +2208,10 @@ app.get('/', (req, res) => {
 async function startServer() {
   try {
     console.log('进入startServer函数...');
-    console.log('开始创建数据库连接...');
-    
-    // 创建数据库连接实例
-    const sequelize = await createSequelizeInstance();
-    console.log('数据库实例创建完成');
-    
-    // 测试数据库连接
     console.log('开始测试数据库连接...');
-    const dbConnected = await sequelize.authenticate();
-    console.log('数据库连接结果:', dbConnected ? '成功' : '失败');
+    // 测试数据库连接
+    const dbConnected = await testConnection();
+    console.log('数据库连接结果:', dbConnected);
     
     if (!dbConnected) {
       if (config.nodeEnv === 'development') {
@@ -2229,7 +2223,19 @@ async function startServer() {
     }
     
     console.log('准备启动HTTP服务器...');
-    
+    // 确保数据库MFA列
+    try {
+      console.log('正在检查/创建MFA列...');
+      await ensureMfaColumns();
+      console.log('MFA列检查/创建完成');
+    } catch (error) {
+      console.error('MFA列检查/创建失败:', error);
+      // 在开发环境中继续启动，生产环境中退出
+      if (config.nodeEnv !== 'development') {
+        throw error;
+      }
+    }
+
     // 启动服务器
     console.log('即将调用server.listen...');
     server.listen(PORT, () => {
@@ -2308,14 +2314,7 @@ process.on('SIGINT', async () => {
   // 停止定时任务
   scheduler.stopAllTasks();
   
-  // 关闭数据库连接
-  try {
-    const sequelize = await createSequelizeInstance();
-    await sequelize.close();
-    console.log('数据库连接已关闭');
-  } catch (error) {
-    console.error('关闭数据库连接时出错:', error);
-  }
-  
+  await pool.end();
+  console.log('数据库连接已关闭');
   process.exit(0);
 });

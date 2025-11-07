@@ -1,69 +1,37 @@
 <template>
-  <div class="room-detail">
+  <div v-if="canViewRoom" class="room-detail">
     <div class="detail-header">
-      <el-button type="text" @click="goBack" class="back-button">
-        <el-icon><ArrowLeft /></el-icon>
-        返回
-      </el-button>
-      <h1>房间详情</h1>
+      <el-button class="back-button" :icon="ArrowLeft" @click="goBack">返回</el-button>
+      <h2 v-if="room">房间详情</h2>
     </div>
 
     <div v-loading="loading" class="detail-content">
       <div v-if="room" class="room-info-section">
-        <el-card shadow="hover" class="room-card">
+        <el-card class="room-card">
           <template #header>
             <div class="card-header">
               <span class="room-name">{{ room.name }}</span>
               <div class="room-actions">
-                <el-tag :type="getStatusTagType(room.status)">
-                  {{ getStatusText(room.status) }}
-                </el-tag>
-                <el-button
-                  v-if="canEdit"
-                  type="primary"
-                  size="small"
-                  @click="editRoom"
-                >
-                  编辑
-                </el-button>
-                <el-button
-                  v-if="canJoin"
-                  type="primary"
-                  size="small"
-                  @click="joinRoom"
-                >
-                  加入房间
-                </el-button>
-                <el-button
-                  v-if="canLeave"
-                  type="danger"
-                  size="small"
-                  @click="leaveRoom"
-                >
-                  退出房间
-                </el-button>
+                <el-button v-if="canEdit" type="primary" @click="editRoom">编辑房间</el-button>
+                <el-button v-if="canJoin" type="success" @click="joinRoom">加入房间</el-button>
+                <el-button v-if="canLeave" type="danger" @click="leaveRoom">退出房间</el-button>
+                <el-button v-if="canManagePaymentRules" @click="goToPaymentRules">支付规则</el-button>
               </div>
             </div>
           </template>
-
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="房间描述" :span="2">
-              {{ room.description || '暂无描述' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="创建者">
-              {{ room.creatorName }}
-            </el-descriptions-item>
-            <el-descriptions-item label="创建时间">
-              {{ formatDate(room.createdAt) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="成员数量">
-              {{ room.memberCount }} / {{ room.maxMembers }}
-            </el-descriptions-item>
-            <el-descriptions-item label="房间状态">
+            <el-descriptions-item label="房间名称">{{ room.name }}</el-descriptions-item>
+            <el-descriptions-item label="房间描述">{{ room.description || '无' }}</el-descriptions-item>
+            <el-descriptions-item label="创建者">{{ room.creatorName }}</el-descriptions-item>
+            <el-descriptions-item label="位置">{{ room.location || '未设置' }}</el-descriptions-item>
+            <el-descriptions-item label="当前成员数">{{ room.memberCount }}/{{ room.maxMembers }}</el-descriptions-item>
+            <el-descriptions-item label="房间类型">{{ getRoomTypeText(room.type) }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
               <el-tag :type="getStatusTagType(room.status)">
                 {{ getStatusText(room.status) }}
               </el-tag>
             </el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ formatDate(room.createdAt) }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </div>
@@ -74,14 +42,11 @@
             <div class="tab-content">
               <div class="tab-header">
                 <h3>房间成员</h3>
-                <el-button
-                  v-if="canManageMembers"
-                  type="primary"
-                  size="small"
-                  @click="showInviteDialog = true"
-                >
-                  邀请成员
-                </el-button>
+                <div class="tab-actions">
+                  <el-button v-if="canManageMembers" type="primary" @click="showInviteDialog = true">
+                    邀请成员
+                  </el-button>
+                </div>
               </div>
               <el-table :data="roomMembers" stripe>
                 <el-table-column prop="userName" label="用户名" width="150" />
@@ -93,12 +58,12 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="joinedAt" label="加入时间" width="180">
+                <el-table-column prop="joinedAt" label="加入时间" width="150">
                   <template #default="scope">
                     {{ formatDate(scope.row.joinedAt) }}
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="180">
+                <el-table-column label="操作" width="150">
                   <template #default="scope">
                     <el-button
                       v-if="canManageMember(scope.row)"
@@ -110,6 +75,7 @@
                     <el-button
                       v-if="canRemoveMember(scope.row)"
                       type="text"
+                      class="danger-button"
                       @click="removeMember(scope.row)"
                     >
                       移除
@@ -119,43 +85,39 @@
               </el-table>
             </div>
           </el-tab-pane>
-
           <el-tab-pane label="费用记录" name="expenses">
             <div class="tab-content">
               <div class="tab-header">
                 <h3>费用记录</h3>
-                <el-button
-                  v-if="isMember"
-                  type="primary"
-                  size="small"
-                  @click="createExpense"
-                >
-                  添加费用
-                </el-button>
+                <div class="tab-actions">
+                  <el-button v-if="canManageExpenses" type="primary" @click="createExpense">
+                    添加费用
+                  </el-button>
+                </div>
               </div>
               <el-table :data="expenses" stripe>
-                <el-table-column prop="title" label="费用名称" width="180" />
-                <el-table-column prop="amount" label="金额" width="120">
-                  <template #default="scope">
-                    ¥{{ scope.row.amount.toFixed(2) }}
-                  </template>
-                </el-table-column>
-                <el-table-column prop="category" label="类型" width="120">
+                <el-table-column prop="title" label="费用名称" width="200" />
+                <el-table-column prop="category" label="类别" width="120">
                   <template #default="scope">
                     <el-tag :type="getCategoryTagType(scope.row.category)">
                       {{ getCategoryText(scope.row.category) }}
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="payerName" label="支付人" width="120" />
-                <el-table-column prop="paymentDate" label="支付日期" width="150">
+                <el-table-column prop="amount" label="总金额" width="120">
                   <template #default="scope">
-                    {{ formatDate(scope.row.paymentDate) }}
+                    ¥{{ scope.row.amount.toFixed(2) }}
                   </template>
                 </el-table-column>
                 <el-table-column label="我的分摊" width="120">
                   <template #default="scope">
                     ¥{{ getMyShare(scope.row).toFixed(2) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="paidBy" label="支付人" width="120" />
+                <el-table-column prop="date" label="日期" width="150">
+                  <template #default="scope">
+                    {{ formatDate(scope.row.date) }}
                   </template>
                 </el-table-column>
                 <el-table-column label="操作" width="120">
@@ -168,32 +130,18 @@
               </el-table>
             </div>
           </el-tab-pane>
-
           <el-tab-pane label="账单管理" name="bills">
             <div class="tab-content">
               <div class="tab-header">
                 <h3>账单管理</h3>
                 <div class="tab-actions">
-                  <el-button
-                    v-if="canManageBills"
-                    type="success"
-                    size="small"
-                    @click="goToPaymentRules"
-                  >
-                    支付规则
-                  </el-button>
-                  <el-button
-                    v-if="canManageBills"
-                    type="primary"
-                    size="small"
-                    @click="createBill"
-                  >
+                  <el-button v-if="canManageBills" type="primary" @click="createBill">
                     创建账单
                   </el-button>
                 </div>
               </div>
               <el-table :data="bills" stripe>
-                <el-table-column prop="title" label="账单名称" width="180" />
+                <el-table-column prop="title" label="账单名称" width="200" />
                 <el-table-column prop="totalAmount" label="总金额" width="120">
                   <template #default="scope">
                     ¥{{ scope.row.totalAmount.toFixed(2) }}
@@ -267,17 +215,29 @@
       </template>
     </el-dialog>
   </div>
+
+  <!-- 无权限访问提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-content">
+      <el-icon class="no-permission-icon"><Lock /></el-icon>
+      <h2>访问受限</h2>
+      <p>您没有权限查看房间详情</p>
+      <el-button type="primary" @click="goBack">返回上一页</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, Lock } from '@element-plus/icons-vue'
 import { roomsApi } from '@/api/rooms'
 import { expenseApi } from '@/api/expenses'
 import { billApi } from '@/api/bills'
 import { useUserStore } from '@/stores/user'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 
 // 路由
 const route = useRoute()
@@ -285,6 +245,7 @@ const router = useRouter()
 
 // 状态
 const userStore = useUserStore()
+const authStore = useAuthStore()
 const loading = ref(false)
 const room = ref(null)
 const roomMembers = ref([])
@@ -315,6 +276,12 @@ const currentUserId = computed(() => userStore.userId)
 const roomId = computed(() => route.params.id)
 const isAdmin = computed(() => userStore.isAdmin)
 
+// 权限检查
+const canViewRoom = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_VIEW) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)
+})
+
 // 是否是房间成员
 const isMember = computed(() => {
   return room.value?.isMember
@@ -322,29 +289,59 @@ const isMember = computed(() => {
 
 // 是否可以编辑房间
 const canEdit = computed(() => {
-  return room.value?.creatorId === currentUserId.value
+  return (room.value?.creatorId === currentUserId.value || 
+          authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) ||
+          authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)) &&
+          canViewRoom.value
 })
 
 // 是否可以加入房间
 const canJoin = computed(() => {
-  return !room.value?.isMember && room.value?.memberCount < room.value?.maxMembers
+  return !room.value?.isMember && 
+         room.value?.memberCount < room.value?.maxMembers &&
+         canViewRoom.value
 })
 
 // 是否可以退出房间
 const canLeave = computed(() => {
-  return room.value?.isMember && room.value?.creatorId !== currentUserId.value
+  return room.value?.isMember && 
+         room.value?.creatorId !== currentUserId.value &&
+         canViewRoom.value
 })
 
 // 是否可以管理成员
 const canManageMembers = computed(() => {
-  return room.value?.creatorId === currentUserId.value || 
-         (room.value?.isAdmin && room.value?.isMember)
+  return (room.value?.creatorId === currentUserId.value || 
+          (room.value?.isAdmin && room.value?.isMember) ||
+          authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) ||
+          authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)) &&
+          canViewRoom.value
 })
 
 // 是否可以管理账单
 const canManageBills = computed(() => {
-  return room.value?.creatorId === currentUserId.value || 
-         (room.value?.isAdmin && room.value?.isMember)
+  return (room.value?.creatorId === currentUserId.value || 
+          (room.value?.isAdmin && room.value?.isMember) ||
+          authStore.hasPermission(PERMISSIONS.BILL_MANAGE) ||
+          authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)) &&
+          canViewRoom.value
+})
+
+// 是否可以管理费用
+const canManageExpenses = computed(() => {
+  return (room.value?.creatorId === currentUserId.value || 
+          (room.value?.isAdmin && room.value?.isMember) ||
+          authStore.hasPermission(PERMISSIONS.EXPENSE_MANAGE) ||
+          authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)) &&
+          canViewRoom.value
+})
+
+// 是否可以管理支付规则
+const canManagePaymentRules = computed(() => {
+  return (room.value?.creatorId === currentUserId.value || 
+          authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) ||
+          authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)) &&
+          canViewRoom.value
 })
 
 // 方法
@@ -352,6 +349,11 @@ const canManageBills = computed(() => {
  * 加载房间详情
  */
 const loadRoomDetail = async () => {
+  if (!canViewRoom.value) {
+    console.log('用户没有查看房间详情的权限')
+    return
+  }
+  
   loading.value = true
   try {
     const resp = await roomsApi.getRoomDetail(roomId.value)
@@ -373,6 +375,11 @@ const loadRoomDetail = async () => {
  * 加载标签页数据
  */
 const loadTabData = async () => {
+  if (!canViewRoom.value) {
+    console.log('用户没有查看房间详情的权限')
+    return
+  }
+  
   if (activeTab.value === 'members') {
     loadRoomMembers()
   } else if (activeTab.value === 'expenses') {
@@ -386,6 +393,11 @@ const loadTabData = async () => {
  * 加载房间成员
  */
 const loadRoomMembers = async () => {
+  if (!canViewRoom.value) {
+    console.log('用户没有查看房间成员的权限')
+    return
+  }
+  
   try {
     const resp = await roomsApi.getRoomMembers(roomId.value)
     if (resp?.data?.success) {
@@ -403,6 +415,11 @@ const loadRoomMembers = async () => {
  * 加载房间费用
  */
 const loadRoomExpenses = async () => {
+  if (!canViewRoom.value) {
+    console.log('用户没有查看房间费用的权限')
+    return
+  }
+  
   try {
     const resp = await expenseApi.getExpenses({ roomId: roomId.value })
     if (resp?.data?.success) {
@@ -421,6 +438,11 @@ const loadRoomExpenses = async () => {
  * 加载房间账单
  */
 const loadRoomBills = async () => {
+  if (!canViewRoom.value) {
+    console.log('用户没有查看房间账单的权限')
+    return
+  }
+  
   try {
     const resp = await billApi.getBills({ roomId: roomId.value })
     if (resp?.data?.success) {
@@ -446,6 +468,10 @@ const goBack = () => {
  * 编辑房间
  */
 const editRoom = () => {
+  if (!canEdit.value) {
+    ElMessage.warning('您没有权限编辑此房间')
+    return
+  }
   router.push(`/rooms/${roomId.value}/edit`)
 }
 
@@ -453,6 +479,11 @@ const editRoom = () => {
  * 加入房间
  */
 const joinRoom = async () => {
+  if (!canJoin.value) {
+    ElMessage.warning('您没有权限加入此房间')
+    return
+  }
+  
   try {
     // 通过邀请码加入在房间详情页不可用，跳转到邀请页处理加入逻辑
     router.push('/rooms/invitations')
@@ -466,6 +497,11 @@ const joinRoom = async () => {
  * 退出房间
  */
 const leaveRoom = async () => {
+  if (!canLeave.value) {
+    ElMessage.warning('您没有权限退出此房间')
+    return
+  }
+  
   try {
     await ElMessageBox.confirm('确定要退出此房间吗？', '确认退出', {
       confirmButtonText: '确定',
@@ -498,6 +534,10 @@ const handleTabClick = () => {
  * 创建费用
  */
 const createExpense = () => {
+  if (!canManageExpenses.value) {
+    ElMessage.warning('您没有权限创建费用')
+    return
+  }
   router.push(`/expenses/create?roomId=${roomId.value}`)
 }
 
@@ -505,6 +545,10 @@ const createExpense = () => {
  * 查看费用详情
  */
 const viewExpenseDetail = (expense) => {
+  if (!canViewRoom.value) {
+    ElMessage.warning('您没有权限查看费用详情')
+    return
+  }
   router.push(`/expenses/${expense.id}`)
 }
 
@@ -512,6 +556,10 @@ const viewExpenseDetail = (expense) => {
  * 创建账单
  */
 const createBill = () => {
+  if (!canManageBills.value) {
+    ElMessage.warning('您没有权限创建账单')
+    return
+  }
   router.push(`/bills/create?roomId=${roomId.value}`)
 }
 
@@ -519,6 +567,10 @@ const createBill = () => {
  * 跳转到支付规则页面
  */
 const goToPaymentRules = () => {
+  if (!canManagePaymentRules.value) {
+    ElMessage.warning('您没有权限管理支付规则')
+    return
+  }
   router.push(`/rooms/${roomId.value}/payment-rules`)
 }
 
@@ -526,6 +578,10 @@ const goToPaymentRules = () => {
  * 查看账单详情
  */
 const viewBillDetail = (bill) => {
+  if (!canViewRoom.value) {
+    ElMessage.warning('您没有权限查看账单详情')
+    return
+  }
   router.push(`/bills/${bill.id}`)
 }
 
@@ -533,6 +589,11 @@ const viewBillDetail = (bill) => {
  * 更改成员角色
  */
 const changeMemberRole = async (member) => {
+  if (!canManageMember(member)) {
+    ElMessage.warning('您没有权限更改此成员的角色')
+    return
+  }
+  
   try {
     const { value: newRole } = await ElMessageBox.prompt('请选择新角色', '更改角色', {
       confirmButtonText: '确定',
@@ -564,6 +625,11 @@ const changeMemberRole = async (member) => {
  * 移除成员
  */
 const removeMember = async (member) => {
+  if (!canRemoveMember(member)) {
+    ElMessage.warning('您没有权限移除此成员')
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(`确定要移除成员 ${member.userName} 吗？`, '确认移除', {
       confirmButtonText: '确定',
@@ -592,6 +658,11 @@ const removeMember = async (member) => {
 const submitInvite = async () => {
   if (!inviteFormRef.value) return
   
+  if (!canManageMembers.value) {
+    ElMessage.warning('您没有权限邀请成员')
+    return
+  }
+  
   try {
     await inviteFormRef.value.validate()
     
@@ -615,13 +686,22 @@ const submitInvite = async () => {
  * 判断是否可以管理成员
  */
 const canManageMember = (member) => {
+  // 检查基本权限
+  if (!canViewRoom.value) return false
+  
   // 不能更改创建者角色
   if (member.userId === room.value?.creatorId) return false
   
   // 创建者可以管理所有成员
   if (room.value?.creatorId === currentUserId.value) return true
   
-  // 管理员可以管理普通成员
+  // 系统管理员可以管理所有成员
+  if (authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)) return true
+  
+  // 房间管理员可以管理普通成员
+  if (authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) && member.role === 'member') return true
+  
+  // 房间内的管理员可以管理普通成员
   if (room.value?.isAdmin && room.value?.isMember && member.role === 'member') return true
   
   return false
@@ -631,6 +711,9 @@ const canManageMember = (member) => {
  * 判断是否可以移除成员
  */
 const canRemoveMember = (member) => {
+  // 检查基本权限
+  if (!canViewRoom.value) return false
+  
   // 不能移除创建者
   if (member.userId === room.value?.creatorId) return false
   
@@ -640,7 +723,13 @@ const canRemoveMember = (member) => {
   // 创建者可以移除所有其他成员
   if (room.value?.creatorId === currentUserId.value) return true
   
-  // 管理员可以移除普通成员
+  // 系统管理员可以移除所有成员(除了创建者)
+  if (authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)) return true
+  
+  // 房间管理员可以移除普通成员
+  if (authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) && member.role === 'member') return true
+  
+  // 房间内的管理员可以移除普通成员
   if (room.value?.isAdmin && room.value?.isMember && member.role === 'member') return true
   
   return false
@@ -774,7 +863,11 @@ const getBillStatusText = (status) => {
 
 // 生命周期
 onMounted(() => {
-  loadRoomDetail()
+  if (canViewRoom.value) {
+    loadRoomDetail()
+  } else {
+    console.log('用户没有查看房间详情的权限')
+  }
 })
 </script>
 
@@ -853,5 +946,43 @@ onMounted(() => {
 .empty-state {
   margin-top: 50px;
   text-align: center;
+}
+
+.no-permission-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: 20px;
+}
+
+.no-permission-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.no-permission-icon {
+  font-size: 64px;
+  color: #F56C6C;
+  margin-bottom: 20px;
+}
+
+.no-permission-content h2 {
+  margin: 0 0 16px;
+  color: #303133;
+}
+
+.no-permission-content p {
+  margin: 0 0 24px;
+  color: #606266;
+  line-height: 1.6;
+}
+
+.danger-button {
+  color: #F56C6C;
+}
+
+.danger-button:hover {
+  color: #f78989;
 }
 </style>

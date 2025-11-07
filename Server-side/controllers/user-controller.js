@@ -142,8 +142,16 @@ class UserController {
         role: 'admin' // 管理员角色
       };
       
-      const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
-      const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+      // 使用TokenManager生成JWT token，与普通用户登录保持一致
+      const { TokenManager } = require('../middleware/tokenManager');
+      const accessToken = TokenManager.generateAccessToken({
+        sub: user.id.toString(),
+        username: user.username,
+        roles: ['admin'], // 管理员角色
+        permissions: ['read', 'write', 'admin']
+      });
+      
+      const refreshToken = TokenManager.generateRefreshToken(user.id.toString());
       
       // 更新最后登录时间 - 如果admin_users表有updated_at字段
       try {
@@ -231,13 +239,53 @@ class UserController {
       // 移除密码字段
       const { password_hash: userPassword, ...userWithoutPassword } = user;
 
+      // 查询用户角色
+      let userRole = 'user'; // 默认角色
+      try {
+        const roleResult = await pool.query(
+          `SELECT r.name as role 
+           FROM user_roles ur 
+           JOIN roles r ON ur.role_id = r.id 
+           WHERE ur.user_id = $1`,
+          [user.id]
+        );
+        
+        if (roleResult.rows.length > 0) {
+          userRole = roleResult.rows[0].role;
+        }
+      } catch (error) {
+        logger.warn('获取用户角色失败，使用默认角色:', error.message);
+      }
+
+      // 查询用户权限
+      let userPermissions = ['read', 'write']; // 默认权限
+      try {
+        const permissionResult = await pool.query(
+          `SELECT p.code as permission 
+           FROM role_permissions rp 
+           JOIN permissions p ON rp.permission_id = p.id 
+           JOIN roles r ON rp.role_id = r.id 
+           WHERE r.name = $1`,
+          [userRole]
+        );
+        
+        if (permissionResult.rows.length > 0) {
+          userPermissions = permissionResult.rows.map(row => row.permission);
+        }
+      } catch (error) {
+        logger.warn('获取用户权限失败，使用默认权限:', error.message);
+      }
+
+      // 添加角色信息到用户对象
+      userWithoutPassword.role = userRole;
+
       // 使用TokenManager生成JWT token
       const { TokenManager } = require('../middleware/tokenManager');
       const accessToken = TokenManager.generateAccessToken({
         sub: user.id.toString(),
         username: user.username,
-        roles: ['user'], // 默认角色为user
-        permissions: ['read', 'write']
+        roles: [userRole], // 使用查询到的角色
+        permissions: userPermissions // 使用查询到的权限
       });
       
       const refreshToken = TokenManager.generateRefreshToken(user.id.toString());
@@ -314,11 +362,16 @@ class UserController {
       const user = users[0];
 
       // 使用TokenManager生成新的JWT token
+      
+      // 从数据库获取最新的用户角色和权限
+      const userRole = await TokenManager.getUserRole(user.id);
+      const userPermissions = await TokenManager.getUserPermissions(user.id);
+      
       const newAccessToken = TokenManager.generateAccessToken({
         sub: user.id.toString(),
         username: user.username,
-        roles: ['user'],
-        permissions: ['read', 'write']
+        roles: [userRole],
+        permissions: userPermissions
       });
       
       const newRefreshToken = TokenManager.generateRefreshToken(user.id.toString());
@@ -429,18 +482,13 @@ class UserController {
       let paramIndex = 1;
       
       if (name !== undefined) {
-        updateFields.push(`name = $${paramIndex++}`);
+        updateFields.push(`display_name = $${paramIndex++}`);
         updateValues.push(name);
       }
       
       if (email !== undefined) {
         updateFields.push(`email = $${paramIndex++}`);
         updateValues.push(email);
-      }
-      
-      if (phone !== undefined) {
-        updateFields.push(`phone = $${paramIndex++}`);
-        updateValues.push(phone);
       }
       
       if (avatar_url !== undefined) {
@@ -456,7 +504,7 @@ class UserController {
         UPDATE users 
         SET ${updateFields.join(', ')}
         WHERE id = $${paramIndex}
-        RETURNING id, username, email, name, phone, avatar_url, role, status, updated_at
+        RETURNING id, username, email, display_name, avatar_url, is_active, updated_at
       `;
       
       const result = await pool.query(updateQuery, updateValues);
@@ -491,23 +539,25 @@ class UserController {
       let paramIndex = 1;
       
       if (role) {
-        conditions.push(`role = $${paramIndex++}`);
+        conditions.push(`r.name = $${paramIndex++}`);
         queryParams.push(role);
       }
       
       if (status) {
-        conditions.push(`status = $${paramIndex++}`);
-        queryParams.push(status);
+        conditions.push(`u.is_active = $${paramIndex++}`);
+        queryParams.push(status === 'active' ? true : false);
       }
       
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       
       // 查询用户列表
       const usersQuery = `
-        SELECT id, username, email, name, phone, avatar_url, role, status, created_at, updated_at
-        FROM users
+        SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.is_active, u.created_at, u.updated_at, r.name as role
+        FROM users u
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id
         ${whereClause}
-        ORDER BY created_at DESC
+        ORDER BY u.created_at DESC
         LIMIT $${paramIndex++} OFFSET $${paramIndex++}
       `;
       
@@ -517,7 +567,13 @@ class UserController {
       const users = usersResult.rows;
       
       // 查询总数
-      const countQuery = `SELECT COUNT(*) FROM users ${whereClause}`;
+      const countQuery = `
+        SELECT COUNT(*) 
+        FROM users u
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id
+        ${whereClause}
+      `;
       const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
       const totalCount = parseInt(countResult.rows[0].count);
       
@@ -766,28 +822,49 @@ class UserController {
       const userId = req.user.sub;
       
       // 查询用户信息
-      const userResult = await pool.query(
-        `SELECT id, username, email, display_name, avatar_url, is_active, created_at, updated_at
-         FROM users WHERE id = $1`,
+    const userResult = await pool.query(
+      `SELECT id, username, email, display_name, avatar_url, is_active, created_at, updated_at
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // 查询用户角色
+    let userRole = 'user'; // 默认角色
+    try {
+      const roleResult = await pool.query(
+        `SELECT r.name as role 
+         FROM user_roles ur 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE ur.user_id = $1`,
         [userId]
       );
       
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+      if (roleResult.rows.length > 0) {
+        userRole = roleResult.rows[0].role;
       }
-      
-      const user = userResult.rows[0];
-      
-      logger.info(`获取用户资料成功: ${user.username}`);
-      
-      res.status(200).json({
-        success: true,
-        message: '获取用户资料成功',
-        data: user
-      });
+    } catch (error) {
+      logger.warn('获取用户角色失败，使用默认角色:', error.message);
+    }
+    
+    // 添加角色信息到用户对象
+    user.role = userRole;
+    
+    logger.info(`获取用户资料成功: ${user.username}`);
+    
+    res.status(200).json({
+      success: true,
+      message: '获取用户资料成功',
+      data: user
+    });
       
     } catch (error) {
       logger.error('获取用户资料失败:', error);

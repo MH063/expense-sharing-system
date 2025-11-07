@@ -2,7 +2,7 @@
   <div class="bill-dashboard">
     <div class="dashboard-header">
       <h1>账单管理</h1>
-      <el-button type="primary" @click="createBill">
+      <el-button v-if="canCreateBill" type="primary" @click="createBill">
         <el-icon><Plus /></el-icon>
         创建账单
       </el-button>
@@ -76,17 +76,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Clock, Money, Warning, WarningFilled } from '@element-plus/icons-vue'
 import BillList from './BillList.vue'
 import { billApi } from '@/api/bills'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 
 // 路由
 const router = useRouter()
 
 // 状态
+const authStore = useAuthStore()
 const activeTab = ref('pending')
 const stats = reactive({
   pendingCount: 0,
@@ -95,11 +98,25 @@ const stats = reactive({
   overdueAmount: 0
 })
 
+// 权限检查
+const canCreateBill = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.BILL_CREATE)
+})
+
+// 权限检查函数
+const checkPermission = (permission) => {
+  return authStore.hasPermission(permission)
+}
+
 // 方法
 /**
  * 创建账单
  */
 const createBill = () => {
+  if (!canCreateBill.value) {
+    ElMessage.warning('您没有创建账单的权限')
+    return
+  }
   router.push({ name: 'BillCreate' })
 }
 
@@ -107,6 +124,12 @@ const createBill = () => {
  * 刷新数据
  */
 const refreshData = async () => {
+  // 检查权限
+  if (!checkPermission(PERMISSIONS.BILL_VIEW)) {
+    console.log('用户没有查看账单的权限')
+    return
+  }
+  
   await loadStats()
 }
 
@@ -114,6 +137,12 @@ const refreshData = async () => {
  * 加载统计数据
  */
 const loadStats = async () => {
+  // 检查权限
+  if (!checkPermission(PERMISSIONS.BILL_VIEW)) {
+    console.log('用户没有查看账单的权限')
+    return
+  }
+  
   try {
     const response = await billApi.getStats()
     if (response.success) {
@@ -129,7 +158,10 @@ const loadStats = async () => {
 
 // 生命周期
 onMounted(() => {
-  loadStats()
+  // 检查权限
+  if (checkPermission(PERMISSIONS.BILL_VIEW)) {
+    loadStats()
+  }
 })
 </script>
 

@@ -92,9 +92,7 @@ class StatsController {
       const splitStatsQuery = `
         SELECT 
           COUNT(*) as split_count,
-          COALESCE(SUM(es.amount), 0) as total_owed,
-          COALESCE(SUM(CASE WHEN es.status = 'PAID' THEN es.amount ELSE 0 END), 0) as total_paid_split,
-          COALESCE(SUM(CASE WHEN es.status = 'PENDING' THEN es.amount ELSE 0 END), 0) as total_pending
+          COALESCE(SUM(es.amount), 0) as total_owed
         FROM expense_splits es
         JOIN expenses e ON es.expense_id = e.id
         WHERE es.user_id = $1 ${roomFilter} ${timeFilter}
@@ -104,19 +102,42 @@ class StatsController {
       const splitStats = splitStatsResult.rows[0];
       
       // 获取账单统计
+      let billRoomFilter = '';
+      let billTimeFilter = '';
+      const billParams = [user_id];
+      let billParamIndex = 2;
+      
+      if (room_id) {
+        billRoomFilter = `AND b.room_id = $${billParamIndex++}`;
+        billParams.push(room_id);
+      }
+      
+      // 根据周期设置账单时间范围
+      switch (period) {
+        case 'week':
+          billTimeFilter = `AND b.created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+          break;
+        case 'month':
+          billTimeFilter = `AND b.created_at >= CURRENT_DATE - INTERVAL '30 days'`;
+          break;
+        case 'quarter':
+          billTimeFilter = `AND b.created_at >= CURRENT_DATE - INTERVAL '90 days'`;
+          break;
+        case 'year':
+          billTimeFilter = `AND b.created_at >= CURRENT_DATE - INTERVAL '365 days'`;
+          break;
+      }
+      
       const billStatsQuery = `
         SELECT 
           COUNT(*) as bill_count,
-          COALESCE(SUM(CASE WHEN b.creator_id = $1 THEN 1 ELSE 0 END), 0) as created_bills,
-          COALESCE(SUM(CASE WHEN bs.user_id = $1 AND bs.status = 'PAID' THEN bs.amount ELSE 0 END), 0) as total_bill_paid,
-          COALESCE(SUM(CASE WHEN bs.user_id = $1 AND bs.status = 'PENDING_PAYMENT' THEN bs.amount ELSE 0 END), 0) as total_bill_pending
+          COALESCE(SUM(CASE WHEN b.created_by = $1 THEN 1 ELSE 0 END), 0) as created_bills
         FROM bills b
-        LEFT JOIN bill_splits bs ON b.id = bs.bill_id
         JOIN room_members rm ON b.room_id = rm.room_id
-        WHERE rm.user_id = $1 ${roomFilter} ${timeFilter}
+        WHERE rm.user_id = $1 ${billRoomFilter} ${billTimeFilter}
       `;
       
-      const billStatsResult = await client.query(billStatsQuery, params);
+      const billStatsResult = await client.query(billStatsQuery, billParams);
       const billStats = billStatsResult.rows[0];
       
       // 获取费用类型分布
@@ -159,15 +180,11 @@ class StatsController {
           },
           split_stats: {
             count: parseInt(splitStats.split_count),
-            total_owed: parseFloat(splitStats.total_owed),
-            total_paid_split: parseFloat(splitStats.total_paid_split),
-            total_pending: parseFloat(splitStats.total_pending)
+            total_owed: parseFloat(splitStats.total_owed)
           },
           bill_stats: {
             count: parseInt(billStats.bill_count),
-            created_bills: parseInt(billStats.created_bills),
-            total_bill_paid: parseFloat(billStats.total_bill_paid),
-            total_bill_pending: parseFloat(billStats.total_bill_pending)
+            created_bills: parseInt(billStats.created_bills)
           },
           expense_types: expenseTypes.map(type => ({
             type_name: type.type_name,
@@ -400,32 +417,15 @@ class StatsController {
    * @param {Object} res - 响应对象
    */
   async getSystemStats(req, res) {
-    const client = await this.pool.connect();
+    const client = await pool.connect();
     try {
       const { period = 'month' } = req.query;
-      
-      // 根据周期设置时间范围
-      let timeFilter = '';
-      switch (period) {
-        case 'week':
-          timeFilter = `WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'`;
-          break;
-        case 'month':
-          timeFilter = `WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'`;
-          break;
-        case 'quarter':
-          timeFilter = `WHERE created_at >= CURRENT_DATE - INTERVAL '90 days'`;
-          break;
-        case 'year':
-          timeFilter = `WHERE created_at >= CURRENT_DATE - INTERVAL '365 days'`;
-          break;
-      }
       
       // 获取用户统计
       const userStatsQuery = `
         SELECT 
           COUNT(*) as total_users,
-          COUNT(CASE ${timeFilter.replace('WHERE', 'AND')} THEN 1 END) as new_users
+          COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '${period === 'week' ? '7' : period === 'month' ? '30' : period === 'quarter' ? '90' : '365'} days' THEN 1 END) as new_users
         FROM users
       `;
       
@@ -436,7 +436,7 @@ class StatsController {
       const roomStatsQuery = `
         SELECT 
           COUNT(*) as total_rooms,
-          COUNT(CASE ${timeFilter.replace('WHERE', 'AND')} THEN 1 END) as new_rooms
+          COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '${period === 'week' ? '7' : period === 'month' ? '30' : period === 'quarter' ? '90' : '365'} days' THEN 1 END) as new_rooms
         FROM rooms
       `;
       
@@ -448,7 +448,7 @@ class StatsController {
         SELECT 
           COUNT(*) as total_expenses,
           COALESCE(SUM(amount), 0) as total_amount,
-          COUNT(CASE ${timeFilter.replace('WHERE', 'AND')} THEN 1 END) as new_expenses
+          COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '${period === 'week' ? '7' : period === 'month' ? '30' : period === 'quarter' ? '90' : '365'} days' THEN 1 END) as new_expenses
         FROM expenses
       `;
       
@@ -532,8 +532,7 @@ class StatsController {
           },
           bill_stats: {
             total_bills: parseInt(billStats.total_bills),
-            total_amount: parseFloat(billStats.total_bill_amount),
-            new_bills: parseInt(billStats.new_bills),
+            total_amount: parseFloat(billStats.total_amount),
             completed_bills: parseInt(billStats.completed_bills),
             pending_bills: parseInt(billStats.pending_bills)
           },
@@ -572,7 +571,7 @@ class StatsController {
    * @param {Object} res - 响应对象
    */
   async getExpenseForecast(req, res) {
-    const client = await this.pool.connect();
+    const client = await pool.connect();
     try {
       const user_id = req.user.sub;
       const { room_id } = req.query;
@@ -580,7 +579,7 @@ class StatsController {
       // 验证用户是否为寝室成员
       if (room_id) {
         const memberCheck = await client.query(
-          'SELECT 1 FROM user_room_relations WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE',
+          'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2',
           [room_id, user_id]
         );
         
@@ -590,6 +589,11 @@ class StatsController {
             message: '您不是该寝室的成员'
           });
         }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: '请提供寝室ID'
+        });
       }
       
       // 获取历史费用数据（过去3个月）
@@ -611,9 +615,9 @@ class StatsController {
         SELECT 
           DATE_TRUNC('week', created_at) as week,
           COUNT(*) as bill_count,
-          COALESCE(SUM(total_amount), 0) as total_amount,
-          COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0) as paid_amount,
-          COALESCE(SUM(CASE WHEN status = 'PENDING' THEN total_amount ELSE 0 END), 0) as pending_amount
+          COALESCE(SUM(amount), 0) as total_amount,
+          COALESCE(SUM(CASE WHEN status = 'settled' THEN amount ELSE 0 END), 0) as paid_amount,
+          COALESCE(SUM(CASE WHEN status = 'open' THEN amount ELSE 0 END), 0) as pending_amount
         FROM bills
         WHERE room_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '90 days'
         GROUP BY DATE_TRUNC('week', created_at)
@@ -692,14 +696,13 @@ class StatsController {
       // 获取费用类型分布
       const typeDistributionQuery = `
         SELECT 
-          et.name as type_name,
+          category as type_name,
           COUNT(*) as count,
-          COALESCE(SUM(e.amount), 0) as total_amount,
-          COALESCE(AVG(e.amount), 0) as avg_amount
-        FROM expenses e
-        JOIN expense_types et ON e.type_id = et.id
-        WHERE e.room_id = $1 AND e.created_at >= CURRENT_DATE - INTERVAL '90 days'
-        GROUP BY et.id, et.name
+          COALESCE(SUM(amount), 0) as total_amount,
+          COALESCE(AVG(amount), 0) as avg_amount
+        FROM expenses
+        WHERE room_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '90 days'
+        GROUP BY category
         ORDER BY total_amount DESC
       `;
       
@@ -711,7 +714,7 @@ class StatsController {
         SELECT 
           status,
           COUNT(*) as count,
-          COALESCE(SUM(total_amount), 0) as total_amount
+          COALESCE(SUM(amount), 0) as total_amount
         FROM bills
         WHERE room_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '90 days'
         GROUP BY status
@@ -726,10 +729,10 @@ class StatsController {
         SELECT 
           id,
           title,
-          total_amount,
+          amount,
           due_date,
           status,
-          creator_id
+          created_by
         FROM bills
         WHERE room_id = $1 AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
         ORDER BY due_date
@@ -768,10 +771,10 @@ class StatsController {
           upcoming_bills: upcomingBills.map(bill => ({
             id: bill.id,
             title: bill.title,
-            total_amount: parseFloat(bill.total_amount),
+            amount: parseFloat(bill.amount),
             due_date: bill.due_date,
             status: bill.status,
-            creator_id: bill.creator_id
+            created_by: bill.created_by
           }))
         }
       });

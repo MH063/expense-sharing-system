@@ -140,158 +140,54 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, DataAnalysis, Clock, ArrowLeft, Refresh, Download, Files, TrendCharts, User, View } from '@element-plus/icons-vue'
+import request from '@/request'
 
 const router = useRouter()
 
 // 文档统计数据
-const documentStats = ref([
-  {
-    id: 1,
-    label: '文档总数',
-    value: 12,
-    icon: Files,
-    color: '#409EFF'
-  },
-  {
-    id: 2,
-    label: '本周更新',
-    value: 5,
-    icon: Refresh,
-    color: '#67C23A'
-  },
-  {
-    id: 3,
-    label: '待审核',
-    value: 3,
-    icon: Clock,
-    color: '#E6A23C'
-  },
-  {
-    id: 4,
-    label: '活跃编辑者',
-    value: 8,
-    icon: User,
-    color: '#F56C6C'
-  }
-])
+const documentStats = ref([])
 
 // 文档类型数据
-const documentTypes = ref([
-  {
-    id: 1,
-    title: '需求文档',
-    description: '系统功能需求、非功能性需求、用户角色定义和权限控制规则',
-    icon: Document,
-    path: '/docs/requirements',
-    updateTime: '2023-12-01',
-    version: 'v1.2'
-  },
-  {
-    id: 2,
-    title: '数据库设计文档',
-    description: '表结构定义、外键约束策略、数据完整性保障和表关系图示',
-    icon: DataAnalysis,
-    path: '/docs/database',
-    updateTime: '2023-11-28',
-    version: 'v1.1'
-  },
-  {
-    id: 3,
-    title: '版本控制',
-    description: '文档版本历史记录、变更追踪和版本对比功能',
-    icon: Clock,
-    path: '/docs/versions',
-    updateTime: '2023-12-02',
-    version: 'v1.0'
-  }
-])
+const documentTypes = ref([])
 
 // 最近编辑的文档
-const recentDocuments = ref([
-  {
-    id: 1,
-    name: '需求文档 - 11.3 管理端需求',
-    editor: '张三',
-    editTime: '2023-12-01 14:30',
-    path: '/docs/requirements'
-  },
-  {
-    id: 2,
-    name: '数据库设计文档 - 用户表结构',
-    editor: '李四',
-    editTime: '2023-11-28 10:15',
-    path: '/docs/database'
-  },
-  {
-    id: 3,
-    name: '需求文档 - 4.3.1 收款码管理功能',
-    editor: '王五',
-    editTime: '2023-11-25 16:45',
-    path: '/docs/requirements'
-  }
-])
+const recentDocuments = ref([])
 
 // 热门文档
-const popularDocuments = ref([
-  {
-    id: 1,
-    name: '需求文档 - 11.3 管理端需求',
-    views: 128,
-    lastView: '2023-12-01 15:20',
-    path: '/docs/requirements'
-  },
-  {
-    id: 2,
-    name: '数据库设计文档 - 用户表结构',
-    views: 96,
-    lastView: '2023-12-01 12:10',
-    path: '/docs/database'
-  },
-  {
-    id: 3,
-    name: '需求文档 - 4.3.1 收款码管理功能',
-    views: 87,
-    lastView: '2023-11-30 18:45',
-    path: '/docs/requirements'
-  }
-])
+const popularDocuments = ref([])
 
 // 最近更新数据
-const recentUpdates = ref([
-  {
-    id: 1,
-    docName: '需求文档',
-    section: '11.3 管理端需求',
-    updateTime: '2023-12-01 14:30',
-    author: '张三',
-    description: '添加了文档管理系统和系统管理功能的详细需求说明',
-    version: 'v1.2.1'
-  },
-  {
-    id: 2,
-    docName: '数据库设计文档',
-    section: '用户表结构',
-    updateTime: '2023-11-28 10:15',
-    author: '李四',
-    description: '更新了用户表的角色字段，添加了系统管理员角色',
-    version: 'v1.1.2'
-  },
-  {
-    id: 3,
-    docName: '需求文档',
-    section: '4.3.1 收款码管理功能',
-    updateTime: '2023-11-25 16:45',
-    author: '王五',
-    description: '完善了收款码上传与维护的功能需求',
-    version: 'v1.2.0'
-  }
-])
+const recentUpdates = ref([])
 
 // 记录文档查看
-const recordDocumentView = (doc) => {
-  // 在实际项目中，这里应该调用API记录文档查看
-  console.log(`查看文档: ${doc.title}`)
-  
+const recordDocumentView = async (doc) => {
+  try {
+    // 调用API记录文档查看
+    const response = await request({
+      url: '/api/docs/view',
+      method: 'post',
+      data: {
+        docId: doc.id,
+        docType: doc.title,
+        path: doc.path
+      }
+    })
+    
+    if (response.success) {
+      console.log(`文档查看记录成功: ${doc.title}`)
+      
+      // 更新本地数据
+      updateLocalViewData(doc)
+    } else {
+      console.error('记录文档查看失败:', response.message)
+    }
+  } catch (error) {
+    console.error('记录文档查看失败:', error)
+  }
+}
+
+// 更新本地查看数据
+const updateLocalViewData = (doc) => {
   // 更新浏览次数
   const popularDoc = popularDocuments.value.find(d => d.name.includes(doc.title))
   if (popularDoc) {
@@ -321,10 +217,34 @@ const recordDocumentView = (doc) => {
 }
 
 // 记录文档编辑
-const recordDocumentEdit = (doc) => {
-  // 在实际项目中，这里应该调用API记录文档编辑
-  console.log(`编辑文档: ${doc.title}`)
-  
+const recordDocumentEdit = async (doc) => {
+  try {
+    // 调用API记录文档编辑
+    const response = await request({
+      url: '/api/docs/edit',
+      method: 'post',
+      data: {
+        docId: doc.id,
+        docType: doc.title,
+        path: doc.path
+      }
+    })
+    
+    if (response.success) {
+      console.log(`文档编辑记录成功: ${doc.title}`)
+      
+      // 更新本地数据
+      updateLocalEditData(doc)
+    } else {
+      console.error('记录文档编辑失败:', response.message)
+    }
+  } catch (error) {
+    console.error('记录文档编辑失败:', error)
+  }
+}
+
+// 更新本地编辑数据
+const updateLocalEditData = (doc) => {
   // 添加到最近编辑
   const recentDoc = recentDocuments.value.find(d => d.name.includes(doc.title))
   if (recentDoc) {
@@ -364,11 +284,30 @@ const recordDocumentEdit = (doc) => {
 }
 
 // 记录历史查看
-const recordHistoryView = (doc) => {
-  // 在实际项目中，这里应该调用API记录历史查看
-  console.log(`查看文档历史: ${doc.title}`)
-  
-  ElMessage.info(`正在查看 ${doc.title} 的历史版本`)
+const recordHistoryView = async (doc) => {
+  try {
+    // 调用API记录历史查看
+    const response = await request({
+      url: '/api/docs/history',
+      method: 'post',
+      data: {
+        docId: doc.id,
+        docType: doc.title,
+        path: doc.path
+      }
+    })
+    
+    if (response.success) {
+      console.log(`文档历史查看记录成功: ${doc.title}`)
+      ElMessage.info(`正在查看 ${doc.title} 的历史版本`)
+    } else {
+      console.error('记录文档历史查看失败:', response.message)
+      ElMessage.error('查看文档历史失败')
+    }
+  } catch (error) {
+    console.error('记录文档历史查看失败:', error)
+    ElMessage.error('查看文档历史失败')
+  }
 }
 
 // 导航到指定文档页面
@@ -377,66 +316,143 @@ const navigateToDoc = (path) => {
 }
 
 // 查看文档
-const viewDoc = (doc) => {
-  // 记录文档查看
-  recordDocumentView(doc)
-  
-  // 根据文档类型导航到对应的页面
-  if (doc.id === 1) { // 需求文档
-    router.push('/docs/requirements?mode=view')
-  } else if (doc.id === 2) { // 数据库设计文档
-    router.push('/docs/database?mode=view')
-  } else if (doc.id === 3) { // 版本控制
-    router.push('/docs/versions?mode=view')
-  } else {
-    // 通用导航
-    router.push(doc.path)
+const viewDoc = async (doc) => {
+  try {
+    // 记录文档查看
+    await recordDocumentView(doc)
+    
+    // 调用API获取文档详情
+    const response = await request({
+      url: `/api/docs/${doc.id}`,
+      method: 'get'
+    })
+    
+    if (response.success) {
+      // 根据文档类型导航到对应的页面
+      if (doc.id === 1) { // 需求文档
+        router.push('/docs/requirements?mode=view')
+      } else if (doc.id === 2) { // 数据库设计文档
+        router.push('/docs/database?mode=view')
+      } else if (doc.id === 3) { // 版本控制
+        router.push('/docs/versions?mode=view')
+      } else {
+        // 通用导航
+        router.push(doc.path)
+      }
+    } else {
+      console.error('获取文档详情失败:', response.message)
+      ElMessage.error('获取文档详情失败')
+    }
+  } catch (error) {
+    console.error('查看文档失败:', error)
+    ElMessage.error('查看文档失败')
   }
 }
 
 // 编辑文档
-const editDoc = (doc) => {
-  // 检查文档是否可编辑
-  if (!doc.editable) {
-    ElMessage.warning('该文档当前不可编辑')
-    return
-  }
-  
-  // 记录编辑操作
-  recordDocumentEdit(doc)
-  
-  // 根据文档类型导航到对应的编辑页面
-  if (doc.id === 1) { // 需求文档
-    router.push('/docs/requirements?mode=edit')
-  } else if (doc.id === 2) { // 数据库设计文档
-    router.push('/docs/database?mode=edit')
-  } else if (doc.id === 3) { // 版本控制
-    router.push('/docs/versions?mode=edit')
-  } else {
-    // 通用导航
-    router.push(`${doc.path}?mode=edit`)
+const editDoc = async (doc) => {
+  try {
+    // 检查文档是否可编辑
+    if (!doc.editable) {
+      ElMessage.warning('该文档当前不可编辑')
+      return
+    }
+    
+    // 记录文档编辑
+    await recordDocumentEdit(doc)
+    
+    // 调用API获取文档详情
+    const response = await request({
+      url: `/api/docs/${doc.id}`,
+      method: 'get'
+    })
+    
+    if (response.success) {
+      // 根据文档类型跳转到相应页面
+      const docType = doc.title
+      
+      if (docType.includes('需求')) {
+        router.push('/docs/requirements?mode=edit')
+      } else if (docType.includes('设计')) {
+        router.push('/docs/design?mode=edit')
+      } else if (docType.includes('数据库')) {
+        router.push('/docs/database?mode=edit')
+      } else if (docType.includes('版本')) {
+        router.push('/docs/versions?mode=edit')
+      } else {
+        router.push('/docs/technical?mode=edit')
+      }
+    } else {
+      console.error('获取文档详情失败:', response.message)
+      ElMessage.error('获取文档详情失败')
+    }
+  } catch (error) {
+    console.error('编辑文档失败:', error)
+    ElMessage.error('编辑文档失败')
   }
 }
 
 // 查看文档历史
-const viewHistory = (doc) => {
-  // 记录历史查看操作
-  recordHistoryView(doc)
-  
-  // 导航到版本控制页面，并传递文档信息
-  router.push({
-    path: '/docs/versions',
-    query: {
-      docId: doc.id,
-      docType: doc.title,
-      from: 'management'
+const viewHistory = async (doc) => {
+  try {
+    // 记录历史查看
+    await recordHistoryView(doc)
+    
+    // 调用API获取文档历史版本
+    const response = await request({
+      url: `/api/docs/${doc.id}/history`,
+      method: 'get'
+    })
+    
+    if (response.success) {
+      // 导航到版本控制页面，并传递文档信息
+      router.push({
+        path: '/docs/versions',
+        query: {
+          docId: doc.id,
+          docType: doc.title,
+          from: 'management'
+        }
+      })
+    } else {
+      console.error('获取文档历史失败:', response.message)
+      ElMessage.error('获取文档历史失败')
     }
-  })
+  } catch (error) {
+    console.error('查看文档历史失败:', error)
+    ElMessage.error('查看文档历史失败')
+  }
 }
 
 // 打开文档
-const openDocument = (doc) => {
-  router.push(doc.path)
+const openDocument = async (doc) => {
+  try {
+    // 调用API获取文档详情
+    const response = await request({
+      url: `/api/docs/${doc.id}`,
+      method: 'get'
+    })
+    
+    if (response.success) {
+      // 记录文档查看
+      await recordDocumentView(doc)
+      
+      // 跳转到文档详情页
+      router.push({
+        path: '/docs/detail',
+        query: {
+          id: doc.id,
+          type: doc.title
+        }
+      })
+    } else {
+      console.error('获取文档详情失败:', response.message)
+      ElMessage.error('获取文档详情失败')
+    }
+  } catch (error) {
+    console.error('打开文档失败:', error)
+    ElMessage.error('打开文档失败')
+  }
 }
 
 // 查看更新详情
@@ -462,86 +478,142 @@ const revertUpdate = (update) => {
 }
 
 // 刷新数据
-const refreshData = () => {
-  // 模拟数据刷新
-  ElMessage.success('数据已刷新')
-  
-  // 在实际项目中，这里应该调用API获取最新数据
-  console.log('刷新文档数据')
+const refreshData = async () => {
+  try {
+    ElMessage.info('正在刷新数据...')
+    
+    // 并行获取所有数据
+    const [statsRes, typesRes, recentRes, popularRes, updatesRes] = await Promise.all([
+      request({ url: '/api/docs/stats', method: 'get' }),
+      request({ url: '/api/docs/types', method: 'get' }),
+      request({ url: '/api/docs/recent', method: 'get' }),
+      request({ url: '/api/docs/popular', method: 'get' }),
+      request({ url: '/api/docs/updates', method: 'get' })
+    ])
+    
+    // 更新统计数据
+    if (statsRes.success) {
+      documentStats.value = statsRes.data
+    }
+    
+    // 更新文档类型
+    if (typesRes.success) {
+      documentTypes.value = typesRes.data
+    }
+    
+    // 更新最近文档
+    if (recentRes.success) {
+      recentDocuments.value = recentRes.data
+    }
+    
+    // 更新热门文档
+    if (popularRes.success) {
+      popularDocuments.value = popularRes.data
+    }
+    
+    // 更新最近更新
+    if (updatesRes.success) {
+      recentUpdates.value = updatesRes.data
+    }
+    
+    ElMessage.success('数据刷新成功')
+  } catch (error) {
+    console.error('刷新数据失败:', error)
+    ElMessage.error('刷新数据失败')
+  }
 }
 
 // 导出概览
-const exportSummary = () => {
-  ElMessageBox.confirm(
-    '请选择导出格式',
-    '导出文档概览',
-    {
-      confirmButtonText: '导出为PDF',
-      cancelButtonText: '导出为Excel',
-      distinguishCancelAndClose: true,
-      type: 'info'
-    }
-  ).then(() => {
-    // 导出为PDF
-    exportToPDF()
-  }).catch((action) => {
-    if (action === 'cancel') {
-      // 导出为Excel
-      exportToExcel()
-    }
-  })
+const exportSummary = async () => {
+  try {
+    ElMessage.info('正在生成文档概览...')
+    
+    // 调用API导出文档概览
+    const response = await request({
+      url: '/api/docs/export/summary',
+      method: 'get',
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `文档概览_${new Date().toLocaleDateString()}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    
+    // 清理
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+    
+    ElMessage.success('文档概览导出成功')
+  } catch (error) {
+    console.error('导出文档概览失败:', error)
+    ElMessage.error('导出文档概览失败')
+  }
 }
 
 // 导出为PDF
-const exportToPDF = () => {
-  // 创建导出内容
-  const exportContent = generateExportContent()
-  
-  // 在实际项目中，这里应该调用API导出PDF
-  console.log('导出PDF内容:', exportContent)
-  
-  // 模拟导出过程
-  ElMessage({
-    message: '正在生成PDF文档...',
-    type: 'info',
-    duration: 1500
-  })
-  
-  setTimeout(() => {
-    // 模拟下载
+const exportToPDF = async () => {
+  try {
+    ElMessage.info('正在生成PDF文档...')
+    
+    // 调用API导出PDF
+    const response = await request({
+      url: '/api/docs/export/pdf',
+      method: 'get',
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
-    link.href = '#'
-    link.download = `文档概览_${new Date().toLocaleDateString()}.pdf`
+    link.href = url
+    link.setAttribute('download', `文档概览_${new Date().toLocaleDateString()}.pdf`)
+    document.body.appendChild(link)
     link.click()
     
+    // 清理
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+    
     ElMessage.success('PDF文档导出成功')
-  }, 1500)
+  } catch (error) {
+    console.error('导出PDF失败:', error)
+    ElMessage.error('导出PDF失败')
+  }
 }
 
 // 导出为Excel
-const exportToExcel = () => {
-  // 创建导出数据
-  const exportData = generateExportData()
-  
-  // 在实际项目中，这里应该调用API导出Excel
-  console.log('导出Excel数据:', exportData)
-  
-  // 模拟导出过程
-  ElMessage({
-    message: '正在生成Excel表格...',
-    type: 'info',
-    duration: 1500
-  })
-  
-  setTimeout(() => {
-    // 模拟下载
+const exportToExcel = async () => {
+  try {
+    ElMessage.info('正在生成Excel文档...')
+    
+    // 调用API导出Excel
+    const response = await request({
+      url: '/api/docs/export/excel',
+      method: 'get',
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
-    link.href = '#'
-    link.download = `文档概览_${new Date().toLocaleDateString()}.xlsx`
+    link.href = url
+    link.setAttribute('download', `文档概览_${new Date().toLocaleDateString()}.xlsx`)
+    document.body.appendChild(link)
     link.click()
     
-    ElMessage.success('Excel表格导出成功')
-  }, 1500)
+    // 清理
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+    
+    ElMessage.success('Excel文档导出成功')
+  } catch (error) {
+    console.error('导出Excel失败:', error)
+    ElMessage.error('导出Excel失败')
+  }
 }
 
 // 生成导出内容
@@ -700,9 +772,49 @@ const goBack = () => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
-  // 这里可以添加API调用来获取最新的文档信息
-  console.log('文档管理系统已加载')
+onMounted(async () => {
+  try {
+    ElMessage.info('正在加载文档数据...')
+    
+    // 并行获取所有数据
+    const [statsRes, typesRes, recentRes, popularRes, updatesRes] = await Promise.all([
+      request({ url: '/api/docs/stats', method: 'get' }),
+      request({ url: '/api/docs/types', method: 'get' }),
+      request({ url: '/api/docs/recent', method: 'get' }),
+      request({ url: '/api/docs/popular', method: 'get' }),
+      request({ url: '/api/docs/updates', method: 'get' })
+    ])
+    
+    // 更新统计数据
+    if (statsRes.success) {
+      documentStats.value = statsRes.data
+    }
+    
+    // 更新文档类型
+    if (typesRes.success) {
+      documentTypes.value = typesRes.data
+    }
+    
+    // 更新最近文档
+    if (recentRes.success) {
+      recentDocuments.value = recentRes.data
+    }
+    
+    // 更新热门文档
+    if (popularRes.success) {
+      popularDocuments.value = popularRes.data
+    }
+    
+    // 更新最近更新
+    if (updatesRes.success) {
+      recentUpdates.value = updatesRes.data
+    }
+    
+    ElMessage.success('文档数据加载完成')
+  } catch (error) {
+    console.error('加载文档数据失败:', error)
+    ElMessage.error('加载文档数据失败')
+  }
 })
 </script>
 

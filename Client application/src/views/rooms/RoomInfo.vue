@@ -1,5 +1,5 @@
 <template>
-  <div class="room-container">
+  <div class="room-container" v-if="canViewRoom">
     <div class="room-header">
       <h1 class="page-title">寝室信息</h1>
       <p class="page-subtitle">查看和管理寝室详细信息</p>
@@ -20,8 +20,8 @@
       <h2>您还没有加入任何寝室</h2>
       <p>加入或创建一个寝室开始使用记账系统</p>
       <div class="empty-actions">
-        <button class="primary-button" @click="createRoom">创建寝室</button>
-        <button class="secondary-button" @click="joinRoom">加入寝室</button>
+        <button class="primary-button" @click="createRoom" v-if="canEditRoom">创建寝室</button>
+        <button class="secondary-button" @click="joinRoom" v-if="canViewRoom">加入寝室</button>
       </div>
     </div>
     
@@ -63,14 +63,14 @@
             </div>
           </div>
           <div class="room-actions">
-            <button v-if="isRoomLeader" class="edit-button" @click="editRoom">
+            <button class="edit-button" @click="editRoom" v-if="canEditRoom">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
               编辑
             </button>
-            <button class="invite-button" @click="showInviteModal = true">
+            <button class="invite-button" @click="showInviteModal = true" v-if="canManageMembers">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                 <circle cx="8.5" cy="7" r="4"></circle>
@@ -79,7 +79,7 @@
               </svg>
               邀请成员
             </button>
-            <button class="leave-button" @click="confirmLeaveRoom">
+            <button class="leave-button" @click="confirmLeaveRoom" v-if="canViewRoom">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
@@ -111,6 +111,7 @@
             class="tab-button"
             :class="{ active: activeTab === 'settings' }"
             @click="activeTab = 'settings'"
+            v-if="canEditRoom"
           >
             寝室设置
           </button>
@@ -121,7 +122,7 @@
           <div v-if="activeTab === 'members'" class="tab-pane">
             <div class="members-header">
               <h3>成员列表</h3>
-              <button v-if="isRoomLeader" class="add-member-button" @click="showInviteModal = true">
+              <button v-if="canManageMembers" class="add-member-button" @click="showInviteModal = true">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="12" y1="5" x2="12" y2="19"></line>
                   <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -148,11 +149,11 @@
                     {{ getRoleDisplayName(member.role) }}
                   </span>
                 </div>
-                <div v-if="isRoomLeader && member.id !== currentUserId" class="member-actions">
-                  <button v-if="member.role !== 'room_leader'" class="promote-button" @click="promoteMember(member)">
+                <div v-if="canManageMembers && member.id !== currentUserId" class="member-actions">
+                  <button v-if="member.role !== 'room_leader' && isRoomLeader" class="promote-button" @click="promoteMember(member)">
                     设为寝室长
                   </button>
-                  <button class="remove-button" @click="confirmRemoveMember(member)">
+                  <button v-if="member.id !== currentUserId && (isRoomLeader || member.role !== 'room_leader')" class="remove-button" @click="confirmRemoveMember(member)">
                     移除
                   </button>
                 </div>
@@ -313,7 +314,7 @@
                 </div>
               </form>
               
-              <div class="danger-zone">
+              <div class="danger-zone" v-if="canDeleteRoom">
                 <h3>危险区域</h3>
                 <p>以下操作不可逆，请谨慎操作</p>
                 <button class="delete-button" @click="confirmDeleteRoom">
@@ -373,12 +374,27 @@
       {{ errorMessage }}
     </div>
   </div>
+  
+  <!-- 无权限访问提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-content">
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="no-permission-icon">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <h2 class="no-permission-title">访问受限</h2>
+      <p class="no-permission-message">您没有权限查看房间信息</p>
+      <button class="back-button" @click="router.push('/')">返回首页</button>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
+import { roomsApi } from '@/api/rooms'
 
 // 路由和状态管理
 const router = useRouter()
@@ -433,6 +449,30 @@ const inviteLink = computed(() => {
   return `${window.location.origin}/join?code=${room.value.inviteCode}`
 })
 
+// 权限控制
+const canViewRoom = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_VIEW) || 
+         authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)
+})
+
+const canEditRoom = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_EDIT) || 
+         authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)
+})
+
+const canManageMembers = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.MEMBER_MANAGE) || 
+         authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)
+})
+
+const canDeleteRoom = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_DELETE) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)
+})
+
 // 获取角色显示名称
 const getRoleDisplayName = (role) => {
   const roleMap = {
@@ -455,38 +495,55 @@ const formatDate = (timestamp) => {
 
 // 加载寝室信息
 const loadRoomData = async () => {
+  if (!canViewRoom.value) {
+    console.warn('用户没有权限查看房间信息')
+    return
+  }
+  
   loading.value = true
   
   try {
     // 获取用户当前寝室信息
-    // 这里应该调用API获取寝室信息
-    // room.value = await api.getCurrentRoom()
+    const response = await roomsApi.getCurrentRoom()
     
-    // 获取用户当前寝室信息
-    room.value = await api.getCurrentRoom()
-    
-    // 获取寝室成员
-    members.value = await api.getRoomMembers(room.value.id)
-    
-    // 获取费用统计
-    const stats = await api.getRoomStatistics(room.value.id)
-    totalExpense.value = stats.totalExpense
-    averageExpense.value = stats.averageExpense
-    pendingAmount.value = stats.pendingAmount
-    
-    // 获取最近支出
-    recentExpenses.value = await api.getRecentExpenses(room.value.id)
-    
-    // 初始化设置表单
-    if (room.value) {
-      roomSettings.name = room.value.name
-      roomSettings.description = room.value.description
-      roomSettings.location = room.value.location
+    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+    if (response.data.success && response.data.data) {
+      room.value = response.data.data
+      
+      // 获取寝室成员
+      const membersResponse = await roomsApi.getRoomMembers(room.value.id)
+      if (membersResponse.data.success) {
+        members.value = membersResponse.data.data || []
+      }
+      
+      // 获取费用统计
+      const statsResponse = await roomsApi.getRoomStatistics(room.value.id)
+      if (statsResponse.data.success) {
+        const stats = statsResponse.data.data
+        totalExpense.value = stats.totalExpense || 0
+        averageExpense.value = stats.averageExpense || 0
+        pendingAmount.value = stats.pendingAmount || 0
+      }
+      
+      // 获取最近支出
+      const expensesResponse = await roomsApi.getRecentExpenses(room.value.id)
+      if (expensesResponse.data.success) {
+        recentExpenses.value = expensesResponse.data.data || []
+      }
+      
+      // 初始化设置表单
+      if (room.value) {
+        roomSettings.name = room.value.name || ''
+        roomSettings.description = room.value.description || ''
+        roomSettings.location = room.value.location || ''
+      }
+    } else {
+      throw new Error(response.data.message || '获取寝室信息失败')
     }
     
   } catch (error) {
     console.error('加载寝室数据失败:', error)
-    errorMessage.value = '加载寝室数据失败'
+    errorMessage.value = '加载寝室数据失败: ' + (error.message || '未知错误')
   } finally {
     loading.value = false
   }
@@ -494,22 +551,39 @@ const loadRoomData = async () => {
 
 // 创建寝室
 const createRoom = () => {
+  if (!canEditRoom.value) {
+    console.warn('用户没有权限创建房间')
+    return
+  }
   router.push('/rooms/create')
 }
 
 // 加入寝室
 const joinRoom = () => {
+  if (!canViewRoom.value) {
+    console.warn('用户没有权限加入房间')
+    return
+  }
   router.push('/rooms/join')
 }
 
 // 编辑寝室
 const editRoom = () => {
+  if (!canEditRoom.value) {
+    console.warn('用户没有权限编辑房间')
+    return
+  }
   // 切换到设置标签页
   activeTab.value = 'settings'
 }
 
 // 确认退出寝室
 const confirmLeaveRoom = () => {
+  if (!canViewRoom.value) {
+    console.warn('用户没有权限退出房间')
+    return
+  }
+  
   if (confirm('确定要退出寝室吗？退出后您将无法查看寝室相关信息。')) {
     leaveRoom()
   }
@@ -517,16 +591,25 @@ const confirmLeaveRoom = () => {
 
 // 退出寝室
 const leaveRoom = async () => {
+  if (!canViewRoom.value) {
+    console.warn('用户没有权限退出房间')
+    return
+  }
+  
   try {
-    // await api.leaveRoom(room.value.id)
+    const response = await roomsApi.leaveRoom(room.value.id)
     
-    successMessage.value = '已成功退出寝室'
-    
-    // 3秒后跳转到首页
-    setTimeout(() => {
-      router.push('/')
-    }, 2000)
-    
+    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+    if (response.data.success) {
+      successMessage.value = '已成功退出寝室'
+      
+      // 3秒后跳转到首页
+      setTimeout(() => {
+        router.push('/')
+      }, 2000)
+    } else {
+      throw new Error(response.data.message || '退出寝室失败')
+    }
   } catch (error) {
     console.error('退出寝室失败:', error)
     errorMessage.value = error.message || '退出寝室失败'
@@ -535,25 +618,34 @@ const leaveRoom = async () => {
 
 // 提升成员为寝室长
 const promoteMember = async (member) => {
+  if (!canManageMembers.value) {
+    console.warn('用户没有权限管理成员')
+    return
+  }
+  
   if (!confirm(`确定要将 ${member.displayName || member.username} 设为寝室长吗？`)) return
   
   try {
-    // await api.promoteMember(room.value.id, member.id)
+    const response = await roomsApi.promoteMember(room.value.id, member.id)
     
-    // 更新本地状态
-    const currentUser = members.value.find(m => m.id === currentUserId.value)
-    const promotedMember = members.value.find(m => m.id === member.id)
-    
-    if (currentUser) currentUser.role = 'member'
-    if (promotedMember) promotedMember.role = 'room_leader'
-    
-    successMessage.value = '已成功设置寝室长'
-    
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
+    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+    if (response.data.success) {
+      // 更新本地状态
+      const currentUser = members.value.find(m => m.id === currentUserId.value)
+      const promotedMember = members.value.find(m => m.id === member.id)
+      
+      if (currentUser) currentUser.role = 'member'
+      if (promotedMember) promotedMember.role = 'room_leader'
+      
+      successMessage.value = '已成功设置寝室长'
+      
+      // 3秒后隐藏成功消息
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      throw new Error(response.data.message || '设置寝室长失败')
+    }
   } catch (error) {
     console.error('设置寝室长失败:', error)
     errorMessage.value = error.message || '设置寝室长失败'
@@ -562,6 +654,11 @@ const promoteMember = async (member) => {
 
 // 确认移除成员
 const confirmRemoveMember = (member) => {
+  if (!canManageMembers.value) {
+    console.warn('用户没有权限管理成员')
+    return
+  }
+  
   if (confirm(`确定要将 ${member.displayName || member.username} 移出寝室吗？`)) {
     removeMember(member)
   }
@@ -569,19 +666,28 @@ const confirmRemoveMember = (member) => {
 
 // 移除成员
 const removeMember = async (member) => {
+  if (!canManageMembers.value) {
+    console.warn('用户没有权限管理成员')
+    return
+  }
+  
   try {
-    // await api.removeMember(room.value.id, member.id)
+    const response = await roomsApi.removeMember(room.value.id, member.id)
     
-    // 更新本地状态
-    members.value = members.value.filter(m => m.id !== member.id)
-    
-    successMessage.value = '已成功移除成员'
-    
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
+    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+    if (response.data.success) {
+      // 更新本地状态
+      members.value = members.value.filter(m => m.id !== member.id)
+      
+      successMessage.value = '已成功移除成员'
+      
+      // 3秒后隐藏成功消息
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      throw new Error(response.data.message || '移除成员失败')
+    }
   } catch (error) {
     console.error('移除成员失败:', error)
     errorMessage.value = error.message || '移除成员失败'
@@ -590,24 +696,33 @@ const removeMember = async (member) => {
 
 // 更新寝室设置
 const updateRoomSettings = async () => {
+  if (!canEditRoom.value) {
+    console.warn('用户没有权限编辑房间')
+    return
+  }
+  
   isSaving.value = true
   errorMessage.value = ''
   
   try {
-    // await api.updateRoomSettings(room.value.id, roomSettings)
+    const response = await roomsApi.updateRoomSettings(room.value.id, roomSettings)
     
-    // 更新本地状态
-    room.value.name = roomSettings.name
-    room.value.description = roomSettings.description
-    room.value.location = roomSettings.location
-    
-    successMessage.value = '寝室设置已更新'
-    
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
+    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+    if (response.data.success) {
+      // 更新本地状态
+      room.value.name = roomSettings.name
+      room.value.description = roomSettings.description
+      room.value.location = roomSettings.location
+      
+      successMessage.value = '寝室设置已更新'
+      
+      // 3秒后隐藏成功消息
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      throw new Error(response.data.message || '更新寝室设置失败')
+    }
   } catch (error) {
     console.error('更新寝室设置失败:', error)
     errorMessage.value = error.message || '更新寝室设置失败'
@@ -618,6 +733,11 @@ const updateRoomSettings = async () => {
 
 // 复制邀请码
 const copyInviteCode = async () => {
+  if (!canManageMembers.value) {
+    console.warn('用户没有权限管理成员')
+    return
+  }
+  
   try {
     await navigator.clipboard.writeText(room.value.inviteCode)
     successMessage.value = '邀请码已复制到剪贴板'
@@ -634,6 +754,11 @@ const copyInviteCode = async () => {
 
 // 复制邀请链接
 const copyInviteLink = async () => {
+  if (!canManageMembers.value) {
+    console.warn('用户没有权限管理成员')
+    return
+  }
+  
   try {
     await navigator.clipboard.writeText(inviteLink.value)
     successMessage.value = '邀请链接已复制到剪贴板'
@@ -650,22 +775,29 @@ const copyInviteLink = async () => {
 
 // 重新生成邀请码
 const regenerateInviteCode = async () => {
+  if (!canManageMembers.value) {
+    console.warn('用户没有权限管理成员')
+    return
+  }
+  
   if (!confirm('确定要重新生成邀请码吗？旧邀请码将失效。')) return
   
   try {
-    // const newCode = await api.regenerateInviteCode(room.value.id)
-    // room.value.inviteCode = newCode
+    const response = await roomsApi.regenerateInviteCode(room.value.id)
     
-    // 模拟新邀请码
-    room.value.inviteCode = 'XYZ789'
-    
-    successMessage.value = '邀请码已重新生成'
-    
-    // 3秒后隐藏成功消息
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-    
+    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+    if (response.data.success && response.data.data) {
+      room.value.inviteCode = response.data.data.inviteCode
+      
+      successMessage.value = '邀请码已重新生成'
+      
+      // 3秒后隐藏成功消息
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
+    } else {
+      throw new Error(response.data.message || '重新生成邀请码失败')
+    }
   } catch (error) {
     console.error('重新生成邀请码失败:', error)
     errorMessage.value = error.message || '重新生成邀请码失败'
@@ -674,6 +806,11 @@ const regenerateInviteCode = async () => {
 
 // 确认删除寝室
 const confirmDeleteRoom = () => {
+  if (!canDeleteRoom.value) {
+    console.warn('用户没有权限删除房间')
+    return
+  }
+  
   const confirmation = prompt('此操作不可逆！请输入 "DELETE" 确认删除寝室：')
   if (confirmation === 'DELETE') {
     deleteRoom()
@@ -684,16 +821,25 @@ const confirmDeleteRoom = () => {
 
 // 删除寝室
 const deleteRoom = async () => {
+  if (!canDeleteRoom.value) {
+    console.warn('用户没有权限删除房间')
+    return
+  }
+  
   try {
-    // await api.deleteRoom(room.value.id)
+    const response = await roomsApi.deleteRoom(room.value.id)
     
-    successMessage.value = '寝室已删除'
-    
-    // 3秒后跳转到首页
-    setTimeout(() => {
-      router.push('/')
-    }, 2000)
-    
+    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
+    if (response.data.success) {
+      successMessage.value = '寝室已删除'
+      
+      // 3秒后跳转到首页
+      setTimeout(() => {
+        router.push('/')
+      }, 2000)
+    } else {
+      throw new Error(response.data.message || '删除寝室失败')
+    }
   } catch (error) {
     console.error('删除寝室失败:', error)
     errorMessage.value = error.message || '删除寝室失败'
@@ -702,7 +848,11 @@ const deleteRoom = async () => {
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadRoomData()
+  if (canViewRoom.value) {
+    loadRoomData()
+  } else {
+    console.warn('用户没有权限查看房间信息')
+  }
 })
 </script>
 
@@ -1566,6 +1716,59 @@ onMounted(() => {
   background-color: #fdecea;
   color: #d32f2f;
   border: 1px solid #f5c6cb;
+}
+
+/* 无权限访问样式 */
+.no-permission-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.no-permission-content {
+  text-align: center;
+  padding: 40px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+}
+
+.no-permission-icon {
+  color: #ccc;
+  margin-bottom: 20px;
+}
+
+.no-permission-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px;
+}
+
+.no-permission-message {
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.back-button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.back-button:hover {
+  opacity: 0.9;
 }
 
 /* 响应式设计 */

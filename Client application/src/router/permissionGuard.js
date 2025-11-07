@@ -4,7 +4,7 @@
  */
 
 import { useAuthStore } from '@/stores/auth'
-import { hasPermission, canAccessRoom } from '@/utils/permissions'
+import { hasPermission, canAccessRoom, ROLES } from '@/utils/permissions'
 
 /**
  * 检查路由权限
@@ -29,7 +29,9 @@ export function checkRoutePermission(to, from, next, store) {
   
   // 检查是否需要特定角色
   if (to.meta.requiresRole && user) {
-    const userRole = user.role || 'guest'
+    // 从auth store获取角色信息
+    const userRoles = store?.roles || []
+    const userRole = userRoles.length > 0 ? userRoles[0] : (user.role || 'guest')
     
     if (Array.isArray(to.meta.requiresRole)) {
       if (!to.meta.requiresRole.includes(userRole)) {
@@ -48,23 +50,34 @@ export function checkRoutePermission(to, from, next, store) {
   if (to.meta.requiresPermission && user) {
     let hasRequiredPermission = false
     
+    // 从auth store获取权限信息
+    const userPermissions = store?.permissions || []
+    
     // 如果用户拥有'all'权限，则具有所有权限
-    if (user.permissions && user.permissions.includes('all')) {
+    if (userPermissions.includes('all')) {
       hasRequiredPermission = true
     } else {
+      // 创建用户对象，包含角色和权限信息
+      const userWithPermissions = {
+        ...user,
+        role: store?.roles?.length > 0 ? store.roles[0] : (user.role || 'guest'),
+        permissions: userPermissions
+      }
+      
       if (Array.isArray(to.meta.requiresPermission)) {
         // 检查是否具有任一权限
         hasRequiredPermission = to.meta.requiresPermission.some(permission => 
-          hasPermission(user, permission)
+          hasPermission(userWithPermissions, permission)
         )
       } else {
         // 检查是否具有指定权限
-        hasRequiredPermission = hasPermission(user, to.meta.requiresPermission)
+        hasRequiredPermission = hasPermission(userWithPermissions, to.meta.requiresPermission)
       }
     }
     
     if (!hasRequiredPermission) {
       console.log(`路由需要权限 ${to.meta.requiresPermission}，权限不足`)
+      console.log('当前用户权限:', userPermissions)
       next({ path: '/403' })
       return
     }
@@ -81,7 +94,15 @@ export function checkRoutePermission(to, from, next, store) {
     }
     
     const permission = to.meta.requiresRoomPermission
-    const canAccess = canAccessRoom(user, roomId, permission)
+    
+    // 创建用户对象，包含角色和权限信息
+    const userWithPermissions = {
+      ...user,
+      role: store?.roles?.length > 0 ? store.roles[0] : (user.role || 'guest'),
+      permissions: store?.permissions || []
+    }
+    
+    const canAccess = canAccessRoom(userWithPermissions, roomId, permission)
     
     if (!canAccess) {
       console.log(`路由需要寝室权限 ${permission}，权限不足`)
@@ -150,7 +171,17 @@ export const permissionMixin = {
     checkPermission(permission, resource = null) {
       const authStore = useAuthStore()
       const user = authStore.currentUser
-      return hasPermission(user, permission, resource)
+      
+      if (!user) return false
+      
+      // 创建用户对象，包含角色和权限信息
+      const userWithPermissions = {
+        ...user,
+        role: authStore.roles?.length > 0 ? authStore.roles[0] : (user.role || 'guest'),
+        permissions: authStore.permissions || []
+      }
+      
+      return hasPermission(userWithPermissions, permission, resource)
     },
     
     /**
@@ -162,7 +193,17 @@ export const permissionMixin = {
     checkAnyPermission(permissions, resource = null) {
       const authStore = useAuthStore()
       const user = authStore.currentUser
-      return permissions.some(permission => hasPermission(user, permission, resource))
+      
+      if (!user) return false
+      
+      // 创建用户对象，包含角色和权限信息
+      const userWithPermissions = {
+        ...user,
+        role: authStore.roles?.length > 0 ? authStore.roles[0] : (user.role || 'guest'),
+        permissions: authStore.permissions || []
+      }
+      
+      return permissions.some(permission => hasPermission(userWithPermissions, permission, resource))
     },
     
     /**
@@ -174,7 +215,17 @@ export const permissionMixin = {
     checkAllPermissions(permissions, resource = null) {
       const authStore = useAuthStore()
       const user = authStore.currentUser
-      return permissions.every(permission => hasPermission(user, permission, resource))
+      
+      if (!user) return false
+      
+      // 创建用户对象，包含角色和权限信息
+      const userWithPermissions = {
+        ...user,
+        role: authStore.roles?.length > 0 ? authStore.roles[0] : (user.role || 'guest'),
+        permissions: authStore.permissions || []
+      }
+      
+      return permissions.every(permission => hasPermission(userWithPermissions, permission, resource))
     },
     
     /**
@@ -186,7 +237,17 @@ export const permissionMixin = {
     checkRoomAccess(roomId, permission) {
       const authStore = useAuthStore()
       const user = authStore.currentUser
-      return canAccessRoom(user, roomId, permission)
+      
+      if (!user) return false
+      
+      // 创建用户对象，包含角色和权限信息
+      const userWithPermissions = {
+        ...user,
+        role: authStore.roles?.length > 0 ? authStore.roles[0] : (user.role || 'guest'),
+        permissions: authStore.permissions || []
+      }
+      
+      return canAccessRoom(userWithPermissions, roomId, permission)
     },
     
     /**
@@ -196,44 +257,9 @@ export const permissionMixin = {
      */
     checkRole(role) {
       const authStore = useAuthStore()
-      const user = authStore.currentUser
-      return user && user.role === role
-    },
-    
-    /**
-     * 检查用户是否是管理员
-     * @returns {boolean} 是否是管理员
-     */
-    isAdmin() {
-      return this.checkRole('admin')
-    },
-    
-    /**
-     * 检查用户是否是寝室所有者
-     * @param {string} roomId - 寝室ID
-     * @returns {boolean} 是否是寝室所有者
-     */
-    isRoomOwner(roomId) {
-      const authStore = useAuthStore()
-      const user = authStore.currentUser
-      if (!user || !roomId) return false
-      
-      const roomMembership = user.rooms && user.rooms.find(room => room.id === roomId)
-      return roomMembership && roomMembership.role === 'owner'
-    },
-    
-    /**
-     * 检查用户是否是寝室成员
-     * @param {string} roomId - 寝室ID
-     * @returns {boolean} 是否是寝室成员
-     */
-    isRoomMember(roomId) {
-      const authStore = useAuthStore()
-      const user = authStore.currentUser
-      if (!user || !roomId) return false
-      
-      const roomMembership = user.rooms && user.rooms.find(room => room.id === roomId)
-      return !!roomMembership
+      const userRoles = authStore.roles || []
+      const userRole = userRoles.length > 0 ? userRoles[0] : (authStore.currentUser?.role || 'guest')
+      return userRole === role
     }
   }
 }

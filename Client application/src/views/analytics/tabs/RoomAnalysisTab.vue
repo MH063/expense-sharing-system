@@ -1,5 +1,5 @@
 <template>
-  <div class="room-analysis-tab">
+  <div class="room-analysis-tab" v-if="canViewAnalytics">
     <div class="stats-cards">
       <el-row :gutter="20">
         <el-col :span="6">
@@ -102,14 +102,27 @@
       </el-card>
     </div>
   </div>
+  
+  <!-- 无权限访问提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-content">
+      <el-icon class="no-permission-icon"><Lock /></el-icon>
+      <h2>访问受限</h2>
+      <p>您没有权限查看房间分析数据</p>
+      <el-button type="primary" @click="$router.push('/dashboard')">返回首页</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, defineProps } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, defineProps } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { roomsApi } from '@/api/rooms'
-import { House, HomeFilled, User, Money, Refresh } from '@element-plus/icons-vue'
+import { House, HomeFilled, User, Money, Refresh, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 import RoomActivityChart from '../charts/RoomActivityChart.vue'
 
 // Props
@@ -118,6 +131,16 @@ const props = defineProps({
     type: Array,
     default: () => []
   }
+})
+
+// 路由
+const router = useRouter()
+
+// 权限检查
+const authStore = useAuthStore()
+const canViewAnalytics = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.SYSTEM_VIEW) || 
+         authStore.hasPermission(PERMISSIONS.ROOM_VIEW)
 })
 
 // 状态
@@ -137,6 +160,11 @@ let expenseChartInstance = null
  * 刷新寝室数据（列表、统计数据和图表）
  */
 const refreshRoomData = async () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限刷新寝室数据')
+    return
+  }
+  
   loading.value = true
   try {
     // 并行获取所有数据
@@ -159,6 +187,11 @@ const refreshRoomData = async () => {
  * 获取寝室统计数据
  */
 const fetchRoomStats = async () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限获取寝室统计数据')
+    return
+  }
+  
   if (!props.dateRange || props.dateRange.length !== 2) return
   
   loading.value = true
@@ -181,6 +214,11 @@ const fetchRoomStats = async () => {
  * 获取寝室列表
  */
 const fetchRoomList = async () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限获取寝室列表')
+    return
+  }
+  
   loading.value = true
   try {
     // 实际项目中应该调用真实的API
@@ -198,6 +236,11 @@ const fetchRoomList = async () => {
  * 初始化寝室消费分布图表
  */
 const initExpenseChart = () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限查看寝室消费分布图表')
+    return
+  }
+  
   if (expenseChartRef.value) {
     expenseChartInstance = echarts.init(expenseChartRef.value)
     updateExpenseChart()
@@ -208,6 +251,11 @@ const initExpenseChart = () => {
    * 更新寝室消费分布图表
    */
   const updateExpenseChart = async () => {
+    if (!canViewAnalytics.value) {
+      console.log('用户没有权限更新寝室消费分布图表')
+      return
+    }
+    
     if (!expenseChartInstance) return
     
     try {
@@ -394,5 +442,35 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+}
+
+.no-permission-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 70vh;
+  padding: 20px;
+}
+
+.no-permission-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.no-permission-icon {
+  font-size: 64px;
+  color: #e6a23c;
+  margin-bottom: 20px;
+}
+
+.no-permission-content h2 {
+  margin: 0 0 16px 0;
+  color: #303133;
+}
+
+.no-permission-content p {
+  margin: 0 0 24px 0;
+  color: #606266;
+  font-size: 16px;
 }
 </style>

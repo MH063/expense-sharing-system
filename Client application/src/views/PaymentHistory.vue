@@ -1,5 +1,5 @@
 <template>
-  <div class="payment-history-container">
+  <div class="payment-history-container" v-if="canViewPayments">
     <div class="page-header">
       <h1>支付记录</h1>
       <div class="header-actions">
@@ -94,17 +94,39 @@
       </button>
     </div>
   </div>
+  
+  <div v-else class="no-permission-container">
+    <div class="no-permission-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      </svg>
+    </div>
+    <h2>访问受限</h2>
+    <p>您没有权限查看支付记录</p>
+  </div>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+import { PERMISSIONS } from '@/utils/permissions';
 import { paymentApi } from '@/api/payments';
 
 export default {
   name: 'PaymentHistory',
   setup() {
     const router = useRouter();
+    const authStore = useAuthStore();
+    
+    // 权限检查
+    const canViewPayments = computed(() => {
+      return authStore.checkPermission(PERMISSIONS.PAYMENT_VIEW)
+    });
+    
+    const checkPermission = (permission) => {
+      return authStore.checkPermission(permission)
+    };
     
     const payments = ref([]);
     const loading = ref(false);
@@ -118,6 +140,12 @@ export default {
 
     // 加载支付记录
     const loadPayments = async () => {
+      // 检查查看权限
+      if (!checkPermission(PERMISSIONS.PAYMENT_VIEW)) {
+        console.warn('用户没有查看支付记录的权限');
+        return;
+      }
+      
       loading.value = true;
       try {
         const params = { 
@@ -203,6 +231,7 @@ export default {
       loading,
       statusFilter,
       pagination,
+      canViewPayments,
       loadPayments,
       changePage,
       viewBill,
@@ -475,5 +504,29 @@ export default {
     flex-direction: column;
     gap: 5px;
   }
+}
+
+.no-permission-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.no-permission-icon {
+  color: #ccc;
+  margin-bottom: 20px;
+}
+
+.no-permission-container h2 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.no-permission-container p {
+  color: #666;
+  margin-bottom: 20px;
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="bill-analysis-tab">
+  <div class="bill-analysis-tab" v-if="canViewAnalytics">
     <!-- 账单统计卡片 -->
     <div class="stats-cards">
       <el-row :gutter="20">
@@ -135,12 +135,24 @@
       </el-row>
     </div>
   </div>
+  
+  <!-- 无权限访问提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-content">
+      <el-icon class="no-permission-icon"><Lock /></el-icon>
+      <h2>访问受限</h2>
+      <p>您没有权限查看账单分析数据</p>
+      <el-button type="primary" @click="$router.push('/dashboard')">返回首页</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, defineProps } from 'vue'
+import { ref, reactive, computed, onMounted, defineProps } from 'vue'
 import { useRouter } from 'vue-router'
-import { Money, CircleCheck, Clock, List, Refresh } from '@element-plus/icons-vue'
+import { Money, CircleCheck, Clock, List, Refresh, Lock } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 import { billForecastApi } from '@/api/bill-forecast'
 import BillForecastChart from '../charts/BillForecastChart.vue'
 import BillStatusChart from '../charts/BillStatusChart.vue'
@@ -155,6 +167,13 @@ const props = defineProps({
 
 // 路由
 const router = useRouter()
+
+// 权限检查
+const authStore = useAuthStore()
+const canViewAnalytics = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.SYSTEM_VIEW) || 
+         authStore.hasPermission(PERMISSIONS.ROOM_VIEW)
+})
 
 // 状态
 const upcomingLoading = ref(false)
@@ -173,6 +192,11 @@ const billStats = reactive({
  * 加载账单统计数据
  */
 const loadBillStats = async () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限查看账单统计数据')
+    return
+  }
+  
   try {
     // 模拟API调用
     console.log('模拟调用 billForecastApi.getBillForecast，参数:', {
@@ -206,6 +230,11 @@ const loadBillStats = async () => {
  * 加载即将到期账单
  */
 const loadUpcomingBills = async () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限查看即将到期账单')
+    return
+  }
+  
   upcomingLoading.value = true
   try {
     // 模拟API调用
@@ -407,5 +436,35 @@ onMounted(() => {
 .upcoming-bills-container {
   height: 280px;
   overflow: auto;
+}
+
+.no-permission-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 70vh;
+  padding: 20px;
+}
+
+.no-permission-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.no-permission-icon {
+  font-size: 64px;
+  color: #e6a23c;
+  margin-bottom: 20px;
+}
+
+.no-permission-content h2 {
+  margin: 0 0 16px 0;
+  color: #303133;
+}
+
+.no-permission-content p {
+  margin: 0 0 24px 0;
+  color: #606266;
+  font-size: 16px;
 }
 </style>

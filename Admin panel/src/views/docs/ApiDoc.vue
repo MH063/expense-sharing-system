@@ -234,58 +234,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import request from '@/request'
 
 // API结构数据
-const apiStructure = ref([
-  {
-    id: '1',
-    title: '用户管理',
-    children: [
-      { id: '1.1', title: '用户注册', type: 'api' },
-      { id: '1.2', title: '用户登录', type: 'api' },
-      { id: '1.3', title: '获取用户信息', type: 'api' },
-      { id: '1.4', title: '更新用户信息', type: 'api' }
-    ]
-  },
-  {
-    id: '2',
-    title: '寝室管理',
-    children: [
-      { id: '2.1', title: '创建寝室', type: 'api' },
-      { id: '2.2', title: '加入寝室', type: 'api' },
-      { id: '2.3', title: '获取寝室信息', type: 'api' },
-      { id: '2.4', title: '寝室成员管理', type: 'api' }
-    ]
-  },
-  {
-    id: '3',
-    title: '费用管理',
-    children: [
-      { id: '3.1', title: '创建费用记录', type: 'api' },
-      { id: '3.2', title: '获取费用列表', type: 'api' },
-      { id: '3.3', title: '更新费用记录', type: 'api' },
-      { id: '3.4', title: '删除费用记录', type: 'api' }
-    ]
-  },
-  {
-    id: '4',
-    title: '支付管理',
-    children: [
-      { id: '4.1', title: '创建支付记录', type: 'api' },
-      { id: '4.2', title: '获取支付状态', type: 'api' },
-      { id: '4.3', title: '扫码支付', type: 'api' }
-    ]
-  },
-  {
-    id: '5',
-    title: '系统管理',
-    children: [
-      { id: '5.1', title: '系统配置', type: 'api' },
-      { id: '5.2', title: '数据统计', type: 'api' },
-      { id: '5.3', title: '审核管理', type: 'api' }
-    ]
-  }
-])
+const apiStructure = ref([])
 
 // 选中的章节
 const selectedSection = ref(null)
@@ -313,115 +265,93 @@ const testResult = ref({
 })
 
 // API数据（实际项目中应该从API获取）
-const apiDataMap = ref({
-  '1.1': {
-    id: '1.1',
-    title: '用户注册',
-    type: 'api',
-    version: 'v1.2',
-    updateTime: '2023-12-01',
-    author: '张三',
-    name: '用户注册接口',
-    method: 'POST',
-    path: '/api/user/register',
-    description: '用户注册接口，用于创建新用户账号',
-    parameters: [
-      { name: 'username', type: 'String', required: true, location: 'Body', description: '用户名' },
-      { name: 'password', type: 'String', required: true, location: 'Body', description: '密码' },
-      { name: 'email', type: 'String', required: false, location: 'Body', description: '邮箱' },
-      { name: 'phone', type: 'String', required: false, location: 'Body', description: '手机号' }
-    ],
-    responseFormat: `{
-  "success": true,
-  "data": {
-    "id": "user-id-123",
-    "username": "example",
-    "email": "example@example.com",
-    "createdAt": "2023-12-01T10:00:00Z"
-  },
-  "message": "注册成功"
-}`,
-    exampleCode: {
-      javascript: `// 用户注册
-const response = await fetch('/api/user/register', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    username: 'example',
-    password: 'password123',
-    email: 'example@example.com'
-  })
-});
-
-const result = await response.json();
-console.log(result);`,
-      python: `# 用户注册
-import requests
-
-response = requests.post('/api/user/register', json={
-    'username': 'example',
-    'password': 'password123',
-    'email': 'example@example.com'
-})
-
-result = response.json()
-print(result)`,
-      curl: `# 用户注册
-curl -X POST /api/user/register \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "username": "example",
-    "password": "password123",
-    "email": "example@example.com"
-  }'`
-    }
-  },
-  '5.1': {
-    id: '5.1',
-    title: '系统配置',
-    type: 'text',
-    version: 'v1.0',
-    updateTime: '2023-11-25',
-    author: '王五',
-    content: '系统配置API说明：\n\n1. 获取系统配置\n   - 接口: GET /api/system/config\n   - 描述: 获取系统全局配置信息\n   - 权限: 系统管理员\n\n2. 更新系统配置\n   - 接口: PUT /api/system/config\n   - 描述: 更新系统全局配置信息\n   - 权限: 系统管理员\n\n3. 配置项说明\n   - maxRoomMembers: 寝室最大成员数\n   - defaultCurrency: 默认货币单位\n   - paymentTimeout: 支付超时时间(分钟)\n   - auditEnabled: 是否启用审核功能'
-  }
-})
+const apiDataMap = ref({})
 
 // 处理节点点击事件
-const handleNodeClick = (data) => {
+const handleNodeClick = async (data) => {
   // 检查是否是叶子节点（没有子节点）
   if (!data.children || data.children.length === 0) {
-    if (data.type === 'api') {
-      selectedSection.value = apiDataMap.value[data.id] || {
-        id: data.id,
-        title: data.title,
-        type: 'api',
-        version: 'v1.0',
-        updateTime: new Date().toISOString().split('T')[0],
-        author: '当前用户',
-        name: '',
-        method: 'GET',
-        path: '',
-        description: '',
-        parameters: [],
-        responseFormat: '',
-        exampleCode: {
-          javascript: '',
-          python: '',
-          curl: ''
+    try {
+      // 调用API获取文档详情
+      const response = await request({
+        url: `/api/docs/${data.id}`,
+        method: 'get'
+      })
+      
+      if (response.success) {
+        selectedSection.value = response.data
+      } else {
+        console.error('获取文档详情失败:', response.message)
+        ElMessage.error('获取文档详情失败')
+        
+        // 如果API失败，创建默认空文档
+        if (data.type === 'api') {
+          selectedSection.value = {
+            id: data.id,
+            title: data.title,
+            type: 'api',
+            version: 'v1.0',
+            updateTime: new Date().toISOString().split('T')[0],
+            author: '当前用户',
+            name: '',
+            method: 'GET',
+            path: '',
+            description: '',
+            parameters: [],
+            responseFormat: '',
+            exampleCode: {
+              javascript: '',
+              python: '',
+              curl: ''
+            }
+          }
+        } else {
+          selectedSection.value = {
+            id: data.id,
+            title: data.title,
+            type: 'text',
+            version: 'v1.0',
+            updateTime: new Date().toISOString().split('T')[0],
+            author: '当前用户',
+            content: ''
+          }
         }
       }
-    } else {
-      selectedSection.value = {
-        id: data.id,
-        title: data.title,
-        type: 'text',
-        version: 'v1.0',
-        updateTime: new Date().toISOString().split('T')[0],
-        author: '当前用户',
-        content: ''
+    } catch (error) {
+      console.error('获取文档详情失败:', error)
+      ElMessage.error('获取文档详情失败')
+      
+      // 如果API失败，创建默认空文档
+      if (data.type === 'api') {
+        selectedSection.value = {
+          id: data.id,
+          title: data.title,
+          type: 'api',
+          version: 'v1.0',
+          updateTime: new Date().toISOString().split('T')[0],
+          author: '当前用户',
+          name: '',
+          method: 'GET',
+          path: '',
+          description: '',
+          parameters: [],
+          responseFormat: '',
+          exampleCode: {
+            javascript: '',
+            python: '',
+            curl: ''
+          }
+        }
+      } else {
+        selectedSection.value = {
+          id: data.id,
+          title: data.title,
+          type: 'text',
+          version: 'v1.0',
+          updateTime: new Date().toISOString().split('T')[0],
+          author: '当前用户',
+          content: ''
+        }
       }
     }
   }
@@ -448,36 +378,110 @@ const removeParameter = (index) => {
 }
 
 // 保存章节
-const saveSection = () => {
+const saveSection = async () => {
   if (!selectedSection.value) return
   
-  // 更新内容映射
-  if (selectedSection.value.type === 'api') {
-    apiDataMap.value[selectedSection.value.id] = {
-      ...selectedSection.value,
-      updateTime: new Date().toISOString().split('T')[0]
+  try {
+    // 调用API保存文档
+    const response = await request({
+      url: `/api/docs/${selectedSection.value.id}`,
+      method: 'put',
+      data: selectedSection.value
+    })
+    
+    if (response.success) {
+      ElMessage.success('章节保存成功')
+    } else {
+      console.error('保存章节失败:', response.message)
+      ElMessage.error('保存章节失败')
     }
+  } catch (error) {
+    console.error('保存章节失败:', error)
+    ElMessage.error('保存章节失败')
   }
-  
-  ElMessage.success('章节保存成功')
 }
 
 // 保存整个文档
-const saveDocument = () => {
-  // 实际项目中应该调用API保存整个文档
-  ElMessage.success('文档保存成功')
+const saveDocument = async () => {
+  try {
+    // 调用API保存整个文档
+    const response = await request({
+      url: '/api/docs/save-all',
+      method: 'post',
+      data: {
+        structure: apiStructure.value,
+        content: apiDataMap.value
+      }
+    })
+    
+    if (response.success) {
+      ElMessage.success('文档保存成功')
+    } else {
+      console.error('保存文档失败:', response.message)
+      ElMessage.error('保存文档失败')
+    }
+  } catch (error) {
+    console.error('保存文档失败:', error)
+    ElMessage.error('保存文档失败')
+  }
 }
 
 // 导出文档
-const exportDocument = () => {
-  // 实际项目中应该调用API导出文档
-  ElMessage.success('文档导出成功')
+const exportDocument = async () => {
+  try {
+    // 调用API导出文档
+    const response = await request({
+      url: '/api/docs/export',
+      method: 'post',
+      data: {
+        structure: apiStructure.value,
+        content: apiDataMap.value
+      },
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `api-docs-${new Date().toISOString().split('T')[0]}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('文档导出成功')
+  } catch (error) {
+    console.error('导出文档失败:', error)
+    ElMessage.error('导出文档失败')
+  }
 }
 
 // 生成Swagger
-const generateSwagger = () => {
-  // 实际项目中应该调用API生成Swagger文档
-  ElMessage.success('Swagger文档生成中...')
+const generateSwagger = async () => {
+  try {
+    // 调用API生成Swagger文档
+    const response = await request({
+      url: '/api/docs/swagger',
+      method: 'post',
+      data: {
+        structure: apiStructure.value,
+        content: apiDataMap.value
+      }
+    })
+    
+    if (response.success) {
+      // 打开Swagger文档页面
+      window.open(response.data.url, '_blank')
+      ElMessage.success('Swagger文档生成成功')
+    } else {
+      console.error('生成Swagger文档失败:', response.message)
+      ElMessage.error('生成Swagger文档失败')
+    }
+  } catch (error) {
+    console.error('生成Swagger文档失败:', error)
+    ElMessage.error('生成Swagger文档失败')
+  }
 }
 
 // 测试API
@@ -503,30 +507,37 @@ const testApi = () => {
 }
 
 // 发送测试请求
-const sendTestRequest = () => {
+const sendTestRequest = async () => {
   try {
     // 验证参数格式
-    JSON.parse(testForm.value.params)
+    const params = JSON.parse(testForm.value.params)
     
-    // 实际项目中应该调用API发送测试请求
-    // 这里模拟测试结果
-    testResult.value = {
-      status: 200,
-      response: JSON.stringify({
-        success: true,
-        data: {
-          // 模拟响应数据
-          id: 'test-id-123',
-          timestamp: new Date().toISOString()
-        },
-        message: '测试成功'
-      }, null, 2)
+    // 调用API发送测试请求
+    const response = await request({
+      url: '/api/docs/test',
+      method: 'post',
+      data: {
+        method: selectedSection.value.method,
+        path: selectedSection.value.path,
+        params: params
+      }
+    })
+    
+    if (response.success) {
+      testResult.value = JSON.stringify(response.data, null, 2)
+      ElMessage.success('测试请求发送成功')
+    } else {
+      testResult.value = JSON.stringify({ error: response.message }, null, 2)
+      ElMessage.error('测试请求失败')
     }
-    
-    testApiVisible.value = false
-    testResultVisible.value = true
   } catch (error) {
-    ElMessage.error('请求参数格式错误，请输入有效的JSON格式')
+    if (error instanceof SyntaxError) {
+      ElMessage.error('参数格式错误，请检查JSON格式')
+    } else {
+      console.error('测试请求失败:', error)
+      ElMessage.error('测试请求失败')
+      testResult.value = JSON.stringify({ error: error.message }, null, 2)
+    }
   }
 }
 
@@ -574,9 +585,24 @@ const previewContent = () => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
-  // 这里可以添加API调用来获取最新的API结构
-  console.log('API接口文档管理页面已加载')
+onMounted(async () => {
+  try {
+    // 调用API获取API文档结构
+    const response = await request({
+      url: '/api/docs/structure',
+      method: 'get'
+    })
+    
+    if (response.success) {
+      apiStructure.value = response.data
+    } else {
+      console.error('获取API文档结构失败:', response.message)
+      ElMessage.error('获取API文档结构失败')
+    }
+  } catch (error) {
+    console.error('获取API文档结构失败:', error)
+    ElMessage.error('获取API文档结构失败')
+  }
 })
 </script>
 

@@ -40,7 +40,16 @@ export const useUserStore = defineStore('user', () => {
       
       token.value = accessToken
       refreshTokenValue.value = refresh
-      user.value = userData
+      
+      // 确保角色信息正确设置
+      if (userData && userData.role) {
+        user.value = {
+          ...userData,
+          role: userData.role // 确保角色信息被正确设置
+        }
+      } else {
+        user.value = userData
+      }
       
       // 保存到本地存储
       localStorage.setItem('token', accessToken)
@@ -103,7 +112,18 @@ export const useUserStore = defineStore('user', () => {
     isLoading.value = true
     try {
       const response = await getCurrentUser()
-      user.value = response.data.data
+      const userData = response.data.data
+      
+      // 确保角色信息正确设置
+      if (userData && userData.role) {
+        user.value = {
+          ...userData,
+          role: userData.role // 确保角色信息被正确设置
+        }
+      } else {
+        user.value = userData
+      }
+      
       return response
     } catch (error) {
       console.error('获取用户信息失败:', error)

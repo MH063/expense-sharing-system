@@ -6,7 +6,7 @@
     </div>
 
     <!-- 上传收款码区域 -->
-    <div class="upload-section">
+    <div class="upload-section" v-if="canManageQrCodes">
       <div class="upload-card">
         <h2>上传收款码</h2>
         <div class="upload-form">
@@ -85,7 +85,7 @@
               创建于: {{ formatDate(qrCode.created_at) }}
             </div>
           </div>
-          <div class="qr-code-actions">
+          <div class="qr-code-actions" v-if="canManageQrCodes">
             <button
               @click="toggleQrCodeStatus(qrCode.id, !qrCode.is_active)"
               :class="['btn', qrCode.is_active ? 'btn-warning' : 'btn-success']"
@@ -130,12 +130,25 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useAuthStore } from '@/stores/auth';
+import { PERMISSIONS } from '@/utils/permissions';
 import { getUserQrCodes, uploadQrCode as uploadQrCodeApi, toggleQrCodeStatus as toggleQrCodeStatusApi, setDefaultQrCode as setDefaultQrCodeApi, deleteQrCode as deleteQrCodeApi } from '@/api/qr-codes';
 
 export default {
   name: 'QrCodeManagement',
   setup() {
+    const authStore = useAuthStore();
+    
+    // 权限检查
+    const canManageQrCodes = computed(() => {
+      return authStore.checkPermission(PERMISSIONS.QRCODE_MANAGE)
+    });
+    
+    const checkPermission = (permission) => {
+      return authStore.checkPermission(permission)
+    };
+    
     const qrCodes = ref([]);
     const loading = ref(true);
     const qrType = ref('');
@@ -148,6 +161,13 @@ export default {
 
     // 获取收款码列表
     const fetchQrCodes = async () => {
+      // 检查查看权限
+      if (!checkPermission(PERMISSIONS.QRCODE_VIEW)) {
+        console.warn('用户没有查看收款码的权限');
+        loading.value = false;
+        return;
+      }
+      
       try {
         loading.value = true;
         console.log('API调用 - 获取收款码列表');
@@ -212,6 +232,12 @@ export default {
         alert('请选择收款码类型和上传图片');
         return;
       }
+      
+      // 检查管理权限
+      if (!canManageQrCodes.value) {
+        console.warn('用户没有管理收款码的权限');
+        return;
+      }
 
       try {
         uploading.value = true;
@@ -245,6 +271,12 @@ export default {
 
     // 切换收款码状态
     const toggleQrCodeStatus = async (id, isActive) => {
+      // 检查管理权限
+      if (!canManageQrCodes.value) {
+        console.warn('用户没有管理收款码的权限');
+        return;
+      }
+      
       try {
         console.log('API调用 - 切换收款码状态:', { id, isActive });
         
@@ -266,6 +298,12 @@ export default {
 
     // 设置默认收款码
     const setDefaultQrCode = async (id) => {
+      // 检查管理权限
+      if (!canManageQrCodes.value) {
+        console.warn('用户没有管理收款码的权限');
+        return;
+      }
+      
       try {
         console.log('API调用 - 设置默认收款码:', id);
         
@@ -287,6 +325,12 @@ export default {
 
     // 确认删除收款码
     const confirmDeleteQrCode = (id) => {
+      // 检查管理权限
+      if (!canManageQrCodes.value) {
+        console.warn('用户没有管理收款码的权限');
+        return;
+      }
+      
       qrCodeToDelete.value = id;
       showDeleteDialog.value = true;
     };
@@ -300,6 +344,12 @@ export default {
     // 删除收款码
     const deleteQrCode = async () => {
       if (!qrCodeToDelete.value) return;
+      
+      // 检查管理权限
+      if (!canManageQrCodes.value) {
+        console.warn('用户没有管理收款码的权限');
+        return;
+      }
 
       try {
         console.log('API调用 - 删除收款码:', qrCodeToDelete.value);
@@ -353,6 +403,7 @@ export default {
       fileInput,
       showDeleteDialog,
       qrCodeToDelete,
+      canManageQrCodes,
       triggerFileInput,
       handleFileChange,
       clearFile,

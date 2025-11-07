@@ -259,110 +259,13 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Download, Plus } from '@element-plus/icons-vue'
+import { expenseApi } from '@/api'
 
 // 检测规则列表
-const detectionRules = ref([
-  {
-    id: 1,
-    name: '高额费用检测',
-    type: 'amount_threshold',
-    description: '检测超过平均费用50%的费用',
-    threshold: 50,
-    severity: 'high',
-    enabled: true
-  },
-  {
-    id: 2,
-    name: '频繁支付检测',
-    type: 'frequency_anomaly',
-    description: '检测同一用户24小时内超过3次支付',
-    threshold: 3,
-    severity: 'medium',
-    enabled: true
-  },
-  {
-    id: 3,
-    name: '非工作时间支付检测',
-    type: 'time_anomaly',
-    description: '检测凌晨1点至6点的支付行为',
-    threshold: 0,
-    severity: 'low',
-    enabled: false
-  },
-  {
-    id: 4,
-    name: '异常类型检测',
-    type: 'category_anomaly',
-    description: '检测系统中不常见的费用类型',
-    threshold: 0,
-    severity: 'medium',
-    enabled: true
-  }
-])
+const detectionRules = ref([])
 
 // 异常费用列表
-const abnormalExpenses = ref([
-  {
-    id: 1,
-    expenseId: 102,
-    category: 'electricity',
-    amount: 350.00,
-    payer: '张三',
-    dorm: 'A101',
-    date: '2023-11-20',
-    severity: 'high',
-    status: 'pending',
-    detectTime: '2023-11-20 10:30:00',
-    ruleName: '高额费用检测',
-    reason: '电费金额350.00元，超过平均电费50%',
-    handleRemark: ''
-  },
-  {
-    id: 2,
-    expenseId: 105,
-    category: 'water',
-    amount: 80.00,
-    payer: '李四',
-    dorm: 'B201',
-    date: '2023-11-19',
-    severity: 'medium',
-    status: 'confirmed',
-    detectTime: '2023-11-19 15:20:00',
-    ruleName: '高额费用检测',
-    reason: '水费金额80.00元，超过平均水费30%',
-    handleRemark: '已确认异常，已联系用户核实'
-  },
-  {
-    id: 3,
-    expenseId: 108,
-    category: 'other',
-    amount: 500.00,
-    payer: '王五',
-    dorm: 'C301',
-    date: '2023-11-18',
-    severity: 'high',
-    status: 'ignored',
-    detectTime: '2023-11-18 16:45:00',
-    ruleName: '高额费用检测',
-    reason: '其他费用500.00元，超过平均其他费用200%',
-    handleRemark: '已忽略，用户已提供购买凭证'
-  },
-  {
-    id: 4,
-    expenseId: 112,
-    category: 'internet',
-    amount: 50.00,
-    payer: '赵六',
-    dorm: 'D401',
-    date: '2023-11-17',
-    severity: 'low',
-    status: 'pending',
-    detectTime: '2023-11-17 09:15:00',
-    ruleName: '非工作时间支付检测',
-    reason: '支付时间02:30，属于非工作时间',
-    handleRemark: ''
-  }
-])
+const abnormalExpenses = ref([])
 
 // 筛选条件
 const filterStatus = ref('')
@@ -550,152 +453,115 @@ const exportReport = () => {
 }
 
 // 导出Excel格式报告
-const exportToExcel = () => {
+const exportToExcel = async () => {
   loading.value = true
-  
-  // 动态导入所需库
-  import('xlsx').then(XLSX => {
-    import('file-saver').then(FileSaver => {
-      try {
-        // 准备导出数据
-        const exportData = abnormalExpenses.value.map(item => ({
-          '异常ID': item.id,
-          '费用ID': item.expenseId,
-          '费用类型': getCategoryName(item.category),
-          '金额(元)': item.amount,
-          '支付人': item.payer,
-          '寝室': item.dorm,
-          '支付日期': item.date,
-          '严重程度': getSeverityName(item.severity),
-          '处理状态': getStatusName(item.status),
-          '检测时间': item.detectTime,
-          '触发规则': item.ruleName,
-          '异常原因': item.reason,
-          '处理备注': item.handleRemark || '无'
-        }))
-        
-        // 创建工作簿
-        const wb = XLSX.utils.book_new()
-        
-        // 创建工作表
-        const ws = XLSX.utils.json_to_sheet(exportData)
-        
-        // 设置列宽
-        const colWidths = [
-          { wch: 8 },  // 异常ID
-          { wch: 8 },  // 费用ID
-          { wch: 10 }, // 费用类型
-          { wch: 10 }, // 金额
-          { wch: 10 }, // 支付人
-          { wch: 8 },  // 寝室
-          { wch: 12 }, // 支付日期
-          { wch: 10 }, // 严重程度
-          { wch: 10 }, // 处理状态
-          { wch: 20 }, // 检测时间
-          { wch: 15 }, // 触发规则
-          { wch: 30 }, // 异常原因
-          { wch: 30 }  // 处理备注
-        ]
-        ws['!cols'] = colWidths
-        
-        // 将工作表添加到工作簿
-        XLSX.utils.book_append_sheet(wb, ws, '异常费用报告')
-        
-        // 生成Excel文件并下载
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        
-        // 生成文件名（包含日期）
-        const today = new Date()
-        const year = today.getFullYear()
-        const month = (today.getMonth() + 1).toString().padStart(2, '0')
-        const day = today.getDate().toString().padStart(2, '0')
-        const dateStr = `${year}${month}${day}`
-        const fileName = `异常费用报告_${dateStr}.xlsx`
-        
-        // 保存文件
-        FileSaver.saveAs(blob, fileName)
-        
-        ElMessage.success('Excel报告导出成功')
-      } catch (error) {
-        console.error('导出Excel失败:', error)
-        ElMessage.error('导出Excel失败，请重试')
-      } finally {
-        loading.value = false
+  try {
+    // 构建查询参数
+    const params = new URLSearchParams()
+    if (filterStatus.value) {
+      params.append('status', filterStatus.value)
+    }
+    if (filterSeverity.value) {
+      params.append('severity', filterSeverity.value)
+    }
+    
+    // 调用导出API
+    const response = await fetch(`/api/abnormal-expenses/export?${params}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
     })
-  })
+    
+    if (response.ok) {
+      // 获取文件名
+      const contentDisposition = response.headers.get('content-disposition')
+      let fileName = '异常费用报告.xlsx'
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        if (fileNameMatch && fileNameMatch[1]) {
+          fileName = fileNameMatch[1].replace(/['"]/g, '')
+        }
+      }
+      
+      // 创建Blob并下载
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      ElMessage.success('Excel报告导出成功')
+    } else {
+      ElMessage.error('导出失败，请重试')
+    }
+  } catch (error) {
+    console.error('导出Excel失败:', error)
+    ElMessage.error('导出Excel失败，请重试')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 导出PDF格式报告
-const exportToPDF = () => {
+const exportToPDF = async () => {
   loading.value = true
-  
-  // 动态导入所需库
-  import('jspdf').then(jsPDF => {
-    import('html2canvas').then(html2canvas => {
-      try {
-        // 创建PDF文档
-        const pdf = new jsPDF.jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        })
-        
-        // 添加自定义字体支持中文（如果需要）
-        pdf.setFont('helvetica')
-        
-        // 添加标题
-        pdf.setFontSize(18)
-        pdf.text('Abnormal Expense Report', 105, 15, { align: 'center' })
-        
-        // 添加生成日期
-        pdf.setFontSize(10)
-        const today = new Date()
-        const dateStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`
-        pdf.text(`Generated on: ${dateStr}`, 105, 22, { align: 'center' })
-        
-        // 添加统计信息
-        pdf.setFontSize(12)
-        pdf.text('Summary Statistics:', 14, 35)
-        
-        pdf.setFontSize(10)
-        const totalExpenses = abnormalExpenses.value.length
-        const pendingExpenses = abnormalExpenses.value.filter(item => item.status === 'pending').length
-        const confirmedExpenses = abnormalExpenses.value.filter(item => item.status === 'confirmed').length
-        const ignoredExpenses = abnormalExpenses.value.filter(item => item.status === 'ignored').length
-        const highSeverityExpenses = abnormalExpenses.value.filter(item => item.severity === 'high').length
-        
-        pdf.text(`Total Abnormal Expenses: ${totalExpenses}`, 14, 42)
-        pdf.text(`Pending: ${pendingExpenses}`, 14, 48)
-        pdf.text(`Confirmed: ${confirmedExpenses}`, 14, 54)
-        pdf.text(`Ignored: ${ignoredExpenses}`, 14, 60)
-        pdf.text(`High Severity: ${highSeverityExpenses}`, 14, 66)
-        
-        // 准备表格数据
-        const tableData = abnormalExpenses.value.map(item => [
-          item.id.toString(),
-          item.expenseId.toString(),
-          getCategoryName(item.category),
-          `¥${item.amount.toFixed(2)}`,
-          item.payer,
-          item.dorm,
-          item.date,
-          getSeverityName(item.severity),
-          getStatusName(item.status),
-          item.ruleName,
-          item.reason.substring(0, 30) + (item.reason.length > 30 ? '...' : ''),
-          item.handleRemark ? (item.handleRemark.substring(0, 20) + (item.handleRemark.length > 20 ? '...' : '')) : 'None'
-        ])
-        
-        // 添加表格标题
-        pdf.setFontSize(12)
-        pdf.text('Abnormal Expenses Details:', 14, 78)
-        
-        // 添加表格
-        pdf.setFontSize(9)
-        const headers = ['ID', 'Expense ID', 'Category', 'Amount', 'Payer', 'Dorm', 'Date', 'Severity', 'Status', 'Rule', 'Reason', 'Remark']
-        let yPosition = 85
+  try {
+    // 构建查询参数
+    const params = new URLSearchParams()
+    if (filterStatus.value) {
+      params.append('status', filterStatus.value)
+    }
+    if (filterSeverity.value) {
+      params.append('severity', filterSeverity.value)
+    }
+    params.append('format', 'pdf') // 指定导出格式为PDF
+    
+    // 调用导出API
+    const response = await fetch(`/api/abnormal-expenses/export?${params}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    if (response.ok) {
+      // 获取文件名
+      const contentDisposition = response.headers.get('content-disposition')
+      let fileName = '异常费用报告.pdf'
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        if (fileNameMatch && fileNameMatch[1]) {
+          fileName = fileNameMatch[1].replace(/['"]/g, '')
+        }
+      }
+      
+      // 创建Blob并下载
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      ElMessage.success('PDF报告导出成功')
+    } else {
+      ElMessage.error('导出失败，请重试')
+    }
+  } catch (error) {
+    console.error('导出PDF失败:', error)
+    ElMessage.error('导出PDF失败，请重试')
+  } finally {
+    loading.value = false
+  }
+}
         
         // 添加表头
         headers.forEach((header, index) => {
@@ -787,53 +653,127 @@ const editRule = (rule) => {
 }
 
 // 删除规则
-const deleteRule = (rule) => {
-  ElMessageBox.confirm(
-    `确定要删除规则"${rule.name}"吗？`,
-    '删除规则',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  )
-    .then(() => {
-      // 模拟API调用
-      const index = detectionRules.value.findIndex(r => r.id === rule.id)
-      if (index !== -1) {
-        detectionRules.value.splice(index, 1)
-        ElMessage.success('删除成功')
+const deleteRule = async (rule) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除规则"${rule.name}"吗？`,
+      '删除规则',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
       }
-    })
-    .catch(() => {
-      ElMessage.info('已取消操作')
-    })
+    )
+    
+    loading.value = true
+    
+    try {
+      // 调用删除规则API
+      const response = await fetch(`/api/abnormal-expenses/rules/${rule.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // 从本地列表中移除规则
+        const index = detectionRules.value.findIndex(r => r.id === rule.id)
+        if (index !== -1) {
+          detectionRules.value.splice(index, 1)
+        }
+        ElMessage.success('删除成功')
+      } else {
+        ElMessage.error(result.message || '删除失败')
+      }
+    } catch (error) {
+      console.error('删除规则失败:', error)
+      ElMessage.error('删除规则失败，请重试')
+    } finally {
+      loading.value = false
+    }
+  } catch {
+    ElMessage.info('已取消操作')
+  }
 }
 
 // 保存规则
-const saveRule = () => {
-  ruleFormRef.value.validate((valid) => {
-    if (valid) {
+const saveRule = async () => {
+  try {
+    const valid = await ruleFormRef.value.validate()
+    if (!valid) return
+    
+    loading.value = true
+    
+    try {
+      let response
+      const ruleData = {
+        name: ruleForm.name,
+        type: ruleForm.type,
+        description: ruleForm.description,
+        threshold: ruleForm.threshold,
+        severity: ruleForm.severity,
+        enabled: ruleForm.enabled
+      }
+      
       if (isEditRule.value) {
         // 编辑规则
-        const index = detectionRules.value.findIndex(r => r.id === ruleForm.id)
-        if (index !== -1) {
-          detectionRules.value[index] = { ...ruleForm }
-          ElMessage.success('更新成功')
-        }
+        response = await fetch(`/api/abnormal-expenses/rules/${ruleForm.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(ruleData)
+        })
       } else {
         // 添加规则
-        const newRule = {
-          ...ruleForm,
-          id: detectionRules.value.length + 1
-        }
-        detectionRules.value.push(newRule)
-        ElMessage.success('添加成功')
+        response = await fetch('/api/abnormal-expenses/rules', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(ruleData)
+        })
       }
-      showAddRuleDialog.value = false
-      resetRuleForm()
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        if (isEditRule.value) {
+          // 更新本地规则列表
+          const index = detectionRules.value.findIndex(r => r.id === ruleForm.id)
+          if (index !== -1) {
+            detectionRules.value[index] = { ...ruleForm }
+          }
+          ElMessage.success('更新成功')
+        } else {
+          // 添加到本地规则列表
+          const newRule = {
+            ...ruleForm,
+            id: result.data.id // 使用后端返回的ID
+          }
+          detectionRules.value.push(newRule)
+          ElMessage.success('添加成功')
+        }
+        
+        showAddRuleDialog.value = false
+        resetRuleForm()
+      } else {
+        ElMessage.error(result.message || '操作失败')
+      }
+    } catch (error) {
+      console.error('保存规则失败:', error)
+      ElMessage.error('保存规则失败，请重试')
+    } finally {
+      loading.value = false
     }
-  })
+  } catch (error) {
+    console.log('表单验证失败:', error)
+  }
 }
 
 // 查看异常费用详情
@@ -843,63 +783,119 @@ const viewAbnormalExpense = (abnormalExpense) => {
 }
 
 // 确认异常
-const confirmAbnormal = (abnormalExpense) => {
-  ElMessageBox.prompt('请输入处理备注', '确认异常', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputType: 'textarea',
-    inputPlaceholder: '请输入处理备注'
-  })
-    .then(({ value }) => {
-      // 模拟API调用
-      const index = abnormalExpenses.value.findIndex(a => a.id === abnormalExpense.id)
-      if (index !== -1) {
-        abnormalExpenses.value[index].status = 'confirmed'
-        abnormalExpenses.value[index].handleRemark = value || '已确认异常'
-      }
-      
-      // 如果是从详情对话框操作的，也更新当前显示的数据
-      if (currentAbnormalExpense.value && currentAbnormalExpense.value.id === abnormalExpense.id) {
-        currentAbnormalExpense.value.status = 'confirmed'
-        currentAbnormalExpense.value.handleRemark = value || '已确认异常'
-      }
-      
-      ElMessage.success('已确认异常')
-      showAbnormalDetailDialog.value = false
+const confirmAbnormal = async (abnormalExpense) => {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入处理备注', '确认异常', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputType: 'textarea',
+      inputPlaceholder: '请输入处理备注'
     })
-    .catch(() => {
-      ElMessage.info('已取消操作')
-    })
+    
+    loading.value = true
+    
+    try {
+      // 调用确认异常API
+      const response = await fetch(`/api/abnormal-expenses/${abnormalExpense.id}/confirm`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          status: 'confirmed',
+          note: value || '已确认异常'
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // 更新本地数据
+        const index = abnormalExpenses.value.findIndex(a => a.id === abnormalExpense.id)
+        if (index !== -1) {
+          abnormalExpenses.value[index].status = 'confirmed'
+          abnormalExpenses.value[index].handleRemark = value || '已确认异常'
+        }
+        
+        // 如果是从详情对话框操作的，也更新当前显示的数据
+        if (currentAbnormalExpense.value && currentAbnormalExpense.value.id === abnormalExpense.id) {
+          currentAbnormalExpense.value.status = 'confirmed'
+          currentAbnormalExpense.value.handleRemark = value || '已确认异常'
+        }
+        
+        ElMessage.success('已确认异常')
+        showAbnormalDetailDialog.value = false
+      } else {
+        ElMessage.error(result.message || '操作失败')
+      }
+    } catch (error) {
+      console.error('确认异常失败:', error)
+      ElMessage.error('确认异常失败，请重试')
+    } finally {
+      loading.value = false
+    }
+  } catch {
+    ElMessage.info('已取消操作')
+  }
 }
 
 // 忽略异常
-const ignoreAbnormal = (abnormalExpense) => {
-  ElMessageBox.prompt('请输入忽略原因', '忽略异常', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputType: 'textarea',
-    inputPlaceholder: '请输入忽略原因'
-  })
-    .then(({ value }) => {
-      // 模拟API调用
-      const index = abnormalExpenses.value.findIndex(a => a.id === abnormalExpense.id)
-      if (index !== -1) {
-        abnormalExpenses.value[index].status = 'ignored'
-        abnormalExpenses.value[index].handleRemark = value || '已忽略异常'
-      }
-      
-      // 如果是从详情对话框操作的，也更新当前显示的数据
-      if (currentAbnormalExpense.value && currentAbnormalExpense.value.id === abnormalExpense.id) {
-        currentAbnormalExpense.value.status = 'ignored'
-        currentAbnormalExpense.value.handleRemark = value || '已忽略异常'
-      }
-      
-      ElMessage.success('已忽略异常')
-      showAbnormalDetailDialog.value = false
+const ignoreAbnormal = async (abnormalExpense) => {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入忽略原因', '忽略异常', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputType: 'textarea',
+      inputPlaceholder: '请输入忽略原因'
     })
-    .catch(() => {
-      ElMessage.info('已取消操作')
-    })
+    
+    loading.value = true
+    
+    try {
+      // 调用忽略异常API
+      const response = await fetch(`/api/abnormal-expenses/${abnormalExpense.id}/ignore`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          status: 'ignored',
+          note: value || '已忽略异常'
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // 更新本地数据
+        const index = abnormalExpenses.value.findIndex(a => a.id === abnormalExpense.id)
+        if (index !== -1) {
+          abnormalExpenses.value[index].status = 'ignored'
+          abnormalExpenses.value[index].handleRemark = value || '已忽略异常'
+        }
+        
+        // 如果是从详情对话框操作的，也更新当前显示的数据
+        if (currentAbnormalExpense.value && currentAbnormalExpense.value.id === abnormalExpense.id) {
+          currentAbnormalExpense.value.status = 'ignored'
+          currentAbnormalExpense.value.handleRemark = value || '已忽略异常'
+        }
+        
+        ElMessage.success('已忽略异常')
+        showAbnormalDetailDialog.value = false
+      } else {
+        ElMessage.error(result.message || '操作失败')
+      }
+    } catch (error) {
+      console.error('忽略异常失败:', error)
+      ElMessage.error('忽略异常失败，请重试')
+    } finally {
+      loading.value = false
+    }
+  } catch {
+    ElMessage.info('已取消操作')
+  }
 }
 
 // 重置规则表单
@@ -961,7 +957,7 @@ const fetchAbnormalExpenses = async () => {
         category: item.type_name.toLowerCase(),
         amount: item.amount,
         payer: item.paid_by_name,
-        dorm: 'A101', // 模拟数据，实际应从后端获取
+        dorm: item.dorm || '未知', // 使用API返回的数据
         date: new Date(item.expense_date).toLocaleDateString(),
         severity: item.rule_type === 'amount_threshold' ? 'high' : 'medium', // 根据规则类型设置严重程度
         status: item.status,

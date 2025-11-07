@@ -106,10 +106,10 @@ const handleLogin = async () => {
     
     // 处理后端返回的双层嵌套结构 {success:true，data:{xxx：[]}}
     if (response && response.success) {
-      const { token, user } = response.data
+      const { user, accessToken, refreshToken } = response.data
       
       // 存储token
-      localStorage.setItem('admin-token', token)
+      localStorage.setItem('admin-token', accessToken)
       
       // 如果选择记住我，则保存用户名
       if (loginForm.remember) {
@@ -119,7 +119,7 @@ const handleLogin = async () => {
       }
       
       // 更新登录状态
-      authLogin({ ...user, token })
+      authLogin({ ...user, token: accessToken })
       
       ElMessage.success('登录成功')
       

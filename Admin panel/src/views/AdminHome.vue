@@ -160,7 +160,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { logout as authLogout } from '../utils/auth'
+import { logout as authLogout, checkAuth } from '../utils/auth'
 import { statisticsApi } from '../api'
 import {
   House,
@@ -190,16 +190,23 @@ const statistics = ref({
 // 加载统计数据
 const loadStatistics = async () => {
   try {
+    // 检查用户是否已登录
+    if (!checkAuth()) {
+      console.log('用户未登录，不加载统计数据')
+      return
+    }
+    
     console.log('开始加载系统统计数据')
     const response = await statisticsApi.getSystemOverview()
     console.log('统计数据响应:', response)
     
     // 处理后端返回的数据结构 {success: true, data: {...}}
     if (response.success && response.data) {
+      // 后端返回的数据结构是嵌套的：{success: true, data: {user_stats: {...}, room_stats: {...}, ...}}
       statistics.value = {
-        totalUsers: response.data.totalUsers || 0,
-        totalExpenses: response.data.totalExpenses || 0,
-        activeRooms: response.data.activeRooms || 0
+        totalUsers: response.data.user_stats?.total_users || 0,
+        totalExpenses: response.data.expense_stats?.total_expenses || 0,
+        activeRooms: response.data.active_rooms?.length || 0
       }
       console.log('统计数据已更新:', statistics.value)
     } else {

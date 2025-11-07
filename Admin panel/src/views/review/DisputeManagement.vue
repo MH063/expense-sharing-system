@@ -454,6 +454,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Download, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
+import { disputeApi } from '@/api'
 
 // 统计数据
 const pendingCount = ref(12)
@@ -807,6 +808,70 @@ const getStatusTagType = (status) => {
   return typeMap[status] || 'info'
 }
 
+// 获取争议列表
+const fetchDisputeList = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      id: searchForm.id || undefined,
+      type: searchForm.type || undefined,
+      initiator: searchForm.initiator || undefined,
+      handler: searchForm.handler || undefined,
+      status: searchForm.status || undefined,
+      startDate: searchForm.dateRange && searchForm.dateRange.length > 0 ? searchForm.dateRange[0] : undefined,
+      endDate: searchForm.dateRange && searchForm.dateRange.length > 1 ? searchForm.dateRange[1] : undefined,
+      priority: filterPriority.value || undefined
+    }
+    
+    const response = await disputeApi.getDisputeList(params)
+    if (response.data.success) {
+      disputeList.value = response.data.data.list || []
+      totalDisputes.value = response.data.data.total || 0
+    } else {
+      ElMessage.error('获取争议列表失败')
+    }
+  } catch (error) {
+    console.error('获取争议列表失败:', error)
+    ElMessage.error('获取争议列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取争议统计数据
+const fetchDisputeStats = async () => {
+  try {
+    const response = await disputeApi.getDisputeStats()
+    if (response.data.success) {
+      const stats = response.data.data
+      pendingCount.value = stats.pendingCount || 0
+      pendingTrend.value = stats.pendingTrend || 0
+      processingCount.value = stats.processingCount || 0
+      processingTrend.value = stats.processingTrend || 0
+      todayResolvedCount.value = stats.todayResolvedCount || 0
+      resolutionRate.value = stats.resolutionRate || 0
+      avgProcessTime.value = stats.avgProcessTime || 0
+      timeTrend.value = stats.timeTrend || 0
+    }
+  } catch (error) {
+    console.error('获取争议统计数据失败:', error)
+  }
+}
+
+// 获取可分配的处理人列表
+const fetchAvailableHandlers = async () => {
+  try {
+    const response = await disputeApi.getAvailableHandlers()
+    if (response.data.success) {
+      availableHandlers.value = response.data.data || []
+    }
+  } catch (error) {
+    console.error('获取可分配处理人列表失败:', error)
+  }
+}
+
 // 创建争议
 const createDispute = () => {
   // 重置表单
@@ -822,75 +887,48 @@ const createDispute = () => {
   showCreateDialog.value = true
 }
 
-// 导出争议报告
+// 导出争议数据
 const exportDisputes = async () => {
   try {
-    loading.value = true
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      status: searchForm.status || undefined,
+      priority: filterPriority.value || undefined,
+      type: searchForm.type || undefined,
+      id: searchForm.id || undefined,
+      initiator: searchForm.initiator || undefined,
+      handler: searchForm.handler || undefined,
+      startDate: searchForm.dateRange && searchForm.dateRange.length > 0 ? searchForm.dateRange[0] : undefined,
+      endDate: searchForm.dateRange && searchForm.dateRange.length > 1 ? searchForm.dateRange[1] : undefined
+    }
     
-    // 动态导入XLSX库
-    const XLSX = await import('xlsx')
-    
-    // 准备导出数据
-    const exportData = disputeList.value.map(item => ({
-      '争议ID': item.id,
-      '争议类型': getTypeName(item.type),
-      '标题': item.title,
-      '发起人': item.initiator,
-      '创建时间': item.createTime,
-      '优先级': getPriorityName(item.priority),
-      '状态': getStatusName(item.status),
-      '处理人': item.handler || '未分配',
-      '截止时间': item.deadline,
-      '争议内容': item.content
-    }))
-    
-    // 创建工作簿
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(exportData)
-    
-    // 设置列宽
-    const colWidths = [
-      { wch: 8 },  // 争议ID
-      { wch: 12 }, // 争议类型
-      { wch: 30 }, // 标题
-      { wch: 12 }, // 发起人
-      { wch: 20 }, // 创建时间
-      { wch: 8 },  // 优先级
-      { wch: 10 }, // 状态
-      { wch: 12 }, // 处理人
-      { wch: 20 }, // 截止时间
-      { wch: 50 }  // 争议内容
-    ]
-    ws['!cols'] = colWidths
-    
-    // 添加工作表到工作簿
-    XLSX.utils.book_append_sheet(wb, ws, '争议案件列表')
-    
-    // 生成文件名（带日期）
-    const now = new Date()
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')
-    const fileName = `争议案件报告_${dateStr}.xlsx`
-    
-    // 导出文件
-    XLSX.writeFile(wb, fileName)
-    
-    ElMessage.success('报告导出成功')
+    const response = await disputeApi.exportDisputes(params)
+    if (response.data.success) {
+      // 创建下载链接
+      const url = window.URL.createObjectURL(new Blob([response.data.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `争议数据_${new Date().toLocaleDateString()}.xlsx`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      ElMessage.success('导出成功')
+    } else {
+      ElMessage.error(response.data.message || '导出失败')
+    }
   } catch (error) {
-    console.error('导出报告失败:', error)
-    ElMessage.error('导出报告失败，请重试')
-  } finally {
-    loading.value = false
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
   }
 }
 
 // 搜索争议
 const searchDisputes = () => {
-  loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('查询完成')
-  }, 500)
+  currentPage.value = 1
+  fetchDisputeList()
 }
 
 // 重置搜索
@@ -901,29 +939,37 @@ const resetSearch = () => {
   searchForm.handler = ''
   searchForm.status = ''
   searchForm.dateRange = []
-  searchDisputes()
+  filterPriority.value = ''
+  currentPage.value = 1
+  fetchDisputeList()
 }
 
 // 筛选争议
 const filterDisputes = () => {
-  loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('筛选完成')
-  }, 500)
+  currentPage.value = 1
+  fetchDisputeList()
 }
 
 // 查看争议详情
-const viewDispute = (dispute) => {
-  currentDispute.value = { ...dispute }
-  showDisputeDetailDialog.value = true
+const viewDispute = async (dispute) => {
+  try {
+    const response = await disputeApi.getDisputeDetail(dispute.id)
+    if (response.data.success) {
+      currentDispute.value = response.data.data
+      showDetailDialog.value = true
+    } else {
+      ElMessage.error(response.data.message || '获取详情失败')
+    }
+  } catch (error) {
+    console.error('获取详情失败:', error)
+    ElMessage.error('获取详情失败')
+  }
 }
 
 // 分配处理人
 const assignHandler = (dispute) => {
   assignForm.disputeId = dispute.id
-  assignForm.handlerId = null
+  assignForm.handlerId = ''
   assignForm.comment = ''
   showAssignDialog.value = true
 }
@@ -931,7 +977,7 @@ const assignHandler = (dispute) => {
 // 处理争议
 const handleDispute = (dispute) => {
   handleForm.disputeId = dispute.id
-  handleForm.method = 'investigate'
+  handleForm.method = ''
   handleForm.comment = ''
   handleForm.attachments = []
   showHandleDialog.value = true
@@ -940,10 +986,39 @@ const handleDispute = (dispute) => {
 // 解决争议
 const resolveDispute = (dispute) => {
   resolveForm.disputeId = dispute.id
-  resolveForm.result = 'approve'
+  resolveForm.result = ''
   resolveForm.explanation = ''
   resolveForm.followUp = ''
   showResolveDialog.value = true
+}
+
+// 删除争议
+const deleteDispute = async (dispute) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除争议"${dispute.title}"吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const response = await disputeApi.deleteDispute(dispute.id)
+    if (response.data.success) {
+      ElMessage.success('删除成功')
+      fetchDisputeList()
+      fetchDisputeStats()
+    } else {
+      ElMessage.error(response.data.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 // 处理争议操作（从详情对话框）
@@ -959,89 +1034,82 @@ const resolveDisputeAction = () => {
 }
 
 // 提交分配
-const submitAssign = () => {
-  assignFormRef.value.validate((valid) => {
-    if (valid) {
-      // 模拟API调用
-      const index = disputeList.value.findIndex(d => d.id === assignForm.disputeId)
-      if (index !== -1) {
-        const handler = availableHandlers.value.find(h => h.id === assignForm.handlerId)
-        if (handler) {
-          disputeList.value[index].handler = handler.name
-          disputeList.value[index].status = 'processing'
-          handler.currentTasks += 1
-          
-          // 添加处理历史
-          disputeList.value[index].history.push({
-            time: new Date().toLocaleString(),
-            operator: handler.name,
-            action: '开始处理',
-            comment: assignForm.comment || '已接手争议处理'
-          })
-        }
-      }
-      
+const submitAssign = async () => {
+  const valid = await assignFormRef.value.validate()
+  if (!valid) return
+  
+  try {
+    const data = {
+      handlerId: assignForm.handlerId,
+      comment: assignForm.comment
+    }
+    
+    const response = await disputeApi.assignHandler(assignForm.disputeId, data)
+    if (response.data.success) {
       ElMessage.success('分配成功')
       showAssignDialog.value = false
+      fetchDisputeList()
+      fetchDisputeStats()
+    } else {
+      ElMessage.error(response.data.message || '分配失败')
     }
-  })
+  } catch (error) {
+    console.error('分配失败:', error)
+    ElMessage.error('分配失败')
+  }
 }
 
 // 提交处理
-const submitHandle = () => {
-  handleFormRef.value.validate((valid) => {
-    if (valid) {
-      // 模拟API调用
-      const index = disputeList.value.findIndex(d => d.id === handleForm.disputeId)
-      if (index !== -1) {
-        disputeList.value[index].comment = handleForm.comment
-        
-        // 添加处理历史
-        const handler = disputeList.value[index].handler
-        disputeList.value[index].history.push({
-          time: new Date().toLocaleString(),
-          operator: handler,
-          action: '处理争议',
-          comment: handleForm.comment
-        })
-      }
-      
+const submitHandle = async () => {
+  const valid = await handleFormRef.value.validate()
+  if (!valid) return
+  
+  try {
+    const data = {
+      method: handleForm.method,
+      comment: handleForm.comment,
+      attachments: handleForm.attachments
+    }
+    
+    const response = await disputeApi.handleDispute(handleForm.disputeId, data)
+    if (response.data.success) {
       ElMessage.success('处理成功')
       showHandleDialog.value = false
+      fetchDisputeList()
+    } else {
+      ElMessage.error(response.data.message || '处理失败')
     }
-  })
+  } catch (error) {
+    console.error('处理失败:', error)
+    ElMessage.error('处理失败')
+  }
 }
 
 // 提交解决
-const submitResolve = () => {
-  resolveFormRef.value.validate((valid) => {
-    if (valid) {
-      // 模拟API调用
-      const index = disputeList.value.findIndex(d => d.id === resolveForm.disputeId)
-      if (index !== -1) {
-        disputeList.value[index].status = 'resolved'
-        disputeList.value[index].comment = resolveForm.explanation
-        
-        // 添加处理历史
-        const handler = disputeList.value[index].handler
-        disputeList.value[index].history.push({
-          time: new Date().toLocaleString(),
-          operator: handler,
-          action: '解决争议',
-          comment: `解决结果: ${resolveForm.result}, 说明: ${resolveForm.explanation}, 后续措施: ${resolveForm.followUp}`
-        })
-        
-        // 更新处理人任务数
-        const handlerIndex = availableHandlers.value.findIndex(h => h.name === handler)
-        if (handlerIndex !== -1) {
-          availableHandlers.value[handlerIndex].currentTasks -= 1
-        }
-      }
-      
+const submitResolve = async () => {
+  const valid = await resolveFormRef.value.validate()
+  if (!valid) return
+  
+  try {
+    const data = {
+      result: resolveForm.result,
+      explanation: resolveForm.explanation,
+      followUp: resolveForm.followUp
+    }
+    
+    const response = await disputeApi.resolveDispute(resolveForm.disputeId, data)
+    if (response.data.success) {
       ElMessage.success('争议已解决')
       showResolveDialog.value = false
+      fetchDisputeList()
+      fetchDisputeStats()
+    } else {
+      ElMessage.error(response.data.message || '解决失败')
     }
-  })
+  } catch (error) {
+    console.error('解决失败:', error)
+    ElMessage.error('解决失败')
+  }
 }
 
 // 处理文件变化
@@ -1055,53 +1123,47 @@ const handleCreateFileChange = (file, fileList) => {
 }
 
 // 提交新建争议
-const submitCreate = () => {
-  createFormRef.value.validate((valid) => {
-    if (valid) {
-      createLoading.value = true
-      
-      // 模拟API调用
-      setTimeout(() => {
-        // 创建新的争议对象
-        const newDispute = {
-          id: disputeList.value.length + 1,
-          type: createForm.type,
-          title: createForm.title,
-          initiator: createForm.initiator,
-          createTime: new Date().toLocaleString(),
-          priority: createForm.priority,
-          status: 'pending',
-          handler: null,
-          deadline: createForm.deadline,
-          content: createForm.content,
-          attachments: createForm.attachments.map(file => ({
-            id: Date.now() + Math.random(),
-            name: file.name,
-            url: `/files/${file.name}`
-          })),
-          comment: '',
-          history: [
-            {
-              time: new Date().toLocaleString(),
-              operator: createForm.initiator,
-              action: '创建争议',
-              comment: '提交争议'
-            }
-          ]
-        }
-        
-        // 添加到争议列表
-        disputeList.value.unshift(newDispute)
-        
-        // 更新统计数据
-        pendingCount.value += 1
-        
-        ElMessage.success('争议创建成功')
-        showCreateDialog.value = false
-        createLoading.value = false
-      }, 1000)
+const submitCreate = async () => {
+  const valid = await createFormRef.value.validate()
+  if (!valid) return
+  
+  try {
+    createLoading.value = true
+    
+    const data = {
+      type: createForm.type,
+      title: createForm.title,
+      initiator: createForm.initiator,
+      priority: createForm.priority,
+      content: createForm.content,
+      deadline: createForm.deadline,
+      attachments: createForm.attachments
     }
-  })
+    
+    const response = await disputeApi.createDispute(data)
+    if (response.data.success) {
+      ElMessage.success('争议创建成功')
+      showCreateDialog.value = false
+      fetchDisputeList()
+      fetchDisputeStats()
+      
+      // 重置表单
+      createForm.type = ''
+      createForm.title = ''
+      createForm.initiator = ''
+      createForm.priority = 'medium'
+      createForm.content = ''
+      createForm.attachments = []
+      createForm.deadline = ''
+    } else {
+      ElMessage.error(response.data.message || '创建失败')
+    }
+  } catch (error) {
+    console.error('创建失败:', error)
+    ElMessage.error('创建失败')
+  } finally {
+    createLoading.value = false
+  }
 }
 
 // 下载文件
@@ -1124,9 +1186,11 @@ const handleCurrentChange = (page) => {
   searchDisputes()
 }
 
-// 组件挂载时加载数据
+// 组件挂载
 onMounted(() => {
-  searchDisputes()
+  fetchDisputeList()
+  fetchDisputeStats()
+  fetchAvailableHandlers()
 })
 </script>
 

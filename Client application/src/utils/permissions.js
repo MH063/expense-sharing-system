@@ -5,17 +5,22 @@
 
 // 角色定义
 export const ROLES = {
-  ADMIN: 'admin',       // 系统管理员
-  ROOM_OWNER: 'owner',  // 寝室创建者/所有者
-  ROOM_MEMBER: 'member', // 寝室成员
-  GUEST: 'guest'        // 访客/未登录用户
+  ADMIN: 'admin',           // 管理员
+  SYSTEM_ADMIN: 'system_admin', // 系统管理员
+  SUPER_ADMIN: 'super_admin',   // 超级管理员
+  ROOM_OWNER: '寝室长',      // 寝室长
+  ROOM_MEMBER: 'payer',     // 付款人
+  USER: 'user',             // 普通用户
+  GUEST: 'guest'            // 访客/未登录用户
 }
 
 // 权限定义
 export const PERMISSIONS = {
   // 系统级权限
-  SYSTEM_ADMIN: 'system:admin',                    // 系统管理
-  USER_MANAGE: 'system:user:manage',               // 用户管理
+  ADMIN_ACCESS: 'admin.access',                    // 访问管理端
+  ADMIN_ROLES_ASSIGN: 'admin.roles.assign',        // 分配角色
+  ADMIN_USERS_READ: 'admin.users.read',            // 查看管理员
+  SYSTEM_ADMIN: 'system.admin',                    // 系统管理员权限
   
   // 寝室级权限
   ROOM_CREATE: 'room:create',                      // 创建寝室
@@ -23,15 +28,20 @@ export const PERMISSIONS = {
   ROOM_EDIT: 'room:edit',                          // 编辑寝室信息
   ROOM_DELETE: 'room:delete',                      // 删除寝室
   ROOM_INVITE: 'room:invite',                      // 邀请成员
-  ROOM_REMOVE_MEMBER: 'room:member:remove',       // 移除成员
-  ROOM_MANAGE_SETTINGS: 'room:settings:manage',   // 管理寝室设置
+  ROOM_MANAGE: 'room:manage',                      // 管理寝室
+  ROOM_JOIN: 'room:join',                          // 加入寝室
+  
+  // 成员管理权限
+  MEMBER_MANAGE: 'member:manage',                  // 管理成员
+  MEMBER_INVITE: 'member:invite',                  // 邀请成员
+  MEMBER_REMOVE: 'member:remove',                  // 移除成员
+  MEMBER_ROLE_CHANGE: 'member:role.change',        // 更改成员角色
   
   // 费用相关权限
   EXPENSE_CREATE: 'expense:create',                 // 创建费用记录
   EXPENSE_VIEW: 'expense:view',                    // 查看费用记录
   EXPENSE_EDIT: 'expense:edit',                    // 编辑费用记录
   EXPENSE_DELETE: 'expense:delete',                // 删除费用记录
-  EXPENSE_SETTLE: 'expense:settle',                // 结算费用
   
   // 账单相关权限
   BILL_CREATE: 'bill:create',                       // 创建账单
@@ -47,26 +57,81 @@ export const PERMISSIONS = {
 
 // 角色权限映射
 export const ROLE_PERMISSIONS = {
-  [ROLES.ADMIN]: [
-    // 系统管理员拥有所有权限
+  [ROLES.SUPER_ADMIN]: [
+    // 超级管理员拥有所有权限
     ...Object.values(PERMISSIONS)
   ],
   
-  [ROLES.ROOM_OWNER]: [
-    // 寝室所有者权限
+  [ROLES.SYSTEM_ADMIN]: [
+    // 系统管理员权限
+    PERMISSIONS.ADMIN_ACCESS,
+    PERMISSIONS.ADMIN_ROLES_ASSIGN,
+    PERMISSIONS.ADMIN_USERS_READ,
+    
+    // 寝室权限
+    PERMISSIONS.ROOM_CREATE,
     PERMISSIONS.ROOM_VIEW,
     PERMISSIONS.ROOM_EDIT,
     PERMISSIONS.ROOM_DELETE,
     PERMISSIONS.ROOM_INVITE,
-    PERMISSIONS.ROOM_REMOVE_MEMBER,
-    PERMISSIONS.ROOM_MANAGE_SETTINGS,
     
     // 费用权限
     PERMISSIONS.EXPENSE_CREATE,
     PERMISSIONS.EXPENSE_VIEW,
     PERMISSIONS.EXPENSE_EDIT,
     PERMISSIONS.EXPENSE_DELETE,
-    PERMISSIONS.EXPENSE_SETTLE,
+    
+    // 账单权限
+    PERMISSIONS.BILL_CREATE,
+    PERMISSIONS.BILL_VIEW,
+    PERMISSIONS.BILL_EDIT,
+    PERMISSIONS.BILL_DELETE,
+    PERMISSIONS.BILL_PAY,
+    
+    // 个人信息权限
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.PROFILE_EDIT
+  ],
+  
+  [ROLES.ADMIN]: [
+    // 管理员权限
+    PERMISSIONS.ADMIN_ACCESS,
+    
+    // 寝室权限
+    PERMISSIONS.ROOM_CREATE,
+    PERMISSIONS.ROOM_VIEW,
+    PERMISSIONS.ROOM_EDIT,
+    PERMISSIONS.ROOM_INVITE,
+    
+    // 费用权限
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_VIEW,
+    PERMISSIONS.EXPENSE_EDIT,
+    PERMISSIONS.EXPENSE_DELETE,
+    
+    // 账单权限
+    PERMISSIONS.BILL_CREATE,
+    PERMISSIONS.BILL_VIEW,
+    PERMISSIONS.BILL_EDIT,
+    PERMISSIONS.BILL_DELETE,
+    PERMISSIONS.BILL_PAY,
+    
+    // 个人信息权限
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.PROFILE_EDIT
+  ],
+  
+  [ROLES.ROOM_OWNER]: [
+    // 寝室长权限
+    PERMISSIONS.ROOM_VIEW,
+    PERMISSIONS.ROOM_EDIT,
+    PERMISSIONS.ROOM_INVITE,
+    
+    // 费用权限
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_VIEW,
+    PERMISSIONS.EXPENSE_EDIT,
+    PERMISSIONS.EXPENSE_DELETE,
     
     // 账单权限
     PERMISSIONS.BILL_CREATE,
@@ -81,21 +146,38 @@ export const ROLE_PERMISSIONS = {
   ],
   
   [ROLES.ROOM_MEMBER]: [
-    // 寝室成员权限
+    // 付款人权限
     PERMISSIONS.ROOM_VIEW,
     
     // 费用权限
     PERMISSIONS.EXPENSE_VIEW,
     PERMISSIONS.EXPENSE_CREATE,
-    PERMISSIONS.EXPENSE_EDIT,  // 只能编辑自己创建的
-    PERMISSIONS.EXPENSE_DELETE, // 只能删除自己创建的
-    PERMISSIONS.EXPENSE_SETTLE,
+    PERMISSIONS.EXPENSE_EDIT,
+    PERMISSIONS.EXPENSE_DELETE,
     
     // 账单权限
     PERMISSIONS.BILL_VIEW,
     PERMISSIONS.BILL_CREATE,
-    PERMISSIONS.BILL_EDIT,     // 只能编辑自己创建的
-    PERMISSIONS.BILL_DELETE,   // 只能删除自己创建的
+    PERMISSIONS.BILL_EDIT,
+    PERMISSIONS.BILL_DELETE,
+    PERMISSIONS.BILL_PAY,
+    
+    // 个人信息权限
+    PERMISSIONS.PROFILE_VIEW,
+    PERMISSIONS.PROFILE_EDIT
+  ],
+  
+  [ROLES.USER]: [
+    // 普通用户权限
+    PERMISSIONS.ROOM_VIEW,
+    
+    // 费用权限
+    PERMISSIONS.EXPENSE_VIEW,
+    PERMISSIONS.EXPENSE_CREATE,
+    
+    // 账单权限
+    PERMISSIONS.BILL_VIEW,
+    PERMISSIONS.BILL_CREATE,
     PERMISSIONS.BILL_PAY,
     
     // 个人信息权限

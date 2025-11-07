@@ -2,7 +2,7 @@
   <div class="expense-dashboard">
     <div class="dashboard-header">
       <h1>费用管理</h1>
-      <el-button type="primary" @click="createExpense">
+      <el-button v-if="canCreateExpense" type="primary" @click="createExpense">
         <el-icon><Plus /></el-icon>
         创建费用记录
       </el-button>
@@ -212,14 +212,14 @@
                   详情
                 </el-button>
                 <el-button
-                  v-if="scope.row.payerId === currentUserId"
+                  v-if="canEditExpense && scope.row.payerId === currentUserId"
                   type="text"
                   @click="editExpense(scope.row)"
                 >
                   编辑
                 </el-button>
                 <el-button
-                  v-if="scope.row.payerId === currentUserId"
+                  v-if="canDeleteExpense && scope.row.payerId === currentUserId"
                   type="text"
                   @click="deleteExpense(scope.row)"
                 >
@@ -280,14 +280,14 @@
                       详情
                     </el-button>
                     <el-button
-                      v-if="expense.payerId === currentUserId"
+                      v-if="canEditExpense && expense.payerId === currentUserId"
                       type="text"
                       @click="editExpense(expense)"
                     >
                       编辑
                     </el-button>
                     <el-button
-                      v-if="expense.payerId === currentUserId"
+                      v-if="canDeleteExpense && expense.payerId === currentUserId"
                       type="text"
                       @click="deleteExpense(expense)"
                     >
@@ -328,6 +328,8 @@ import { Plus, Money, User, ArrowDown, ArrowUp, List, Grid } from '@element-plus
 import { expenseApi } from '@/api/expenses'
 import { roomsApi } from '@/api/rooms'
 import { useUserStore } from '@/stores/user'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 import { debounce } from 'lodash-es'
 
 // 引入 ECharts
@@ -338,6 +340,7 @@ const router = useRouter()
 
 // 状态
 const userStore = useUserStore()
+const authStore = useAuthStore()
 const loading = ref(false)
 const chartLoading = ref(false)
 const viewMode = ref('list')
@@ -386,11 +389,35 @@ const expenseCategories = [
 // 计算属性
 const currentUserId = computed(() => userStore.userId)
 
+// 权限检查
+const canCreateExpense = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.EXPENSE_CREATE)
+})
+
+const canEditExpense = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.EXPENSE_EDIT)
+})
+
+const canDeleteExpense = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.EXPENSE_DELETE)
+})
+
+// 权限检查函数
+const checkPermission = (permission) => {
+  return authStore.hasPermission(permission)
+}
+
 // 方法
 /**
  * 加载费用列表
  */
 const loadExpenses = async (forceRefresh = false) => {
+  // 检查权限
+  if (!checkPermission(PERMISSIONS.EXPENSE_VIEW)) {
+    console.log('用户没有查看费用的权限')
+    return
+  }
+  
   // 生成缓存键
   const cacheKey = `expenses_${currentPage.value}_${pageSize.value}_${filterForm.roomId || 'all'}_${filterForm.category || 'all'}_${filterForm.dateRange?.[0] || 'all'}_${filterForm.dateRange?.[1] || 'all'}`
   
@@ -473,6 +500,63 @@ const loadExpenses = async (forceRefresh = false) => {
     ElMessage.error('加载费用列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 创建费用记录
+ */
+const createExpense = () => {
+  if (!canCreateExpense.value) {
+    ElMessage.warning('您没有创建费用记录的权限')
+    return
+  }
+  router.push('/expenses/create')
+}
+
+/**
+ * 编辑费用记录
+ */
+const editExpense = (expense) => {
+  if (!canEditExpense.value) {
+    ElMessage.warning('您没有编辑费用记录的权限')
+    return
+  }
+  router.push(`/expenses/${expense.id}/edit`)
+}
+
+/**
+ * 删除费用记录
+ */
+const deleteExpense = async (expense) => {
+  if (!canDeleteExpense.value) {
+    ElMessage.warning('您没有删除费用记录的权限')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除费用记录"${expense.title}"吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const response = await expenseApi.deleteExpense(expense.id)
+    if (response.data && response.data.success) {
+      ElMessage.success('删除成功')
+      loadExpenses(true) // 强制刷新列表
+    } else {
+      ElMessage.error(response.data?.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除费用记录失败:', error)
+      ElMessage.error('删除失败')
+    }
   }
 }
 
@@ -825,7 +909,7 @@ const loadRooms = async () => {
     console.log('加载房间列表')
     
     // 使用真实API调用
-    const response = await roomsApi.getRooms()
+    const response = await roomsApi.getUserRooms()
     
     if (response.data && response.data.success) {
       rooms.value = response.data.data || []
@@ -839,56 +923,10 @@ const loadRooms = async () => {
 }
 
 /**
- * 创建费用记录
- */
-const createExpense = () => {
-  router.push('/expenses/create')
-}
-
-/**
  * 查看费用详情
  */
 const viewExpenseDetail = (expense) => {
   router.push(`/expenses/${expense.id}`)
-}
-
-/**
- * 编辑费用记录
- */
-const editExpense = (expense) => {
-  router.push(`/expenses/${expense.id}/edit`)
-}
-
-/**
- * 删除费用记录
- */
-const deleteExpense = async (expense) => {
-  try {
-    await ElMessageBox.confirm('确定要删除这条费用记录吗？', '确认删除', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    
-    console.log('删除费用记录:', expense.id)
-    
-    // 使用真实API调用
-    const response = await expenseApi.deleteExpense(expense.id)
-    
-    if (response.data && response.data.success) {
-      ElMessage.success('删除成功')
-      loadExpenses()
-      console.log('费用记录删除成功:', expense.id)
-    } else {
-      console.error('费用记录删除失败:', response.data?.message || '未知错误')
-      ElMessage.error('删除费用记录失败')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除费用记录失败:', error)
-      ElMessage.error('删除费用记录失败')
-    }
-  }
 }
 
 /**

@@ -1,33 +1,30 @@
 <template>
-  <div class="room-dashboard">
-    <div class="dashboard-header">
-      <h1>房间管理</h1>
-      <el-button type="primary" @click="createRoom">
-        <el-icon><Plus /></el-icon>
-        创建房间
-      </el-button>
+  <div class="room-management-container" v-if="canManageRooms">
+    <div class="page-header">
+      <div class="header-content">
+        <h1 class="page-title">房间管理</h1>
+        <el-button type="primary" @click="createRoom" v-if="canCreateRoom">
+          <el-icon><Plus /></el-icon>
+          创建房间
+        </el-button>
+      </div>
     </div>
 
     <div class="filter-section">
       <el-form :inline="true" :model="filterForm" class="filter-form">
         <el-form-item label="房间状态">
-          <el-select v-model="filterForm.status" placeholder="选择状态" clearable>
-            <el-option
-              v-for="item in statusOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
+          <el-select v-model="filterForm.status" placeholder="全部状态" clearable>
+            <el-option label="全部" value="" />
+            <el-option label="活跃" value="active" />
+            <el-option label="非活跃" value="inactive" />
           </el-select>
         </el-form-item>
         <el-form-item label="成员数量">
-          <el-select v-model="filterForm.memberCount" placeholder="选择成员数量" clearable>
-            <el-option
-              v-for="item in memberCountOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
+          <el-select v-model="filterForm.memberCount" placeholder="全部" clearable>
+            <el-option label="全部" value="" />
+            <el-option label="1-2人" value="1-2" />
+            <el-option label="3-4人" value="3-4" />
+            <el-option label="5人以上" value="5+" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -40,216 +37,183 @@
     <div class="stats-section">
       <el-row :gutter="20">
         <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-value">{{ stats.total }}</div>
-              <div class="stat-label">总房间数</div>
-            </div>
-            <div class="stat-icon total">
-              <el-icon><House /></el-icon>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-value">{{ stats.myRooms }}</div>
-              <div class="stat-label">我的房间</div>
-            </div>
-            <div class="stat-icon my">
-              <el-icon><User /></el-icon>
+          <el-card class="stats-card">
+            <div class="stats-item">
+              <div class="stats-icon total">
+                <el-icon><House /></el-icon>
+              </div>
+              <div class="stats-info">
+                <div class="stats-value">{{ stats.totalRooms }}</div>
+                <div class="stats-label">总房间数</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-value">{{ stats.activeRooms }}</div>
-              <div class="stat-label">活跃房间</div>
-            </div>
-            <div class="stat-icon active">
-              <el-icon><CircleCheck /></el-icon>
+          <el-card class="stats-card">
+            <div class="stats-item">
+              <div class="stats-icon my">
+                <el-icon><User /></el-icon>
+              </div>
+              <div class="stats-info">
+                <div class="stats-value">{{ stats.myRooms }}</div>
+                <div class="stats-label">我的房间</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card shadow="hover" class="stat-card">
-            <div class="stat-content">
-              <div class="stat-value">{{ stats.pendingInvitations }}</div>
-              <div class="stat-label">待处理邀请</div>
+          <el-card class="stats-card">
+            <div class="stats-item">
+              <div class="stats-icon active">
+                <el-icon><Star /></el-icon>
+              </div>
+              <div class="stats-info">
+                <div class="stats-value">{{ stats.activeRooms }}</div>
+                <div class="stats-label">活跃房间</div>
+              </div>
             </div>
-            <div class="stat-icon pending">
-              <el-icon><Bell /></el-icon>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card class="stats-card">
+            <div class="stats-item">
+              <div class="stats-icon pending">
+                <el-icon><Bell /></el-icon>
+              </div>
+              <div class="stats-info">
+                <div class="stats-value">{{ stats.pendingInvites }}</div>
+                <div class="stats-label">待处理邀请</div>
+              </div>
             </div>
           </el-card>
         </el-col>
       </el-row>
     </div>
 
-    <div class="room-list">
-      <el-card shadow="hover">
-        <template #header>
-          <div class="card-header">
-            <span>房间列表</span>
-            <div class="header-actions">
-              <el-button-group>
-                <el-button
-                  :type="viewMode === 'list' ? 'primary' : ''"
-                  @click="viewMode = 'list'"
-                >
-                  <el-icon><List /></el-icon>
-                  列表视图
-                </el-button>
-                <el-button
-                  :type="viewMode === 'card' ? 'primary' : ''"
-                  @click="viewMode = 'card'"
-                >
-                  <el-icon><Grid /></el-icon>
-                  卡片视图
-                </el-button>
-              </el-button-group>
-            </div>
-          </div>
-        </template>
+    <div class="rooms-section">
+      <div class="section-header">
+        <div class="view-toggle">
+          <el-radio-group v-model="viewMode">
+            <el-radio-button label="list">
+              <el-icon><List /></el-icon>
+              列表视图
+            </el-radio-button>
+            <el-radio-button label="card">
+              <el-icon><Grid /></el-icon>
+              卡片视图
+            </el-radio-button>
+          </el-radio-group>
+        </div>
+      </div>
 
-        <div v-loading="loading" class="room-content">
-          <!-- 列表视图 -->
-          <el-table
-            v-if="viewMode === 'list'"
-            :data="rooms"
-            stripe
-            style="width: 100%"
-          >
-            <el-table-column prop="name" label="房间名称" width="180" />
-            <el-table-column prop="description" label="描述" width="200" />
-            <el-table-column prop="memberCount" label="成员数量" width="100" />
-            <el-table-column prop="maxMembers" label="最大成员" width="100" />
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="scope">
-                <el-tag :type="getStatusTagType(scope.row.status)">
-                  {{ getStatusText(scope.row.status) }}
+      <!-- 列表视图 -->
+      <div v-if="viewMode === 'list'" class="list-view">
+        <el-table :data="rooms" v-loading="loading" stripe>
+          <el-table-column prop="name" label="房间名称" min-width="150" />
+          <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="memberCount" label="成员数量" width="100" align="center" />
+          <el-table-column prop="status" label="状态" width="100" align="center">
+            <template #default="scope">
+              <el-tag :type="getStatusTagType(scope.row.status)">
+                {{ getStatusText(scope.row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="creatorName" label="创建者" width="120" />
+          <el-table-column prop="createdAt" label="创建时间" width="160">
+            <template #default="scope">
+              {{ formatDate(scope.row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" align="center">
+            <template #default="scope">
+              <el-button size="small" type="primary" @click="viewRoom(scope.row.id)">
+                详情
+              </el-button>
+              <el-button size="small" type="warning" @click="editRoom(scope.row.id)" v-if="canEdit(scope.row)">
+                编辑
+              </el-button>
+              <el-button size="small" type="success" @click="joinRoom(scope.row.id)" v-if="canJoin(scope.row)">
+                加入
+              </el-button>
+              <el-button size="small" type="danger" @click="leaveRoom(scope.row.id)" v-if="canLeave(scope.row)">
+                退出
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 卡片视图 -->
+      <div v-else class="card-view">
+        <el-row :gutter="20">
+          <el-col :span="6" v-for="room in rooms" :key="room.id">
+            <el-card class="room-card" shadow="hover">
+              <div class="room-header">
+                <h3 class="room-name">{{ room.name }}</h3>
+                <el-tag :type="getStatusTagType(room.status)" size="small">
+                  {{ getStatusText(room.status) }}
                 </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="createdAt" label="创建时间" width="150">
-              <template #default="scope">
-                {{ formatDate(scope.row.createdAt) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200">
-              <template #default="scope">
-                <el-button type="text" @click="viewRoomDetail(scope.row)">
+              </div>
+              <div class="room-description">
+                {{ truncateText(room.description, 50) }}
+              </div>
+              <div class="room-meta">
+                <div class="meta-item">
+                  <el-icon><User /></el-icon>
+                  <span>{{ room.memberCount }} 成员</span>
+                </div>
+                <div class="meta-item">
+                  <el-icon><Calendar /></el-icon>
+                  <span>{{ formatDate(room.createdAt) }}</span>
+                </div>
+                <div class="meta-item">
+                  <el-icon><UserFilled /></el-icon>
+                  <span>{{ room.creatorName }}</span>
+                </div>
+              </div>
+              <div class="room-actions">
+                <el-button size="small" type="primary" @click="viewRoom(room.id)">
                   详情
                 </el-button>
-                <el-button
-                  v-if="canEdit(scope.row)"
-                  type="text"
-                  @click="editRoom(scope.row)"
-                >
+                <el-button size="small" type="warning" @click="editRoom(room.id)" v-if="canEdit(room)">
                   编辑
                 </el-button>
-                <el-button
-                  v-if="canJoin(scope.row)"
-                  type="text"
-                  @click="joinRoom(scope.row)"
-                >
+                <el-button size="small" type="success" @click="joinRoom(room.id)" v-if="canJoin(room)">
                   加入
                 </el-button>
-                <el-button
-                  v-if="canLeave(scope.row)"
-                  type="text"
-                  @click="leaveRoom(scope.row)"
-                >
+                <el-button size="small" type="danger" @click="leaveRoom(room.id)" v-if="canLeave(room)">
                   退出
                 </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
 
-          <!-- 卡片视图 -->
-          <div v-else class="card-view">
-            <el-row :gutter="20">
-              <el-col
-                v-for="room in rooms"
-                :key="room.id"
-                :span="8"
-                class="room-col"
-              >
-                <el-card shadow="hover" class="room-card">
-                  <template #header>
-                    <div class="card-header">
-                      <span class="room-title">{{ room.name }}</span>
-                      <el-tag :type="getStatusTagType(room.status)" size="small">
-                        {{ getStatusText(room.status) }}
-                      </el-tag>
-                    </div>
-                  </template>
-                  <div class="room-info">
-                    <div class="info-item">
-                      <span class="label">描述:</span>
-                      <span class="value description">{{ truncateText(room.description, 30) }}</span>
-                    </div>
-                    <div class="info-item">
-                      <span class="label">成员:</span>
-                      <span class="value">{{ room.memberCount }}/{{ room.maxMembers }}</span>
-                    </div>
-                    <div class="info-item">
-                      <span class="label">创建时间:</span>
-                      <span class="value">{{ formatDate(room.createdAt) }}</span>
-                    </div>
-                    <div class="info-item">
-                      <span class="label">创建者:</span>
-                      <span class="value">{{ room.creatorName }}</span>
-                    </div>
-                  </div>
-                  <div class="card-actions">
-                    <el-button type="text" @click="viewRoomDetail(room)">
-                      详情
-                    </el-button>
-                    <el-button
-                      v-if="canEdit(room)"
-                      type="text"
-                      @click="editRoom(room)"
-                    >
-                      编辑
-                    </el-button>
-                    <el-button
-                      v-if="canJoin(room)"
-                      type="text"
-                      @click="joinRoom(room)"
-                    >
-                      加入
-                    </el-button>
-                    <el-button
-                      v-if="canLeave(room)"
-                      type="text"
-                      @click="leaveRoom(room)"
-                    >
-                      退出
-                    </el-button>
-                  </div>
-                </el-card>
-              </el-col>
-            </el-row>
-          </div>
-
-          <div v-if="rooms.length === 0 && !loading" class="empty-state">
-            <el-empty description="暂无房间" />
-          </div>
-        </div>
-
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
-      </el-card>
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="totalRooms"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
+  </div>
+  
+  <!-- 无权限访问提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-content">
+      <el-icon class="lock-icon"><Lock /></el-icon>
+      <h2 class="no-permission-title">访问受限</h2>
+      <p class="no-permission-desc">您没有权限查看房间管理数据</p>
+      <el-button type="primary" @click="$router.push('/')">返回首页</el-button>
     </div>
   </div>
 </template>
@@ -258,24 +222,37 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  Plus, House, User, CircleCheck, Bell,
-  List, Grid
+import { 
+  Plus, House, User, Star, Bell, List, Grid, 
+  Calendar, UserFilled, Lock
 } from '@element-plus/icons-vue'
 import { roomsApi } from '@/api/rooms'
 import { useUserStore } from '@/stores/user'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 
-// 路由
 const router = useRouter()
-
-// 状态
 const userStore = useUserStore()
+const authStore = useAuthStore()
+
+// 权限检查
+const canManageRooms = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_MANAGE) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)
+})
+
+const canCreateRoom = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.ROOM_CREATE) || 
+         authStore.hasPermission(PERMISSIONS.SYSTEM_ADMIN)
+})
+
+// 状态变量
 const loading = ref(false)
+const rooms = ref([])
 const viewMode = ref('list')
 const currentPage = ref(1)
 const pageSize = ref(10)
-const total = ref(0)
-const rooms = ref([])
+const totalRooms = ref(0)
 
 // 过滤表单
 const filterForm = reactive({
@@ -285,254 +262,37 @@ const filterForm = reactive({
 
 // 统计数据
 const stats = reactive({
-  total: 0,
+  totalRooms: 0,
   myRooms: 0,
   activeRooms: 0,
-  pendingInvitations: 0
+  pendingInvites: 0
 })
 
-// 状态选项
-const statusOptions = [
-  { value: 'active', label: '活跃' },
-  { value: 'inactive', label: '不活跃' },
-  { value: 'full', label: '已满' }
-]
-
-// 成员数量选项
-const memberCountOptions = [
-  { value: '1', label: '1人' },
-  { value: '2', label: '2人' },
-  { value: '3', label: '3人' },
-  { value: '4', label: '4人及以上' }
-]
-
-// 计算属性
-const currentUserId = computed(() => userStore.userId)
-
-// 方法
-/**
- * 加载房间列表
- */
-const loadRooms = async () => {
-  loading.value = true
-  try {
-    // 模拟API调用
-    console.log('模拟加载房间列表API调用:', {
-      page: currentPage.value,
-      limit: pageSize.value,
-      status: filterForm.status || undefined,
-      memberCount: filterForm.memberCount || undefined
-    })
-    
-    // 调用真实后端接口获取房间列表
-    const resp = await roomsApi.getUserRooms()
-    if (resp.success && resp.data) {
-      const list = resp.data || []
-      rooms.value = list.slice((currentPage.value - 1) * pageSize.value, (currentPage.value - 1) * pageSize.value + pageSize.value)
-      total.value = list.length
-      // 加载统计数据基于真实列表
-      await loadStats()
-    } else {
-      throw new Error(resp.message || '房间列表接口返回异常')
-    }
-  } catch (error) {
-    console.error('加载房间列表失败:', error)
-    ElMessage.error('加载房间列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-/**
- * 加载统计数据
- */
-const loadStats = async () => {
-  try {
-    // 模拟API调用
-    console.log('模拟加载房间统计数据API调用')
-    
-    // 根据真实数据计算统计信息
-    stats.total = total.value
-    stats.myRooms = rooms.value.filter(r => r.isMember).length
-    stats.activeRooms = rooms.value.filter(r => r.status === 'active').length
-    // 待处理邀请暂以通知未读或后台字段代替，若后端提供邀请接口，再改为真实接口值
-    const unreadResp = await roomsApi.getUserInvitations()
-    if (unreadResp && unreadResp.success && Array.isArray(unreadResp.data)) {
-      stats.pendingInvitations = unreadResp.data.filter(i => i.status === 'pending').length
-    }
-  } catch (error) {
-    console.error('加载统计数据失败:', error)
-  }
-}
-
-/**
- * 创建房间
- */
-const createRoom = () => {
-  router.push('/rooms/create')
-}
-
-/**
- * 查看房间详情
- */
-const viewRoomDetail = (room) => {
-  router.push(`/rooms/${room.id}`)
-}
-
-/**
- * 编辑房间
- */
-const editRoom = (room) => {
-  router.push(`/rooms/${room.id}/edit`)
-}
-
-/**
- * 加入房间
- */
-const joinRoom = async (roomId) => {
-  try {
-    // 模拟API调用
-    console.log('模拟加入房间API调用:', { roomId })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 模拟成功响应
-    ElMessage.success('成功加入房间')
-    loadRooms() // 重新加载房间列表
-  } catch (error) {
-    console.error('加入房间失败:', error)
-    ElMessage.error('加入房间失败')
-  }
-}
-
-/**
- * 退出房间
- */
-const leaveRoom = async (roomId) => {
-  try {
-    // 模拟API调用
-    console.log('模拟退出房间API调用:', { roomId })
-    
-    // 模拟API响应延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 模拟成功响应
-    ElMessage.success('已退出房间')
-    loadRooms() // 重新加载房间列表
-  } catch (error) {
-    console.error('退出房间失败:', error)
-    ElMessage.error('退出房间失败')
-  }
-}
-
-/**
- * 重置过滤条件
- */
-const resetFilter = () => {
-  filterForm.status = ''
-  filterForm.memberCount = ''
-  currentPage.value = 1
-  loadRooms()
-}
-
-/**
- * 处理页码变化
- */
-const handleCurrentChange = (page) => {
-  currentPage.value = page
-  loadRooms()
-}
-
-/**
- * 处理每页数量变化
- */
-const handleSizeChange = (size) => {
-  pageSize.value = size
-  currentPage.value = 1
-  loadRooms()
-}
-
-/**
- * 格式化日期
- */
-const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('zh-CN')
-}
-
-/**
- * 截断文本
- */
-const truncateText = (text, maxLength) => {
-  if (!text) return ''
-  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
-}
-
-/**
- * 判断是否可以编辑房间
- */
-const canEdit = (room) => {
-  return room.creatorId === currentUserId.value
-}
-
-/**
- * 判断是否可以加入房间
- */
-const canJoin = (room) => {
-  if (!room.isMember && room.memberCount < room.maxMembers) {
-    return true
-  }
-  return false
-}
-
-/**
- * 判断是否可以退出房间
- */
-const canLeave = (room) => {
-  return room.isMember && room.creatorId !== currentUserId.value
-}
-
-/**
- * 获取状态标签类型
- */
-const getStatusTagType = (status) => {
-  const statusMap = {
-    active: 'success',
-    inactive: 'info',
-    full: 'warning'
-  }
-  return statusMap[status] || 'info'
-}
-
-/**
- * 获取状态文本
- */
-const getStatusText = (status) => {
-  const statusMap = {
-    active: '活跃',
-    inactive: '不活跃',
-    full: '已满'
-  }
-  return statusMap[status] || '未知'
-}
-
-// 生命周期
-onMounted(() => {
-  loadRooms()
-})
+// ... existing code ...
 </script>
 
 <style scoped>
-.room-dashboard {
+.room-management-container {
   padding: 20px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
 }
 
-.dashboard-header {
+.page-header {
+  margin-bottom: 20px;
+}
+
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .filter-section {
@@ -540,140 +300,187 @@ onMounted(() => {
 }
 
 .filter-form {
-  background-color: #f5f7fa;
-  padding: 15px;
-  border-radius: 4px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .stats-section {
   margin-bottom: 20px;
 }
 
-.stat-card {
-  position: relative;
+.stats-card {
+  border-radius: 8px;
   overflow: hidden;
 }
 
-.stat-content {
-  position: relative;
-  z-index: 1;
+.stats-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
 }
 
-.stat-value {
+.stats-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
   font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 5px;
+  color: #fff;
 }
 
-.stat-label {
+.stats-icon.total {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.stats-icon.my {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stats-icon.active {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.stats-icon.pending {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.stats-info {
+  flex: 1;
+}
+
+.stats-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #303133;
+  line-height: 1;
+}
+
+.stats-label {
   font-size: 14px;
-  color: #666;
+  color: #909399;
+  margin-top: 5px;
 }
 
-.stat-icon {
-  position: absolute;
-  right: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 40px;
-  opacity: 0.2;
+.rooms-section {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 20px;
 }
 
-.stat-icon.total {
-  color: #409eff;
-}
-
-.stat-icon.my {
-  color: #67c23a;
-}
-
-.stat-icon.active {
-  color: #e6a23c;
-}
-
-.stat-icon.pending {
-  color: #f56c6c;
-}
-
-.room-list {
-  margin-bottom: 20px;
-}
-
-.card-header {
+.section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.room-content {
-  min-height: 400px;
+.list-view {
+  margin-bottom: 20px;
 }
 
 .card-view {
-  margin-top: 10px;
-}
-
-.room-col {
   margin-bottom: 20px;
 }
 
 .room-card {
+  margin-bottom: 20px;
   height: 100%;
+  transition: transform 0.3s;
 }
 
-.room-title {
-  font-weight: bold;
-  max-width: 150px;
+.room-card:hover {
+  transform: translateY(-5px);
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.room-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.room-description {
+  color: #606266;
+  font-size: 14px;
+  margin-bottom: 15px;
+  height: 40px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.room-info {
+.room-meta {
   margin-bottom: 15px;
 }
 
-.info-item {
+.meta-item {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  align-items: center;
+  margin-bottom: 5px;
+  color: #909399;
+  font-size: 12px;
 }
 
-.label {
-  color: #666;
-  min-width: 60px;
+.meta-item .el-icon {
+  margin-right: 5px;
 }
 
-.value {
-  font-weight: 500;
-  text-align: right;
-  flex: 1;
-}
-
-.value.description {
-  text-align: left;
-  line-height: 1.4;
-}
-
-.card-actions {
+.room-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
   flex-wrap: wrap;
-}
-
-.empty-state {
-  margin-top: 50px;
+  gap: 5px;
 }
 
 .pagination-container {
-  margin-top: 20px;
   display: flex;
   justify-content: center;
+  margin-top: 20px;
+}
+
+/* 无权限访问样式 */
+.no-permission-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 70vh;
+  background-color: #f5f7fa;
+}
+
+.no-permission-content {
+  text-align: center;
+  padding: 40px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+}
+
+.lock-icon {
+  font-size: 64px;
+  color: #e6a23c;
+  margin-bottom: 20px;
+}
+
+.no-permission-title {
+  margin: 0 0 10px 0;
+  font-size: 22px;
+  color: #303133;
+}
+
+.no-permission-desc {
+  margin: 0 0 20px 0;
+  color: #606266;
+  font-size: 14px;
 }
 </style>

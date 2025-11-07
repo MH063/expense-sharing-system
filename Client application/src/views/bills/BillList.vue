@@ -2,7 +2,7 @@
   <div class="bill-list-container">
     <div class="page-header">
       <h1>账单管理</h1>
-      <button class="add-button" @click="createBill">
+      <button v-if="canCreateBill" class="add-button" @click="createBill">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -194,7 +194,7 @@
       </div>
       <h2>暂无账单</h2>
       <p>您还没有创建任何账单</p>
-      <button class="primary-button" @click="createBill">创建第一个账单</button>
+      <button v-if="canCreateBill" class="primary-button" @click="createBill">创建第一个账单</button>
     </div>
     
     <div v-else>
@@ -342,10 +342,20 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 
 // 路由和状态管理
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 权限检查
+const canCreateBill = computed(() => {
+  return authStore.checkPermission(PERMISSIONS.BILL_CREATE)
+})
+
+const checkPermission = (permission) => {
+  return authStore.checkPermission(permission)
+}
 
 // 响应式数据
 const loading = ref(true)
@@ -521,6 +531,10 @@ const resetFilters = () => {
 
 // 创建账单
 const createBill = () => {
+  if (!canCreateBill.value) {
+    console.warn('用户没有创建账单的权限')
+    return
+  }
   router.push('/bills/create')
 }
 
@@ -531,6 +545,13 @@ const viewBill = (billId) => {
 
 // 加载账单数据
 const loadBills = async () => {
+  // 检查查看权限
+  if (!checkPermission(PERMISSIONS.BILL_VIEW)) {
+    console.warn('用户没有查看账单的权限')
+    loading.value = false
+    return
+  }
+  
   loading.value = true
   
   try {

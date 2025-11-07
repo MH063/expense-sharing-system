@@ -1,5 +1,5 @@
 <template>
-  <div class="analytics-dashboard">
+  <div class="analytics-dashboard" v-if="canViewAnalytics">
     <div class="dashboard-header">
       <h1>数据分析</h1>
       <div class="header-actions">
@@ -38,11 +38,23 @@
       </el-tab-pane>
     </el-tabs>
   </div>
+  
+  <!-- 无权限访问提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-content">
+      <el-icon class="no-permission-icon"><Lock /></el-icon>
+      <h2>访问受限</h2>
+      <p>您没有权限访问数据分析功能</p>
+      <el-button type="primary" @click="$router.push('/dashboard')">返回首页</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Refresh } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { Refresh, Lock } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 import OverviewTab from './tabs/OverviewTab.vue'
 import ExpenseAnalysisTab from './tabs/ExpenseAnalysisTab.vue'
 import BillAnalysisTab from './tabs/BillAnalysisTab.vue'
@@ -56,6 +68,13 @@ const dateRange = ref([
   new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
   new Date().toISOString().split('T')[0]
 ])
+
+// 权限检查
+const authStore = useAuthStore()
+const canViewAnalytics = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.SYSTEM_VIEW) || 
+         authStore.hasPermission(PERMISSIONS.ROOM_VIEW)
+})
 
 // 方法
 /**
@@ -100,5 +119,35 @@ onMounted(() => {
 
 .analytics-tabs {
   margin-top: 20px;
+}
+
+.no-permission-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 70vh;
+  padding: 20px;
+}
+
+.no-permission-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.no-permission-icon {
+  font-size: 64px;
+  color: #e6a23c;
+  margin-bottom: 20px;
+}
+
+.no-permission-content h2 {
+  margin: 0 0 16px 0;
+  color: #303133;
+}
+
+.no-permission-content p {
+  margin: 0 0 24px 0;
+  color: #606266;
+  font-size: 16px;
 }
 </style>

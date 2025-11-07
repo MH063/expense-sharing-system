@@ -167,6 +167,61 @@ export const roomsApi = {
    */
   resendInvitation(invitationId) {
     return http.post(`/rooms/invitations/${invitationId}/resend`);
+  },
+
+  /**
+   * 获取用户当前房间
+   * @returns {Promise} 当前房间信息
+   */
+  getCurrentRoom() {
+    return http.get('/rooms/current');
+  },
+
+  /**
+   * 获取房间统计信息
+   * @param {string} roomId - 房间ID
+   * @returns {Promise} 统计信息
+   */
+  getRoomStatistics(roomId) {
+    return http.get(`/rooms/${roomId}/statistics`);
+  },
+
+  /**
+   * 获取房间最近支出
+   * @param {string} roomId - 房间ID
+   * @returns {Promise} 最近支出列表
+   */
+  getRecentExpenses(roomId) {
+    return http.get(`/rooms/${roomId}/expenses/recent`);
+  },
+
+  /**
+   * 更新房间设置
+   * @param {string} roomId - 房间ID
+   * @param {Object} data - 设置数据
+   * @returns {Promise} 更新结果
+   */
+  updateRoomSettings(roomId, data) {
+    return http.put(`/rooms/${roomId}/settings`, data);
+  },
+
+  /**
+   * 提升成员为寝室长
+   * @param {string} roomId - 房间ID
+   * @param {string} userId - 用户ID
+   * @returns {Promise} 提升结果
+   */
+  promoteMember(roomId, userId) {
+    return http.put(`/rooms/${roomId}/members/${userId}/promote`);
+  },
+
+  /**
+   * 重新生成邀请码
+   * @param {string} roomId - 房间ID
+   * @returns {Promise} 新邀请码
+   */
+  regenerateInviteCode(roomId) {
+    return http.post(`/rooms/${roomId}/invite-code/regenerate`);
   }
 };
 
@@ -189,5 +244,11 @@ export const acceptInvitation = roomsApi.acceptInvitation;
 export const rejectInvitation = roomsApi.rejectInvitation;
 export const cancelInvitation = roomsApi.cancelInvitation;
 export const resendInvitation = roomsApi.resendInvitation;
+export const getCurrentRoom = roomsApi.getCurrentRoom;
+export const getRoomStatistics = roomsApi.getRoomStatistics;
+export const getRecentExpenses = roomsApi.getRecentExpenses;
+export const updateRoomSettings = roomsApi.updateRoomSettings;
+export const promoteMember = roomsApi.promoteMember;
+export const regenerateInviteCode = roomsApi.regenerateInviteCode;
 
 export default roomsApi;

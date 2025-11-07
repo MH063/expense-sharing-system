@@ -1,8 +1,8 @@
 <template>
-  <div class="invite-code-container">
+  <div class="invite-code-container" v-if="canManageInviteCodes">
     <div class="page-header">
       <h1>邀请码管理</h1>
-      <div class="header-actions">
+      <div class="header-actions" v-if="canManageInviteCodes">
         <button class="primary-button" @click="showCreateModal = true">
           生成邀请码
         </button>
@@ -51,7 +51,7 @@
           </div>
         </div>
 
-        <div class="code-actions">
+        <div class="code-actions" v-if="canManageInviteCodes">
           <button class="copy-btn" @click="copyToClipboard(code.code)">
             复制邀请码
           </button>
@@ -80,7 +80,7 @@
       </div>
       <h2>暂无邀请码</h2>
       <p>该房间还没有生成任何邀请码</p>
-      <button class="primary-button" @click="showCreateModal = true">
+      <button class="primary-button" @click="showCreateModal = true" v-if="canManageInviteCodes">
         生成邀请码
       </button>
     </div>
@@ -162,6 +162,17 @@
       </div>
     </div>
   </div>
+  
+  <!-- 无权限访问时的提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      </svg>
+    </div>
+    <h2>无权限访问</h2>
+    <p>您没有权限管理邀请码，请联系寝室长或管理员</p>
+  </div>
 </template>
 
 <script>
@@ -170,12 +181,15 @@ import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { inviteCodesApi } from '@/api';
 import { roomsApi } from '@/api';
+import { useAuthStore } from '@/stores/auth';
+import { PERMISSIONS } from '@/utils/permissions';
 
 export default {
   name: 'InviteCodeManagement',
   setup() {
     const store = useStore();
     const router = useRouter();
+    const authStore = useAuthStore();
     
     const rooms = ref([]);
     const selectedRoomId = ref('');
@@ -190,6 +204,16 @@ export default {
       maxUses: 10,
       expiresAt: ''
     });
+    
+    // 权限控制
+    const canManageInviteCodes = computed(() => {
+      return authStore.checkPermission(PERMISSIONS.ROOM_INVITE);
+    });
+    
+    // 权限检查函数
+    const checkPermission = (permission) => {
+      return authStore.checkPermission(permission);
+    };
     
     // 计算属性
     const minDateTime = computed(() => {
@@ -218,6 +242,15 @@ export default {
     const loadInviteCodes = async () => {
       if (!selectedRoomId.value) return;
       
+      // 检查权限
+      if (!checkPermission(PERMISSIONS.ROOM_VIEW)) {
+        store.dispatch('showNotification', {
+          message: '您没有权限查看邀请码',
+          type: 'error'
+        });
+        return;
+      }
+      
       loading.value = true;
       try {
         const response = await inviteCodesApi.getRoomInviteCodes(selectedRoomId.value);
@@ -233,6 +266,15 @@ export default {
     
     // 创建邀请码
     const createInviteCode = async () => {
+      // 检查权限
+      if (!checkPermission(PERMISSIONS.ROOM_INVITE)) {
+        store.dispatch('showNotification', {
+          message: '您没有权限生成邀请码',
+          type: 'error'
+        });
+        return;
+      }
+      
       try {
         const response = await inviteCodesApi.generateInviteCode(newCode.value);
         if (response.data.success) {
@@ -265,6 +307,15 @@ export default {
     // 撤销邀请码
     const revokeInviteCode = async () => {
       if (!selectedCode.value) return;
+      
+      // 检查权限
+      if (!checkPermission(PERMISSIONS.ROOM_INVITE)) {
+        store.dispatch('showNotification', {
+          message: '您没有权限撤销邀请码',
+          type: 'error'
+        });
+        return;
+      }
       
       try {
         const response = await inviteCodesApi.revokeInviteCode(selectedCode.value.id);
@@ -371,6 +422,7 @@ export default {
       newCode,
       minDateTime,
       isFormValid,
+      canManageInviteCodes,
       loadInviteCodes,
       createInviteCode,
       revokeInviteCode,
@@ -725,6 +777,31 @@ export default {
   gap: 10px;
   padding: 20px;
   border-top: 1px solid #eee;
+}
+
+/* 无权限访问样式 */
+.no-permission-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.no-permission-icon {
+  color: #ccc;
+  margin-bottom: 20px;
+}
+
+.no-permission-container h2 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.no-permission-container p {
+  color: #666;
+  max-width: 500px;
 }
 
 @media (max-width: 768px) {

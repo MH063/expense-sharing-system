@@ -348,144 +348,19 @@ const fetchReviewList = async () => {
     }
   } catch (error) {
     console.error('获取审核列表错误:', error)
-    throw new Error('获取审核列表错误')
-  }
-}
-      {
-        id: 1001,
-        type: 'expense',
-        title: '宿舍电费分摊申请',
-        applicant: '张三',
-        submitTime: '2023-11-15 09:30:00',
-        priority: 'high',
-        status: 'pending',
-        reviewer: '',
-        deadline: '2023-11-18 17:00:00',
-        content: '申请分摊本季度宿舍电费，共计320元，每人80元',
-        attachments: [
-          { id: 'file1', name: '电费缴费凭证.jpg' },
-          { id: 'file2', name: '宿舍成员名单.xlsx' }
-        ],
-        comment: ''
-      },
-      {
-        id: 1002,
-        type: 'user',
-        title: '新用户注册审核',
-        applicant: '李四',
-        submitTime: '2023-11-15 10:15:00',
-        priority: 'medium',
-        status: 'processing',
-        reviewer: '王审核员',
-        deadline: '2023-11-17 17:00:00',
-        content: '新用户李四申请加入宿舍费用管理系统，需要审核身份信息',
-        attachments: [
-          { id: 'file3', name: '身份证照片.jpg' }
-        ],
-        comment: '正在核实身份信息'
-      },
-      {
-        id: 1003,
-        type: 'dispute',
-        title: '费用分摊争议',
-        applicant: '赵五',
-        submitTime: '2023-11-14 14:20:00',
-        priority: 'high',
-        status: 'approved',
-        reviewer: '钱审核员',
-        deadline: '2023-11-16 17:00:00',
-        content: '对上月水费分摊有异议，认为计算有误',
-        attachments: [
-          { id: 'file4', name: '水费账单.jpg' },
-          { id: 'file5', name: '分摊计算说明.pdf' }
-        ],
-        comment: '已核实，重新计算后分摊金额正确'
-      },
-      {
-        id: 1004,
-        type: 'expense',
-        title: '宿舍网费分摊申请',
-        applicant: '孙六',
-        submitTime: '2023-11-14 16:45:00',
-        priority: 'low',
-        status: 'rejected',
-        reviewer: '周审核员',
-        deadline: '2023-11-16 17:00:00',
-        content: '申请分摊本季度宿舍网费，共计180元，每人45元',
-        attachments: [
-          { id: 'file6', name: '网费缴费凭证.jpg' }
-        ],
-        comment: '申请材料不完整，缺少缴费凭证'
-      },
-      {
-        id: 1005,
-        type: 'expense',
-        title: '宿舍公共物品采购',
-        applicant: '吴七',
-        submitTime: '2023-11-13 11:00:00',
-        priority: 'medium',
-        status: 'pending',
-        reviewer: '',
-        deadline: '2023-11-15 17:00:00',
-        content: '申请采购宿舍公共物品，包括扫帚、拖把、垃圾袋等，共计120元',
-        attachments: [
-          { id: 'file7', name: '采购清单.xlsx' },
-          { id: 'file8', name: '物品照片.jpg' }
-        ],
-        comment: ''
-      }
-    ]
-    
-    // 应用筛选条件
-    let filteredData = mockData
-    if (filterType.value) {
-      filteredData = filteredData.filter(item => item.type === filterType.value)
-    }
-    if (filterStatus.value) {
-      filteredData = filteredData.filter(item => item.status === filterStatus.value)
-    }
-    if (filterPriority.value) {
-      filteredData = filteredData.filter(item => item.priority === filterPriority.value)
-    }
-    
-    // 应用分页
-    const startIndex = (currentPage.value - 1) * pageSize.value
-    const endIndex = startIndex + pageSize.value
-    reviewList.value = filteredData.slice(startIndex, endIndex)
-    totalReviews.value = filteredData.length
-    
-    ElMessage.info('当前使用模拟数据')
-  } catch (error) {
-    console.error('获取审核列表错误:', error)
-    throw new Error('获取审核列表错误')
+    ElMessage.error('获取审核列表失败，请稍后重试')
   }
 }
 
 // 获取可用审核人列表
 const fetchAvailableReviewers = async () => {
   try {
-    // 尝试从API获取数据
-    try {
-      const response = await expenseApi.getAvailableReviewers()
-      if (response.data.success) {
-        availableReviewers.value = response.data.data || []
-        return
-      }
-    } catch (apiError) {
-      console.log('API不可用，使用模拟数据')
-    }
-    
-    // 如果API不可用，使用模拟数据
-    availableReviewers.value = [
-      { id: 'reviewer1', name: '王审核员', currentTasks: 5 },
-      { id: 'reviewer2', name: '钱审核员', currentTasks: 3 },
-      { id: 'reviewer3', name: '周审核员', currentTasks: 7 },
-      { id: 'reviewer4', name: '吴审核员', currentTasks: 2 },
-      { id: 'reviewer5', name: '郑审核员', currentTasks: 4 }
-    ]
+    // 暂时使用空数组，等待后端提供获取审核人列表的API
+    availableReviewers.value = []
+    ElMessage.info('审核人列表API暂未实现')
   } catch (error) {
     console.error('获取审核人列表错误:', error)
-    throw new Error('获取审核人列表错误')
+    ElMessage.error('获取审核人列表失败')
   }
 }
 

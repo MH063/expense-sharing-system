@@ -186,6 +186,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Document, Files, DataAnalysis, Setting, User } from '@element-plus/icons-vue'
+import request from '@/request'
 
 const router = useRouter()
 const route = useRoute()
@@ -220,47 +221,10 @@ const pagination = ref({
 const pageTitle = ref('文档搜索与浏览')
 
 // 热门文档
-const popularDocs = ref([
-  {
-    id: '1',
-    name: '需求文档',
-    type: 'requirements',
-    description: '系统功能需求和业务流程说明',
-    author: '张三',
-    updateTime: '2023-12-01',
-    version: 'v1.2.0'
-  },
-  {
-    id: '2',
-    name: '数据库设计文档',
-    type: 'database',
-    description: '数据库表结构和关系设计',
-    author: '李四',
-    updateTime: '2023-11-28',
-    version: 'v1.1.0'
-  },
-  {
-    id: '3',
-    name: 'API接口文档',
-    type: 'api',
-    description: '系统API接口详细说明',
-    author: '王五',
-    updateTime: '2023-11-25',
-    version: 'v1.0.5'
-  },
-  {
-    id: '4',
-    name: '系统设计文档',
-    type: 'system',
-    description: '系统架构和模块设计说明',
-    author: '赵六',
-    updateTime: '2023-11-20',
-    version: 'v1.0.2'
-  }
-])
+const popularDocs = ref([])
 
 // 处理搜索
-const handleSearch = () => {
+const handleSearch = async () => {
   if (!searchForm.value.keyword && !searchForm.value.docType && !searchForm.value.dateRange.length) {
     ElMessage.warning('请至少输入一个搜索条件')
     return
@@ -268,40 +232,51 @@ const handleSearch = () => {
   
   hasSearched.value = true
   
-  // 实际项目中应该调用API进行搜索
-  // 这里模拟搜索结果
-  searchResults.value = [
-    {
-      id: '1',
-      name: '需求文档',
-      type: 'requirements',
-      author: '张三',
-      updateTime: '2023-12-01',
-      version: 'v1.2.0',
-      matchedContent: '...<mark>支付流程</mark>优化功能需求...'
-    },
-    {
-      id: '2',
-      name: 'API接口文档',
-      type: 'api',
-      author: '王五',
-      updateTime: '2023-11-25',
-      version: 'v1.0.5',
-      matchedContent: '...<mark>支付接口</mark> /api/payment/create...'
-    },
-    {
-      id: '3',
-      name: '系统设计文档',
-      type: 'system',
-      author: '赵六',
-      updateTime: '2023-11-20',
-      version: 'v1.0.2',
-      matchedContent: '...<mark>支付模块</mark>设计说明...'
+  try {
+    // 构建搜索参数
+    const params = {
+      keyword: searchForm.value.keyword,
+      docType: searchForm.value.docType,
+      author: searchForm.value.author,
+      version: searchForm.value.version,
+      status: searchForm.value.status,
+      page: pagination.value.currentPage,
+      limit: pagination.value.pageSize
     }
-  ]
-  
-  pagination.value.total = searchResults.value.length
-  ElMessage.success(`找到 ${searchResults.value.length} 个匹配结果`)
+    
+    // 处理日期范围
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = searchForm.value.dateRange[0]
+      params.endDate = searchForm.value.dateRange[1]
+    }
+    
+    // 调用API进行搜索
+    const response = await request({
+      url: '/api/docs/search',
+      method: 'get',
+      params
+    })
+    
+    if (response.success) {
+      searchResults.value = response.data.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        author: item.author,
+        updateTime: item.updateTime,
+        version: item.version,
+        matchedContent: item.matchedContent
+      }))
+      
+      pagination.value.total = response.data.pagination.totalItems
+      ElMessage.success(`找到 ${searchResults.value.length} 个匹配结果`)
+    } else {
+      ElMessage.error(response.message || '搜索失败')
+    }
+  } catch (error) {
+    console.error('搜索文档失败:', error)
+    ElMessage.error('搜索文档失败，请重试')
+  }
 }
 
 // 重置搜索
@@ -319,40 +294,122 @@ const resetSearch = () => {
 }
 
 // 查看文档
-const viewDocument = (doc) => {
-  // 根据文档类型跳转到相应的页面
-  let route = ''
-  
-  switch (doc.type) {
-    case 'requirements':
-      route = '/docs/requirements'
-      break
-    case 'database':
-      route = '/docs/database'
-      break
-    case 'api':
-      route = '/docs/api'
-      break
-    case 'system':
-      route = '/docs/system'
-      break
-    default:
-      route = '/docs'
+const viewDocument = async (doc) => {
+  try {
+    // 调用API获取文档详情
+    const response = await request({
+      url: `/api/docs/${doc.id}`,
+      method: 'get'
+    })
+    
+    if (response.success) {
+      // 根据文档类型跳转到相应的页面
+      let route = ''
+      
+      switch (doc.type) {
+        case 'requirements':
+          route = '/docs/requirements'
+          break
+        case 'database':
+          route = '/docs/database'
+          break
+        case 'api':
+          route = '/docs/api'
+          break
+        case 'system':
+          route = '/docs/system'
+          break
+        default:
+          route = '/docs'
+      }
+      
+      router.push(route)
+    } else {
+      ElMessage.error(response.message || '获取文档详情失败')
+    }
+  } catch (error) {
+    console.error('获取文档详情失败:', error)
+    ElMessage.error('获取文档详情失败，请重试')
   }
-  
-  router.push(route)
 }
 
 // 下载文档
-const downloadDocument = (doc) => {
-  // 实际项目中应该调用API下载文档
-  ElMessage.success(`正在下载 ${doc.name}...`)
+const downloadDocument = async (doc) => {
+  try {
+    // 调用API下载文档
+    const response = await request({
+      url: `/api/docs/${doc.id}/download`,
+      method: 'get',
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `${doc.name}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    
+    // 清理
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('文档下载成功')
+  } catch (error) {
+    console.error('下载文档失败:', error)
+    ElMessage.error('下载文档失败，请重试')
+  }
 }
 
 // 导出搜索结果
-const exportResults = () => {
-  // 实际项目中应该调用API导出搜索结果
-  ElMessage.success('搜索结果导出中...')
+const exportResults = async () => {
+  if (searchResults.value.length === 0) {
+    ElMessage.warning('没有可导出的搜索结果')
+    return
+  }
+  
+  try {
+    // 构建导出参数
+    const params = {
+      keyword: searchForm.value.keyword,
+      docType: searchForm.value.docType,
+      author: searchForm.value.author,
+      version: searchForm.value.version,
+      status: searchForm.value.status
+    }
+    
+    // 处理日期范围
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = searchForm.value.dateRange[0]
+      params.endDate = searchForm.value.dateRange[1]
+    }
+    
+    // 调用API导出搜索结果
+    const response = await request({
+      url: '/api/docs/export',
+      method: 'get',
+      params,
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `文档搜索结果_${new Date().toISOString().split('T')[0]}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    
+    // 清理
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('搜索结果导出成功')
+  } catch (error) {
+    console.error('导出搜索结果失败:', error)
+    ElMessage.error('导出搜索结果失败，请重试')
+  }
 }
 
 // 分页大小改变
@@ -416,7 +473,7 @@ const getDocTypeColor = (type) => {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
   // 检查是否有从其他页面传递的参数
   const { filter, title } = route.query
   
@@ -429,10 +486,10 @@ onMounted(() => {
     // 根据筛选类型执行相应的搜索
     switch (filter) {
       case 'recent':
-        searchRecentDocuments()
+        await searchRecentDocuments()
         break
       case 'popular':
-        searchPopularDocuments()
+        await searchPopularDocuments()
         break
       default:
         break
@@ -443,81 +500,71 @@ onMounted(() => {
 })
 
 // 搜索最近编辑的文档
-const searchRecentDocuments = () => {
-  hasSearched.value = true
-  
-  // 模拟最近编辑的文档数据
-  searchResults.value = [
-    {
-      id: '1',
-      name: '需求文档 - 11.3 管理端需求',
-      type: 'requirements',
-      author: '张三',
-      updateTime: '2023-12-01 14:30',
-      version: 'v1.2.1',
-      matchedContent: '添加了文档管理系统和系统管理功能的详细需求说明'
-    },
-    {
-      id: '2',
-      name: '数据库设计文档 - 用户表结构',
-      type: 'database',
-      author: '李四',
-      updateTime: '2023-11-28 10:15',
-      version: 'v1.1.2',
-      matchedContent: '更新了用户表的角色字段，添加了系统管理员角色'
-    },
-    {
-      id: '3',
-      name: '需求文档 - 4.3.1 收款码管理功能',
-      type: 'requirements',
-      author: '王五',
-      updateTime: '2023-11-25 16:45',
-      version: 'v1.2.0',
-      matchedContent: '完善了收款码上传与维护的功能需求'
+const searchRecentDocuments = async () => {
+  try {
+    const response = await request({
+      url: '/api/docs/recent',
+      method: 'get',
+      params: {
+        limit: 5
+      }
+    })
+    
+    if (response.success) {
+      searchResults.value = response.data.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        author: item.author,
+        updateTime: item.updateTime,
+        version: item.version,
+        matchedContent: item.matchedContent
+      }))
+      
+      pagination.value.total = response.data.pagination.totalItems
+      hasSearched.value = true
+      ElMessage.success(`找到 ${searchResults.value.length} 个最近编辑的文档`)
+    } else {
+      ElMessage.error(response.message || '获取最近文档失败')
     }
-  ]
-  
-  pagination.value.total = searchResults.value.length
-  ElMessage.success(`找到 ${searchResults.value.length} 个最近编辑的文档`)
+  } catch (error) {
+    console.error('获取最近文档失败:', error)
+    ElMessage.error('获取最近文档失败，请重试')
+  }
 }
 
 // 搜索热门文档
-const searchPopularDocuments = () => {
-  hasSearched.value = true
-  
-  // 模拟热门文档数据
-  searchResults.value = [
-    {
-      id: '1',
-      name: '需求文档 - 11.3 管理端需求',
-      type: 'requirements',
-      author: '张三',
-      updateTime: '2023-12-01 14:30',
-      version: 'v1.2.1',
-      matchedContent: '浏览次数: 128 | 最近浏览: 2023-12-01 15:20'
-    },
-    {
-      id: '2',
-      name: '数据库设计文档 - 用户表结构',
-      type: 'database',
-      author: '李四',
-      updateTime: '2023-11-28 10:15',
-      version: 'v1.1.2',
-      matchedContent: '浏览次数: 96 | 最近浏览: 2023-12-01 12:10'
-    },
-    {
-      id: '3',
-      name: '需求文档 - 4.3.1 收款码管理功能',
-      type: 'requirements',
-      author: '王五',
-      updateTime: '2023-11-25 16:45',
-      version: 'v1.2.0',
-      matchedContent: '浏览次数: 87 | 最近浏览: 2023-11-30 18:45'
+const searchPopularDocuments = async () => {
+  try {
+    const response = await request({
+      url: '/api/docs/popular',
+      method: 'get',
+      params: {
+        limit: 5
+      }
+    })
+    
+    if (response.success) {
+      searchResults.value = response.data.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        author: item.author,
+        updateTime: item.updateTime,
+        version: item.version,
+        matchedContent: item.matchedContent
+      }))
+      
+      pagination.value.total = response.data.pagination.totalItems
+      hasSearched.value = true
+      ElMessage.success(`找到 ${searchResults.value.length} 个热门文档`)
+    } else {
+      ElMessage.error(response.message || '获取热门文档失败')
     }
-  ]
-  
-  pagination.value.total = searchResults.value.length
-  ElMessage.success(`找到 ${searchResults.value.length} 个热门文档`)
+  } catch (error) {
+    console.error('获取热门文档失败:', error)
+    ElMessage.error('获取热门文档失败，请重试')
+  }
 }
 </script>
 

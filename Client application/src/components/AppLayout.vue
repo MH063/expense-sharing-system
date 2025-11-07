@@ -20,13 +20,13 @@
             <li class="nav-item" v-if="isAuthenticated">
               <router-link to="/bills" class="nav-link">账单</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated && hasPermission('BILL_PAY')">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('bill:pay')">
               <router-link to="/qr-codes" class="nav-link">收款码</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated && hasPermission('BILL_PAY')">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('bill:pay')">
               <router-link to="/payments/history" class="nav-link">支付记录</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated && hasPermission('ROOM_MANAGE')">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('room:invite')">
               <router-link to="/invite-codes" class="nav-link">邀请码管理</router-link>
             </li>
             <li class="nav-item" v-if="isAuthenticated">
@@ -79,7 +79,7 @@
                     设置
                   </router-link>
                 </li>
-                <li v-if="hasPermission('SYSTEM_ADMIN')">
+                <li v-if="hasPermission('admin.access')">
                   <router-link to="/admin/permissions" class="dropdown-item">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -148,12 +148,13 @@ const userAvatar = computed(() => {
 const userRoleText = computed(() => {
   // 使用认证store的角色信息
   const role = currentRole.value
+  // 角色映射表
   const roleMap = {
     'admin': '管理员',
-    'room_owner': '寝室长',
-    'room_member': '寝室成员',
-    'guest': '访客',
-    'dormitory_admin': '寝室管理员',
+    'system_admin': '系统管理员',
+    'super_admin': '超级管理员',
+    '寝室长': '寝室长',
+    'payer': '付款人',
     'user': '普通用户'
   }
   

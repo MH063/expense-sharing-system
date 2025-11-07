@@ -38,18 +38,29 @@ function authenticateToken(req, res, next) {
  * @param {Array} allowedRoles - 允许访问的角色列表
  */
 function checkRole(allowedRoles) {
-  return (req, res, next) => {
-    // 这里应该从数据库获取用户角色，暂时从token中获取
-    const userRole = req.user.roles && req.user.roles[0]; // 简化处理，实际应该从数据库获取
+  return async (req, res, next) => {
+    try {
+      // 从数据库获取用户角色
+      const { TokenManager } = require('./tokenManager');
+      const userRole = await TokenManager.getUserRole(req.user.sub);
 
-    if (!allowedRoles.includes(userRole)) {
-      return res.status(403).json({
+      if (!allowedRoles.includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          message: '权限不足'
+        });
+      }
+
+      // 更新req.user中的角色信息
+      req.user.roles = [userRole];
+      next();
+    } catch (error) {
+      console.error('角色验证失败:', error);
+      return res.status(500).json({
         success: false,
-        message: '权限不足'
+        message: '服务器内部错误'
       });
     }
-
-    next();
   };
 }
 
@@ -58,23 +69,34 @@ function checkRole(allowedRoles) {
  * @param {Array} requiredPermissions - 需要的权限列表
  */
 function checkPermission(requiredPermissions) {
-  return (req, res, next) => {
-    // 这里应该从数据库获取用户权限，暂时从token中获取
-    const userPermissions = req.user.permissions || []; // 简化处理，实际应该从数据库获取
+  return async (req, res, next) => {
+    try {
+      // 从数据库获取用户权限
+      const { TokenManager } = require('./tokenManager');
+      const userPermissions = await TokenManager.getUserPermissions(req.user.sub);
 
-    // 检查用户是否拥有所有需要的权限
-    const hasAllPermissions = requiredPermissions.every(permission => 
-      userPermissions.includes(permission)
-    );
+      // 检查用户是否拥有所有需要的权限
+      const hasAllPermissions = requiredPermissions.every(permission => 
+        userPermissions.includes(permission)
+      );
 
-    if (!hasAllPermissions) {
-      return res.status(403).json({
+      if (!hasAllPermissions) {
+        return res.status(403).json({
+          success: false,
+          message: '权限不足'
+        });
+      }
+
+      // 更新req.user中的权限信息
+      req.user.permissions = userPermissions;
+      next();
+    } catch (error) {
+      console.error('权限验证失败:', error);
+      return res.status(500).json({
         success: false,
-        message: '权限不足'
+        message: '服务器内部错误'
       });
     }
-
-    next();
   };
 }
 

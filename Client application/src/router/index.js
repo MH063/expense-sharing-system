@@ -283,7 +283,7 @@ const routes = [
     component: InviteCodeManagement,
     meta: { 
       requiresAuth: true,
-      requiresPermission: PERMISSIONS.ROOM_MANAGE
+      requiresPermission: PERMISSIONS.ROOM_INVITE
     }
   },
   {
@@ -300,7 +300,7 @@ const routes = [
     component: SpecialPaymentRules,
     meta: { 
       requiresAuth: true,
-      requiresRoomPermission: PERMISSIONS.ROOM_MANAGE
+      requiresRoomPermission: PERMISSIONS.ROOM_EDIT
     },
     props: true
   },
@@ -320,7 +320,7 @@ const routes = [
     component: ReviewDashboard,
     meta: { 
       requiresAuth: true, 
-      requiresRole: [ROLES.ADMIN, ROLES.ROOM_OWNER]
+      requiresPermission: PERMISSIONS.ROOM_EDIT
     }
   },
   {
@@ -329,7 +329,7 @@ const routes = [
     component: ReviewDetail,
     meta: { 
       requiresAuth: true, 
-      requiresRole: [ROLES.ADMIN, ROLES.ROOM_OWNER]
+      requiresPermission: PERMISSIONS.ROOM_EDIT
     },
     props: true
   },
@@ -386,7 +386,7 @@ const routes = [
     meta: {
       title: '权限测试',
       requiresAuth: true,
-      requiresPermission: PERMISSIONS.SYSTEM_ADMIN
+      requiresPermission: PERMISSIONS.ADMIN_ACCESS
     }
   },
   {

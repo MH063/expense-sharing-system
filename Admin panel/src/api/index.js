@@ -553,3 +553,184 @@ export const webhookApi = {
     })
   }
 }
+
+/**
+ * 争议管理相关API
+ */
+export const disputeApi = {
+  // 获取争议列表
+  getDisputeList: (params) => {
+    return request({
+      url: '/api/admin/disputes',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 获取争议详情
+  getDisputeDetail: (id) => {
+    return request({
+      url: `/api/admin/disputes/${id}`,
+      method: 'get'
+    })
+  },
+  
+  // 创建争议
+  createDispute: (data) => {
+    return request({
+      url: '/api/admin/disputes',
+      method: 'post',
+      data
+    })
+  },
+  
+  // 更新争议
+  updateDispute: (id, data) => {
+    return request({
+      url: `/api/admin/disputes/${id}`,
+      method: 'put',
+      data
+    })
+  },
+  
+  // 删除争议
+  deleteDispute: (id) => {
+    return request({
+      url: `/api/admin/disputes/${id}`,
+      method: 'delete'
+    })
+  },
+  
+  // 分配处理人
+  assignHandler: (id, data) => {
+    return request({
+      url: `/api/admin/disputes/${id}/assign`,
+      method: 'post',
+      data
+    })
+  },
+  
+  // 处理争议
+  handleDispute: (id, data) => {
+    return request({
+      url: `/api/admin/disputes/${id}/handle`,
+      method: 'post',
+      data
+    })
+  },
+  
+  // 解决争议
+  resolveDispute: (id, data) => {
+    return request({
+      url: `/api/admin/disputes/${id}/resolve`,
+      method: 'post',
+      data
+    })
+  },
+  
+  // 获取可分配的处理人列表
+  getAvailableHandlers: () => {
+    return request({
+      url: '/api/admin/disputes/handlers',
+      method: 'get'
+    })
+  },
+  
+  // 获取争议统计数据
+  getDisputeStats: () => {
+    return request({
+      url: '/api/admin/disputes/stats',
+      method: 'get'
+    })
+  }
+}
+
+/**
+ * 寝室管理相关API
+ */
+export const dormApi = {
+  // 获取寝室列表
+  getDormList: (params) => {
+    return request({
+      url: '/api/admin/dorms',
+      method: 'get',
+      params
+    })
+  },
+  
+  // 获取寝室详情
+  getDormDetail: (id) => {
+    return request({
+      url: `/api/admin/dorms/${id}`,
+      method: 'get'
+    })
+  },
+  
+  // 创建寝室
+  createDorm: (data) => {
+    return request({
+      url: '/api/admin/dorms',
+      method: 'post',
+      data
+    })
+  },
+  
+  // 更新寝室
+  updateDorm: (id, data) => {
+    return request({
+      url: `/api/admin/dorms/${id}`,
+      method: 'put',
+      data
+    })
+  },
+  
+  // 删除寝室
+  deleteDorm: (id) => {
+    return request({
+      url: `/api/admin/dorms/${id}`,
+      method: 'delete'
+    })
+  },
+  
+  // 获取寝室成员列表
+  getDormMembers: (id) => {
+    return request({
+      url: `/api/admin/dorms/${id}/members`,
+      method: 'get'
+    })
+  },
+  
+  // 添加寝室成员
+  addDormMember: (id, data) => {
+    return request({
+      url: `/api/admin/dorms/${id}/members`,
+      method: 'post',
+      data
+    })
+  },
+  
+  // 移除寝室成员
+  removeDormMember: (id, memberId) => {
+    return request({
+      url: `/api/admin/dorms/${id}/members/${memberId}`,
+      method: 'delete'
+    })
+  },
+  
+  // 设置寝室长
+  setDormLeader: (id, memberId) => {
+    return request({
+      url: `/api/admin/dorms/${id}/leader`,
+      method: 'put',
+      data: { memberId }
+    })
+  },
+  
+  // 获取可分配用户列表
+  getAvailableUsers: () => {
+    return request({
+      url: '/api/admin/users/available',
+      method: 'get'
+    })
+  }
+}

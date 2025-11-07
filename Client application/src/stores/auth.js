@@ -40,6 +40,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const hasRole = (role) => roles.value.includes(role)
   const hasPermission = (permission) => permissions.value.includes(permission)
+  
+  // 添加checkPermission方法作为hasPermission的别名，保持向后兼容
+  const checkPermission = (permission) => hasPermission(permission)
 
   /**
    * 初始化认证状态
@@ -456,6 +459,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearSession,
     hasRole,
     hasPermission,
+    checkPermission, // 添加checkPermission到导出对象
     getTokenStatus
   }
 })

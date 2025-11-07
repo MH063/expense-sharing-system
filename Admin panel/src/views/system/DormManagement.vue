@@ -317,6 +317,7 @@ import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { dormApi } from '../../api'
 
 // 搜索表单
 const searchForm = reactive({
@@ -326,92 +327,15 @@ const searchForm = reactive({
 })
 
 // 寝室列表
-const dormList = ref([
-  {
-    id: 1,
-    roomNumber: '101',
-    building: 'A',
-    floor: 1,
-    capacity: 4,
-    currentCount: 4,
-    status: 'active',
-    leader: '张三',
-    totalExpense: 580.50,
-    expenseCount: 12,
-    createTime: '2023-09-01 10:00:00',
-    remarks: '朝南，阳光充足',
-    members: [
-      { id: 1, username: 'zhangsan', realName: '张三', phone: '13800138001', joinTime: '2023-09-01 10:00:00', isLeader: true },
-      { id: 2, username: 'lisi', realName: '李四', phone: '13800138002', joinTime: '2023-09-01 10:30:00', isLeader: false },
-      { id: 3, username: 'wangwu', realName: '王五', phone: '13800138003', joinTime: '2023-09-01 11:00:00', isLeader: false },
-      { id: 4, username: 'zhaoliu', realName: '赵六', phone: '13800138004', joinTime: '2023-09-01 11:30:00', isLeader: false }
-    ]
-  },
-  {
-    id: 2,
-    roomNumber: '201',
-    building: 'B',
-    floor: 2,
-    capacity: 4,
-    currentCount: 3,
-    status: 'active',
-    leader: '钱七',
-    totalExpense: 420.30,
-    expenseCount: 8,
-    createTime: '2023-09-01 14:00:00',
-    remarks: '靠近楼梯，方便出行',
-    members: [
-      { id: 5, username: 'qianqi', realName: '钱七', phone: '13800138005', joinTime: '2023-09-01 14:00:00', isLeader: true },
-      { id: 6, username: 'sunba', realName: '孙八', phone: '13800138006', joinTime: '2023-09-01 14:30:00', isLeader: false },
-      { id: 7, username: 'zhoujiu', realName: '周九', phone: '13800138007', joinTime: '2023-09-01 15:00:00', isLeader: false }
-    ]
-  },
-  {
-    id: 3,
-    roomNumber: '301',
-    building: 'C',
-    floor: 3,
-    capacity: 4,
-    currentCount: 0,
-    status: 'vacant',
-    leader: null,
-    totalExpense: 0,
-    expenseCount: 0,
-    createTime: '2023-09-01 16:00:00',
-    remarks: '新装修，设施齐全',
-    members: []
-  },
-  {
-    id: 4,
-    roomNumber: '401',
-    building: 'D',
-    floor: 4,
-    capacity: 4,
-    currentCount: 2,
-    status: 'maintenance',
-    leader: null,
-    totalExpense: 120.00,
-    expenseCount: 3,
-    createTime: '2023-09-01 17:00:00',
-    remarks: '空调维修中',
-    members: [
-      { id: 8, username: 'wushi', realName: '吴十', phone: '13800138008', joinTime: '2023-09-01 17:00:00', isLeader: false },
-      { id: 9, username: 'zhengyi', realName: '郑一', phone: '13800138009', joinTime: '2023-09-01 17:30:00', isLeader: false }
-    ]
-  }
-])
+const dormList = ref([])
 
 // 可分配用户列表
-const availableUsers = ref([
-  { id: 10, username: 'chener', realName: '陈二' },
-  { id: 11, username: 'linthree', realName: '林三' },
-  { id: 12, username: 'huangfour', realName: '黄四' }
-])
+const availableUsers = ref([])
 
 // 分页相关
 const currentPage = ref(1)
 const pageSize = ref(10)
-const totalDorms = ref(100)
+const totalDorms = ref(0)
 
 // 加载状态
 const loading = ref(false)
@@ -487,14 +411,54 @@ const getStatusTagType = (status) => {
   return typeMap[status] || 'info'
 }
 
+// 获取寝室列表
+const fetchDormList = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      roomNumber: searchForm.roomNumber || undefined,
+      status: searchForm.status || undefined,
+      building: searchForm.building || undefined
+    }
+    const response = await dormApi.getDormList(params)
+    if (response && response.success) {
+      const data = response.data
+      dormList.value = Array.isArray(data) ? data : (data.list || data.data || [])
+      totalDorms.value = data.total || dormList.value.length
+    }
+  } catch (error) {
+    console.error('获取寝室列表错误:', error)
+    ElMessage.error('获取寝室列表失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取可分配用户列表
+const fetchAvailableUsers = async () => {
+  try {
+    const response = await dormApi.getAvailableUsers()
+    if (response && response.success) {
+      availableUsers.value = Array.isArray(response.data) ? response.data : (response.data.data || [])
+    }
+  } catch (error) {
+    console.error('获取可分配用户列表错误:', error)
+    ElMessage.error('获取可分配用户列表失败')
+  }
+}
+
+// 页面加载时获取数据
+onMounted(() => {
+  fetchDormList()
+  fetchAvailableUsers()
+})
+
 // 搜索寝室
 const handleSearch = () => {
-  loading.value = true
-  // 模拟API调用
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('搜索完成')
-  }, 500)
+  currentPage.value = 1
+  fetchDormList()
 }
 
 // 重置搜索
@@ -502,7 +466,8 @@ const resetSearch = () => {
   searchForm.roomNumber = ''
   searchForm.status = ''
   searchForm.building = ''
-  handleSearch()
+  currentPage.value = 1
+  fetchDormList()
 }
 
 // 查看寝室详情
@@ -525,7 +490,7 @@ const manageMembers = (dorm) => {
 }
 
 // 指定寝室长
-const assignLeader = (dorm) => {
+const assignLeader = async (dorm) => {
   if (!dorm.members || dorm.members.length === 0) {
     ElMessage.warning('该寝室没有成员，无法指定寝室长')
     return
@@ -542,19 +507,26 @@ const assignLeader = (dorm) => {
     inputType: 'select',
     inputOptions: memberOptions
   })
-    .then(({ value }) => {
-      // 模拟API调用
-      const memberId = parseInt(value)
-      const member = dorm.members.find(m => m.id === memberId)
-      
-      if (member) {
-        // 清除所有成员的寝室长标记
-        dorm.members.forEach(m => m.isLeader = false)
-        // 设置新的寝室长
-        member.isLeader = true
-        dorm.leader = member.realName
+    .then(async ({ value }) => {
+      try {
+        const memberId = parseInt(value)
+        const member = dorm.members.find(m => m.id === memberId)
         
-        ElMessage.success(`已指定 ${member.realName} 为寝室长`)
+        if (member) {
+          // 调用API设置寝室长
+          await dormApi.setDormLeader(dorm.id, memberId)
+          
+          // 清除所有成员的寝室长标记
+          dorm.members.forEach(m => m.isLeader = false)
+          // 设置新的寝室长
+          member.isLeader = true
+          dorm.leader = member.realName
+          
+          ElMessage.success(`已指定 ${member.realName} 为寝室长`)
+        }
+      } catch (error) {
+        console.error('指定寝室长失败:', error)
+        ElMessage.error('指定寝室长失败，请稍后重试')
       }
     })
     .catch(() => {
@@ -563,47 +535,63 @@ const assignLeader = (dorm) => {
 }
 
 // 设为寝室长
-const setAsLeader = (member) => {
+const setAsLeader = async (member) => {
   if (!currentDorm.value) return
   
-  // 清除所有成员的寝室长标记
-  currentDorm.value.members.forEach(m => m.isLeader = false)
-  // 设置新的寝室长
-  member.isLeader = true
-  currentDorm.value.leader = member.realName
-  
-  // 更新原寝室列表中的数据
-  const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
-  if (dorm) {
-    dorm.leader = member.realName
-    dorm.members.forEach(m => m.isLeader = false)
-    const targetMember = dorm.members.find(m => m.id === member.id)
-    if (targetMember) {
-      targetMember.isLeader = true
+  try {
+    // 调用API设置寝室长
+    await dormApi.setDormLeader(currentDorm.value.id, member.id)
+    
+    // 清除所有成员的寝室长标记
+    currentDorm.value.members.forEach(m => m.isLeader = false)
+    // 设置新的寝室长
+    member.isLeader = true
+    currentDorm.value.leader = member.realName
+    
+    // 更新原寝室列表中的数据
+    const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
+    if (dorm) {
+      dorm.leader = member.realName
+      dorm.members.forEach(m => m.isLeader = false)
+      const targetMember = dorm.members.find(m => m.id === member.id)
+      if (targetMember) {
+        targetMember.isLeader = true
+      }
     }
+    
+    ElMessage.success(`已指定 ${member.realName} 为寝室长`)
+  } catch (error) {
+    console.error('设置寝室长失败:', error)
+    ElMessage.error('设置寝室长失败，请稍后重试')
   }
-  
-  ElMessage.success(`已指定 ${member.realName} 为寝室长`)
 }
 
 // 移除寝室长
-const removeLeader = (member) => {
+const removeLeader = async (member) => {
   if (!currentDorm.value) return
   
-  member.isLeader = false
-  currentDorm.value.leader = null
-  
-  // 更新原寝室列表中的数据
-  const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
-  if (dorm) {
-    dorm.leader = null
-    const targetMember = dorm.members.find(m => m.id === member.id)
-    if (targetMember) {
-      targetMember.isLeader = false
+  try {
+    // 调用API移除寝室长
+    await dormApi.removeDormLeader(currentDorm.value.id, member.id)
+    
+    member.isLeader = false
+    currentDorm.value.leader = null
+    
+    // 更新原寝室列表中的数据
+    const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
+    if (dorm) {
+      dorm.leader = null
+      const targetMember = dorm.members.find(m => m.id === member.id)
+      if (targetMember) {
+        targetMember.isLeader = false
+      }
     }
+    
+    ElMessage.success(`已移除 ${member.realName} 的寝室长身份`)
+  } catch (error) {
+    console.error('移除寝室长失败:', error)
+    ElMessage.error('移除寝室长失败，请稍后重试')
   }
-  
-  ElMessage.success(`已移除 ${member.realName} 的寝室长身份`)
 }
 
 // 删除寝室
@@ -617,12 +605,20 @@ const deleteDorm = (dorm) => {
       type: 'warning'
     }
   )
-    .then(() => {
-      // 模拟API调用
-      const index = dormList.value.findIndex(d => d.id === dorm.id)
-      if (index !== -1) {
-        dormList.value.splice(index, 1)
-        ElMessage.success('删除成功')
+    .then(async () => {
+      try {
+        // 调用API删除寝室
+        await dormApi.deleteDorm(dorm.id)
+        
+        // 从列表中移除
+        const index = dormList.value.findIndex(d => d.id === dorm.id)
+        if (index !== -1) {
+          dormList.value.splice(index, 1)
+          ElMessage.success('删除成功')
+        }
+      } catch (error) {
+        console.error('删除寝室失败:', error)
+        ElMessage.error('删除寝室失败，请稍后重试')
       }
     })
     .catch(() => {
@@ -632,38 +628,33 @@ const deleteDorm = (dorm) => {
 
 // 保存寝室
 const saveDorm = () => {
-  dormFormRef.value.validate((valid) => {
+  dormFormRef.value.validate(async (valid) => {
     if (valid) {
-      if (isEdit.value) {
-        // 编辑寝室
-        const index = dormList.value.findIndex(d => d.id === dormForm.id)
-        if (index !== -1) {
-          dormList.value[index] = { ...dormForm }
+      try {
+        if (isEdit.value) {
+          // 编辑寝室
+          await dormApi.updateDorm(dormForm.id, dormForm)
           ElMessage.success('更新成功')
+        } else {
+          // 添加寝室
+          await dormApi.createDorm(dormForm)
+          ElMessage.success('添加成功')
         }
-      } else {
-        // 添加寝室
-        const newDorm = {
-          ...dormForm,
-          id: dormList.value.length + 1,
-          currentCount: 0,
-          leader: null,
-          totalExpense: 0,
-          expenseCount: 0,
-          createTime: new Date().toLocaleString(),
-          members: []
-        }
-        dormList.value.unshift(newDorm)
-        ElMessage.success('添加成功')
+        
+        showAddDormDialog.value = false
+        resetDormForm()
+        // 刷新列表
+        fetchDormList()
+      } catch (error) {
+        console.error('保存寝室失败:', error)
+        ElMessage.error('保存寝室失败，请稍后重试')
       }
-      showAddDormDialog.value = false
-      resetDormForm()
     }
   })
 }
 
 // 添加成员
-const addMember = () => {
+const addMember = async () => {
   if (!addMemberForm.userId) {
     ElMessage.warning('请选择用户')
     return
@@ -677,38 +668,46 @@ const addMember = () => {
     return
   }
   
-  // 查找用户
-  const user = availableUsers.value.find(u => u.id === addMemberForm.userId)
-  if (!user) return
-  
-  // 添加成员
-  const newMember = {
-    id: user.id,
-    username: user.username,
-    realName: user.realName,
-    phone: user.phone || '',
-    joinTime: new Date().toLocaleString(),
-    isLeader: false
+  try {
+    // 调用API添加成员
+    await dormApi.addDormMember(currentDorm.value.id, addMemberForm.userId)
+    
+    // 查找用户
+    const user = availableUsers.value.find(u => u.id === addMemberForm.userId)
+    if (!user) return
+    
+    // 添加成员到本地数据
+    const newMember = {
+      id: user.id,
+      username: user.username,
+      realName: user.realName,
+      phone: user.phone || '',
+      joinTime: new Date().toLocaleString(),
+      isLeader: false
+    }
+    
+    currentDorm.value.members.push(newMember)
+    currentDorm.value.currentCount += 1
+    
+    // 更新原寝室列表中的数据
+    const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
+    if (dorm) {
+      dorm.members.push(newMember)
+      dorm.currentCount += 1
+    }
+    
+    // 从可用用户列表中移除
+    const index = availableUsers.value.findIndex(u => u.id === addMemberForm.userId)
+    if (index !== -1) {
+      availableUsers.value.splice(index, 1)
+    }
+    
+    ElMessage.success('成员添加成功')
+    addMemberForm.userId = null
+  } catch (error) {
+    console.error('添加成员失败:', error)
+    ElMessage.error('添加成员失败，请稍后重试')
   }
-  
-  currentDorm.value.members.push(newMember)
-  currentDorm.value.currentCount += 1
-  
-  // 更新原寝室列表中的数据
-  const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
-  if (dorm) {
-    dorm.members.push(newMember)
-    dorm.currentCount += 1
-  }
-  
-  // 从可用用户列表中移除
-  const index = availableUsers.value.findIndex(u => u.id === addMemberForm.userId)
-  if (index !== -1) {
-    availableUsers.value.splice(index, 1)
-  }
-  
-  ElMessage.success('成员添加成功')
-  addMemberForm.userId = null
 }
 
 // 移除成员
@@ -724,38 +723,46 @@ const removeMember = (member) => {
       type: 'warning'
     }
   )
-    .then(() => {
-      // 从寝室成员列表中移除
-      const index = currentDorm.value.members.findIndex(m => m.id === member.id)
-      if (index !== -1) {
-        currentDorm.value.members.splice(index, 1)
-        currentDorm.value.currentCount -= 1
-      }
-      
-      // 更新原寝室列表中的数据
-      const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
-      if (dorm) {
-        const memberIndex = dorm.members.findIndex(m => m.id === member.id)
-        if (memberIndex !== -1) {
-          dorm.members.splice(memberIndex, 1)
-          dorm.currentCount -= 1
+    .then(async () => {
+      try {
+        // 调用API移除成员
+        await dormApi.removeDormMember(currentDorm.value.id, member.id)
+        
+        // 从寝室成员列表中移除
+        const index = currentDorm.value.members.findIndex(m => m.id === member.id)
+        if (index !== -1) {
+          currentDorm.value.members.splice(index, 1)
+          currentDorm.value.currentCount -= 1
         }
         
-        // 如果移除的是寝室长，清除寝室长
-        if (member.isLeader) {
-          dorm.leader = null
+        // 更新原寝室列表中的数据
+        const dorm = dormList.value.find(d => d.id === currentDorm.value.id)
+        if (dorm) {
+          const memberIndex = dorm.members.findIndex(m => m.id === member.id)
+          if (memberIndex !== -1) {
+            dorm.members.splice(memberIndex, 1)
+            dorm.currentCount -= 1
+          }
+          
+          // 如果移除的是寝室长，清除寝室长
+          if (member.isLeader) {
+            dorm.leader = null
+          }
         }
+        
+        // 添加到可用用户列表
+        availableUsers.value.push({
+          id: member.id,
+          username: member.username,
+          realName: member.realName,
+          phone: member.phone
+        })
+        
+        ElMessage.success('成员移除成功')
+      } catch (error) {
+        console.error('移除成员失败:', error)
+        ElMessage.error('移除成员失败，请稍后重试')
       }
-      
-      // 添加到可用用户列表
-      availableUsers.value.push({
-        id: member.id,
-        username: member.username,
-        realName: member.realName,
-        phone: member.phone
-      })
-      
-      ElMessage.success('成员移除成功')
     })
     .catch(() => {
       ElMessage.info('已取消操作')
@@ -998,20 +1005,19 @@ const resetDormForm = () => {
 const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
-  // 重新加载数据
-  handleSearch()
+  fetchDormList()
 }
 
 // 处理当前页变化
 const handleCurrentChange = (page) => {
   currentPage.value = page
-  // 重新加载数据
-  handleSearch()
+  fetchDormList()
 }
 
 // 组件挂载时加载数据
 onMounted(() => {
-  handleSearch()
+  fetchDormList()
+  fetchAvailableUsers()
 })
 </script>
 

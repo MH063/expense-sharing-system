@@ -1,5 +1,5 @@
 <template>
-  <div class="overview-tab">
+  <div class="overview-tab" v-if="canViewAnalytics">
     <!-- 统计卡片 -->
     <div class="stats-cards">
       <el-row :gutter="20">
@@ -131,12 +131,24 @@
       </el-card>
     </div>
   </div>
+  
+  <!-- 无权限访问提示 -->
+  <div v-else class="no-permission-container">
+    <div class="no-permission-content">
+      <el-icon class="no-permission-icon"><Lock /></el-icon>
+      <h2>访问受限</h2>
+      <p>您没有权限查看概览数据</p>
+      <el-button type="primary" @click="$router.push('/dashboard')">返回首页</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, defineProps } from 'vue'
+import { ref, reactive, computed, onMounted, defineProps } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, House, Money, UserFilled } from '@element-plus/icons-vue'
+import { User, House, Money, UserFilled, Lock } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
+import { PERMISSIONS } from '@/utils/permissions'
 import { analyticsApi } from '@/api/analytics'
 import ExpenseTrendChart from '../charts/ExpenseTrendChart.vue'
 import UserGrowthChart from '../charts/UserGrowthChart.vue'
@@ -154,6 +166,13 @@ const props = defineProps({
 // 路由
 const router = useRouter()
 
+// 权限检查
+const authStore = useAuthStore()
+const canViewAnalytics = computed(() => {
+  return authStore.hasPermission(PERMISSIONS.SYSTEM_VIEW) || 
+         authStore.hasPermission(PERMISSIONS.ROOM_VIEW)
+})
+
 // 状态
 const loading = ref(false)
 const overviewData = reactive({
@@ -169,6 +188,11 @@ const recentActivities = ref([])
  * 加载概览数据
  */
 const loadOverviewData = async () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限查看概览数据')
+    return
+  }
+  
   loading.value = true
   try {
     const resp = await analyticsApi.getOverviewData({
@@ -192,6 +216,11 @@ const loadOverviewData = async () => {
  * 加载最近活动
  */
 const loadRecentActivities = async () => {
+  if (!canViewAnalytics.value) {
+    console.log('用户没有权限查看最近活动')
+    return
+  }
+  
   try {
     const resp = await analyticsApi.getRecentActivities({ limit: 10 })
     
@@ -336,5 +365,35 @@ onMounted(() => {
 .activity-description {
   color: #666;
   font-size: 14px;
+}
+
+.no-permission-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 70vh;
+  padding: 20px;
+}
+
+.no-permission-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.no-permission-icon {
+  font-size: 64px;
+  color: #e6a23c;
+  margin-bottom: 20px;
+}
+
+.no-permission-content h2 {
+  margin: 0 0 16px 0;
+  color: #303133;
+}
+
+.no-permission-content p {
+  margin: 0 0 24px 0;
+  color: #606266;
+  font-size: 16px;
 }
 </style>

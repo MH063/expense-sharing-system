@@ -75,12 +75,16 @@ class TokenManager {
     const kid = crypto.createHash('sha256').update(currentSecret).digest('hex').slice(0, 16);
     const jti = crypto.randomUUID();
     
+    // 确保roles和permissions是数组
+    const userRoles = Array.isArray(roles) ? roles : [roles];
+    const userPermissions = Array.isArray(permissions) ? permissions : [permissions];
+    
     return jwt.sign(
       { 
         sub,
         username,
-        roles,
-        permissions,
+        roles: userRoles,
+        permissions: userPermissions,
         jti
       },
       currentSecret,
@@ -326,6 +330,105 @@ class TokenManager {
       
       return { truncated: false };
     }
+  }
+
+  /**
+   * 从数据库获取用户权限
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>} 用户权限列表
+   */
+  static async getUserPermissions(userId) {
+    try {
+      const { pool } = require('../config/db');
+      
+      // 查询用户角色
+      const roleResult = await pool.query(
+        `SELECT r.name as role 
+         FROM user_roles ur 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE ur.user_id = $1`,
+        [userId]
+      );
+      
+      if (roleResult.rows.length === 0) {
+        // 如果用户没有角色，返回默认权限
+        return ['read', 'write'];
+      }
+      
+      const userRole = roleResult.rows[0].role;
+      
+      // 根据角色获取权限
+      const permissionResult = await pool.query(
+        `SELECT p.code as permission 
+         FROM role_permissions rp 
+         JOIN permissions p ON rp.permission_id = p.id 
+         JOIN roles r ON rp.role_id = r.id 
+         WHERE r.name = $1`,
+        [userRole]
+      );
+      
+      if (permissionResult.rows.length === 0) {
+        // 如果角色没有权限，返回默认权限
+        return ['read', 'write'];
+      }
+      
+      return permissionResult.rows.map(row => row.permission);
+    } catch (error) {
+      logger.error('获取用户权限失败:', error);
+      // 出错时返回默认权限
+      return ['read', 'write'];
+    }
+  }
+
+  /**
+   * 从数据库获取用户角色
+   * @param {string} userId - 用户ID
+   * @returns {Promise<string>} 用户角色
+   */
+  static async getUserRole(userId) {
+    try {
+      const { pool } = require('../config/db');
+      
+      // 查询用户角色
+      const roleResult = await pool.query(
+        `SELECT r.name as role 
+         FROM user_roles ur 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE ur.user_id = $1`,
+        [userId]
+      );
+      
+      if (roleResult.rows.length === 0) {
+        // 如果用户没有角色，返回默认角色
+        return 'user';
+      }
+      
+      return roleResult.rows[0].role;
+    } catch (error) {
+      logger.error('获取用户角色失败:', error);
+      // 出错时返回默认角色
+      return 'user';
+    }
+  }
+
+  /**
+   * 生成带有数据库角色和权限的访问令牌
+   * @param {string} userId - 用户ID
+   * @param {string} username - 用户名
+   * @returns {Promise<string>} 访问令牌
+   */
+  static async generateAccessTokenWithDbPermissions(userId, username) {
+    const [role, permissions] = await Promise.all([
+      this.getUserRole(userId),
+      this.getUserPermissions(userId)
+    ]);
+    
+    return this.generateAccessToken({
+      sub: userId,
+      username,
+      roles: [role],
+      permissions
+    });
   }
 }
 

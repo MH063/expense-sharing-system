@@ -1,0 +1,1754 @@
+{
+  "CreateTable": [
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admins (\n    id SERIAL PRIMARY KEY,\n    username VARCHAR(50) UNIQUE NOT NULL,\n    email VARCHAR(100) UNIQUE NOT NULL,\n    password_hash VARCHAR(255) NOT NULL,\n    full_name VARCHAR(100),\n    phone VARCHAR(20),\n    status VARCHAR(20) DEFAULT 'active',\n    last_login_at TIMESTAMP,\n    login_count INTEGER DEFAULT 0,\n    failed_login_attempts INTEGER DEFAULT 0,\n    locked_until TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_tokens (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    access_token TEXT NOT NULL,\n    refresh_token TEXT NOT NULL,\n    expires_at TIMESTAMP NOT NULL,\n    device_name VARCHAR(100),\n    device_type VARCHAR(20), -- 'mobile', 'desktop', 'tablet'\n    ip_address INET,\n    user_agent TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 角色管理相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_roles (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) UNIQUE NOT NULL,\n    description TEXT,\n    is_system BOOLEAN DEFAULT false,\n    version INTEGER DEFAULT 1,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_permissions (\n    id SERIAL PRIMARY KEY,\n    code VARCHAR(100) UNIQUE NOT NULL,\n    name VARCHAR(100) NOT NULL,\n    description TEXT,\n    module VARCHAR(50) NOT NULL,\n    version INTEGER DEFAULT 1,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_role_permissions (\n    id SERIAL PRIMARY KEY,\n    role_id INTEGER REFERENCES admin_roles(id),\n    permission_id INTEGER REFERENCES admin_permissions(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(role_id, permission_id)\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_user_roles (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    role_id INTEGER REFERENCES admin_roles(id),\n    assigned_by INTEGER REFERENCES admins(id),\n    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(admin_id, role_id)\n);\n\n-- 用户管理扩展表（补充前端用户表）"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_status_logs (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    old_status VARCHAR(20),\n    new_status VARCHAR(20) NOT NULL,\n    reason TEXT,\n    changed_by INTEGER REFERENCES admins(id),\n    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_roles (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    role_name VARCHAR(50) NOT NULL,\n    assigned_by INTEGER REFERENCES admins(id),\n    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    expires_at TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n\n-- 账单管理扩展表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_admin_logs (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    admin_id INTEGER REFERENCES admins(id),\n    action VARCHAR(100) NOT NULL,\n    old_data JSONB,\n    new_data JSONB,\n    details JSONB,\n    reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 费用审核相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_reviews (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    reviewer_id INTEGER REFERENCES admins(id),\n    admin_id INTEGER REFERENCES admins(id),\n    status VARCHAR(20) NOT NULL,\n    review_notes TEXT,\n    review_details JSONB,\n    reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE abnormal_expenses (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    reason TEXT NOT NULL,\n    severity VARCHAR(20) DEFAULT 'medium',\n    status VARCHAR(20) DEFAULT 'pending',\n    detected_by INTEGER REFERENCES admins(id),\n    resolved_by INTEGER REFERENCES admins(id),\n    admin_id INTEGER REFERENCES admins(id),\n    handling_details JSONB,\n    resolved_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE abnormal_expense_stats (\n    id SERIAL PRIMARY KEY,\n    stat_date DATE NOT NULL,\n    total_count INTEGER DEFAULT 0,\n    pending_count INTEGER DEFAULT 0,\n    resolved_count INTEGER DEFAULT 0,\n    high_severity_count INTEGER DEFAULT 0,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(stat_date)\n);\n\n-- 系统设置相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_configs (\n    id SERIAL PRIMARY KEY,\n    config_key VARCHAR(100) UNIQUE NOT NULL,\n    config_value JSONB NOT NULL,\n    config_type VARCHAR(50) DEFAULT 'string',\n    description TEXT,\n    is_public BOOLEAN DEFAULT false,\n    version INTEGER DEFAULT 1,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE feature_flags (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) UNIQUE NOT NULL,\n    description TEXT,\n    is_enabled BOOLEAN DEFAULT false,\n    target_scope VARCHAR(20) DEFAULT 'global',\n    target_value JSONB,\n    version INTEGER DEFAULT 1,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE maintenance_windows (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    description TEXT,\n    start_time TIMESTAMP NOT NULL,\n    end_time TIMESTAMP NOT NULL,\n    affected_services JSONB,\n    status VARCHAR(20) DEFAULT 'scheduled',\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE announcements (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    content TEXT NOT NULL,\n    announcement_type VARCHAR(50) DEFAULT 'info',\n    priority VARCHAR(20) DEFAULT 'normal',\n    start_at TIMESTAMP,\n    end_at TIMESTAMP,\n    is_active BOOLEAN DEFAULT true,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 操作日志相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_operation_logs (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    operation_type VARCHAR(100) NOT NULL,\n    resource_type VARCHAR(50) NOT NULL,\n    resource_id INTEGER,\n    request_method VARCHAR(10),\n    request_path VARCHAR(500),\n    request_params JSONB,\n    ip_address INET,\n    user_agent TEXT,\n    status_code INTEGER,\n    response_time INTEGER,\n    operation_result VARCHAR(20), -- 'success', 'failure', 'partial'\n    details JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE data_change_audits (\n    id SERIAL PRIMARY KEY,\n    table_name VARCHAR(100) NOT NULL,\n    record_id INTEGER NOT NULL,\n    operation_type VARCHAR(20) NOT NULL,\n    old_values JSONB,\n    new_values JSONB,\n    changed_by INTEGER REFERENCES admins(id),\n    ip_address INET,\n    user_agent TEXT,\n    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 批量任务与报表相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE batch_jobs (\n    id SERIAL PRIMARY KEY,\n    job_type VARCHAR(100) NOT NULL,\n    job_name VARCHAR(255) NOT NULL,\n    description TEXT,\n    parameters JSONB,\n    status VARCHAR(20) DEFAULT 'pending',\n    progress INTEGER DEFAULT 0,\n    total_items INTEGER,\n    processed_items INTEGER DEFAULT 0,\n    started_at TIMESTAMP,\n    completed_at TIMESTAMP,\n    error_message TEXT,\n    admin_id INTEGER REFERENCES admins(id),\n    execution_details JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE report_definitions (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(255) NOT NULL,\n    description TEXT,\n    report_type VARCHAR(100) NOT NULL,\n    query_sql TEXT,\n    parameters_schema JSONB,\n    schedule_cron VARCHAR(100),\n    is_active BOOLEAN DEFAULT true,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE report_snapshots (\n    id SERIAL PRIMARY KEY,\n    report_definition_id INTEGER REFERENCES report_definitions(id),\n    snapshot_data JSONB NOT NULL,\n    parameters_used JSONB,\n    admin_id INTEGER REFERENCES admins(id),\n    generation_details JSONB,\n    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE export_tasks (\n    id SERIAL PRIMARY KEY,\n    task_type VARCHAR(100) NOT NULL,\n    file_name VARCHAR(255),\n    file_format VARCHAR(20) NOT NULL,\n    filters JSONB,\n    status VARCHAR(20) DEFAULT 'pending',\n    file_url VARCHAR(500),\n    file_size INTEGER,\n    admin_id INTEGER REFERENCES admins(id),\n    export_details JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    completed_at TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n\n-- 内容审核与工单相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE moderation_queue (\n    id SERIAL PRIMARY KEY,\n    content_type VARCHAR(50) NOT NULL,\n    content_id INTEGER NOT NULL,\n    content_preview TEXT,\n    reason TEXT,\n    reported_by INTEGER REFERENCES users(id),\n    status VARCHAR(20) DEFAULT 'pending',\n    assigned_to INTEGER REFERENCES admins(id),\n    admin_id INTEGER REFERENCES admins(id),\n    decision VARCHAR(20),\n    decision_notes TEXT,\n    review_details JSONB,\n    decided_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE support_tickets (\n    id SERIAL PRIMARY KEY,\n    ticket_number VARCHAR(50) UNIQUE NOT NULL,\n    title VARCHAR(255) NOT NULL,\n    description TEXT NOT NULL,\n    ticket_type VARCHAR(50) NOT NULL,\n    priority VARCHAR(20) DEFAULT 'medium',\n    status VARCHAR(20) DEFAULT 'open',\n    created_by INTEGER REFERENCES users(id),\n    assigned_to INTEGER REFERENCES admins(id),\n    admin_id INTEGER REFERENCES admins(id),\n    handling_details JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    resolved_at TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE ticket_comments (\n    id SERIAL PRIMARY KEY,\n    ticket_id INTEGER REFERENCES support_tickets(id),\n    author_id INTEGER, -- 可以是用户或管理员\n    author_type VARCHAR(20) NOT NULL, -- 'user' 或 'admin'\n    admin_id INTEGER REFERENCES admins(id),\n    content TEXT NOT NULL,\n    is_internal BOOLEAN DEFAULT false,\n    comment_details JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n\n-- 集成与回调相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE webhooks (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(255) NOT NULL,\n    target_url VARCHAR(500) NOT NULL,\n    secret_token VARCHAR(100),\n    events JSONB NOT NULL,\n    is_active BOOLEAN DEFAULT true,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE webhook_events (\n    id SERIAL PRIMARY KEY,\n    webhook_id INTEGER REFERENCES webhooks(id),\n    event_type VARCHAR(100) NOT NULL,\n    payload JSONB NOT NULL,\n    status VARCHAR(20) DEFAULT 'pending',\n    response_status INTEGER,\n    response_body TEXT,\n    attempts INTEGER DEFAULT 0,\n    last_attempt_at TIMESTAMP,\n    processing_details JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n\n-- 争议管理扩展表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE dispute_assignments (\n    id SERIAL PRIMARY KEY,\n    dispute_id INTEGER REFERENCES disputes(id),\n    assigned_to INTEGER REFERENCES admins(id),\n    assigned_by INTEGER REFERENCES admins(id),\n    admin_id INTEGER REFERENCES admins(id),\n    handling_details JSONB,\n    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    completed_at TIMESTAMP,\n    version INTEGER DEFAULT 1\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE dispute_handling_logs (\n    id SERIAL PRIMARY KEY,\n    dispute_id INTEGER REFERENCES disputes(id),\n    handled_by INTEGER REFERENCES admins(id),\n    admin_id INTEGER REFERENCES admins(id),\n    action VARCHAR(100) NOT NULL,\n    notes TEXT,\n    log_details JSONB,\n    handled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 寝室管理扩展表（补充前端房间表）"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE dorm_admin_logs (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    admin_id INTEGER REFERENCES admins(id),\n    action VARCHAR(100) NOT NULL,\n    old_data JSONB,\n    new_data JSONB,\n    log_details JSONB,\n    reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE room_leaders (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    user_id INTEGER REFERENCES users(id),\n    assigned_by INTEGER REFERENCES admins(id),\n    admin_id INTEGER REFERENCES admins(id),\n    appointment_date DATE,\n    end_date DATE,\n    appointment_reason TEXT,\n    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    version INTEGER DEFAULT 1,\n    UNIQUE(room_id)\n);\n\n-- 文档管理相关表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE documents (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    content TEXT NOT NULL,\n    document_type VARCHAR(50) NOT NULL,\n    slug VARCHAR(100) UNIQUE,\n    status VARCHAR(20) DEFAULT 'draft',\n    version INTEGER DEFAULT 1,\n    download_count INTEGER DEFAULT 0,\n    last_downloaded_at TIMESTAMP,\n    admin_id INTEGER REFERENCES admins(id),\n    created_by INTEGER REFERENCES admins(id),\n    updated_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE document_histories (\n    id SERIAL PRIMARY KEY,\n    document_id INTEGER REFERENCES documents(id),\n    version INTEGER NOT NULL,\n    title VARCHAR(255) NOT NULL,\n    content TEXT NOT NULL,\n    admin_id INTEGER REFERENCES admins(id),\n    history_details JSONB,\n    changed_by INTEGER REFERENCES admins(id),\n    change_reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(document_id, version)\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE document_types (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) UNIQUE NOT NULL,\n    description TEXT,\n    icon VARCHAR(50),\n    version INTEGER DEFAULT 1,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE document_statistics (\n    id SERIAL PRIMARY KEY,\n    document_id INTEGER REFERENCES documents(id),\n    view_count INTEGER DEFAULT 0,\n    download_count INTEGER DEFAULT 0,\n    last_viewed_at TIMESTAMP,\n    last_downloaded_at TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE document_access_logs (\n    id SERIAL PRIMARY KEY,\n    document_id INTEGER REFERENCES documents(id),\n    user_id INTEGER REFERENCES users(id),\n    access_type VARCHAR(20) NOT NULL, -- 'view', 'download', etc.\n    accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 管理员会话表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_sessions (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    session_token VARCHAR(255) UNIQUE NOT NULL,\n    device_name VARCHAR(100),\n    device_type VARCHAR(20), -- 'mobile', 'desktop', 'tablet'\n    ip_address INET,\n    user_agent TEXT,\n    is_active BOOLEAN DEFAULT true,\n    last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    expires_at TIMESTAMP NOT NULL\n);\n\n-- 补充表 - 管理员权限变更历史表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_permission_history (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    role_id INTEGER REFERENCES admin_roles(id),\n    permission_id INTEGER REFERENCES admin_permissions(id),\n    action VARCHAR(20) NOT NULL, -- 'grant', 'revoke'\n    granted_by INTEGER REFERENCES admins(id),\n    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    reason TEXT\n);\n\n-- 补充表 - 管理员操作限制表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_operation_restrictions (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    operation_type VARCHAR(50) NOT NULL,\n    restriction_type VARCHAR(20) NOT NULL, -- 'time_based', 'count_based', 'ip_based'\n    restriction_config JSONB NOT NULL,\n    is_active BOOLEAN DEFAULT true,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 管理员操作统计表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_operation_statistics (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    operation_date DATE NOT NULL,\n    operation_type VARCHAR(50),\n    operation_count INTEGER DEFAULT 0,\n    success_count INTEGER DEFAULT 0,\n    failure_count INTEGER DEFAULT 0,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(admin_id, operation_date, operation_type)\n);\n\n-- 补充表 - 系统性能监控表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_performance_metrics (\n    id SERIAL PRIMARY KEY,\n    metric_name VARCHAR(100) NOT NULL,\n    metric_value DECIMAL(15,2) NOT NULL,\n    metric_unit VARCHAR(20),\n    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    additional_data JSONB\n);\n\n-- 补充表 - 系统资源使用表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_resource_usage (\n    id SERIAL PRIMARY KEY,\n    cpu_usage DECIMAL(5,2),\n    memory_usage DECIMAL(5,2),\n    disk_usage DECIMAL(5,2),\n    network_in DECIMAL(15,2),\n    network_out DECIMAL(15,2),\n    active_connections INTEGER,\n    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统错误日志表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_error_logs (\n    id SERIAL PRIMARY KEY,\n    error_level VARCHAR(20) NOT NULL, -- 'debug', 'info', 'warning', 'error', 'critical'\n    error_code VARCHAR(50),\n    error_message TEXT NOT NULL,\n    error_details JSONB,\n    stack_trace TEXT,\n    module VARCHAR(100),\n    function_name VARCHAR(100),\n    line_number INTEGER,\n    admin_id INTEGER REFERENCES admins(id),\n    user_id INTEGER,\n    ip_address INET,\n    user_agent TEXT,\n    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统审计日志表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_audit_logs (\n    id SERIAL PRIMARY KEY,\n    event_type VARCHAR(50) NOT NULL,\n    event_category VARCHAR(50),\n    event_description TEXT,\n    event_data JSONB,\n    admin_id INTEGER REFERENCES admins(id),\n    user_id INTEGER,\n    ip_address INET,\n    user_agent TEXT,\n    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 数据备份记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE data_backup_records (\n    id SERIAL PRIMARY KEY,\n    backup_name VARCHAR(255) NOT NULL,\n    backup_type VARCHAR(20) NOT NULL, -- 'full', 'incremental', 'differential'\n    backup_size BIGINT,\n    backup_path VARCHAR(500),\n    backup_status VARCHAR(20) NOT NULL, -- 'started', 'running', 'completed', 'failed'\n    start_time TIMESTAMP,\n    end_time TIMESTAMP,\n    backup_details JSONB,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 数据恢复记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE data_restore_records (\n    id SERIAL PRIMARY KEY,\n    restore_name VARCHAR(255) NOT NULL,\n    backup_id INTEGER REFERENCES data_backup_records(id),\n    restore_type VARCHAR(20) NOT NULL, -- 'full', 'partial', 'table'\n    restore_status VARCHAR(20) NOT NULL, -- 'started', 'running', 'completed', 'failed'\n    restore_tables JSONB,\n    start_time TIMESTAMP,\n    end_time TIMESTAMP,\n    restore_details JSONB,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统维护计划表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_maintenance_plans (\n    id SERIAL PRIMARY KEY,\n    plan_name VARCHAR(255) NOT NULL,\n    plan_type VARCHAR(20) NOT NULL, -- 'scheduled', 'emergency', 'routine'\n    plan_description TEXT,\n    start_time TIMESTAMP NOT NULL,\n    end_time TIMESTAMP,\n    affected_modules JSONB,\n    maintenance_tasks JSONB,\n    status VARCHAR(20) DEFAULT 'planned', -- 'planned', 'in_progress', 'completed', 'cancelled'\n    notification_sent BOOLEAN DEFAULT false,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统维护执行记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_maintenance_executions (\n    id SERIAL PRIMARY KEY,\n    plan_id INTEGER REFERENCES system_maintenance_plans(id),\n    task_name VARCHAR(255) NOT NULL,\n    task_status VARCHAR(20) NOT NULL, -- 'pending', 'running', 'completed', 'failed'\n    start_time TIMESTAMP,\n    end_time TIMESTAMP,\n    execution_details JSONB,\n    executed_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统通知表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_notifications (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    message TEXT NOT NULL,\n    notification_type VARCHAR(50) NOT NULL, -- 'info', 'warning', 'error', 'success'\n    target_type VARCHAR(20) NOT NULL, -- 'all', 'admin', 'user', 'role'\n    target_ids JSONB, -- 目标ID数组\n    is_read BOOLEAN DEFAULT false,\n    read_at TIMESTAMP,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    expires_at TIMESTAMP\n);\n\n-- 补充表 - 系统通知阅读记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_notification_reads (\n    id SERIAL PRIMARY KEY,\n    notification_id INTEGER REFERENCES system_notifications(id),\n    admin_id INTEGER REFERENCES admins(id),\n    user_id INTEGER,\n    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(notification_id, admin_id),\n    UNIQUE(notification_id, user_id)\n);\n\n-- 补充表 - 系统配置变更历史表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_config_history (\n    id SERIAL PRIMARY KEY,\n    config_id INTEGER REFERENCES system_configs(id),\n    config_key VARCHAR(100) NOT NULL,\n    old_value TEXT,\n    new_value TEXT,\n    changed_by INTEGER REFERENCES admins(id),\n    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    reason TEXT\n);\n\n-- 补充表 - 功能开关变更历史表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE feature_flag_history (\n    id SERIAL PRIMARY KEY,\n    flag_id INTEGER REFERENCES feature_flags(id),\n    flag_key VARCHAR(100) NOT NULL,\n    old_enabled BOOLEAN,\n    new_enabled BOOLEAN,\n    old_config JSONB,\n    new_config JSONB,\n    changed_by INTEGER REFERENCES admins(id),\n    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    reason TEXT\n);\n\n-- 补充表 - 管理员登录历史表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_login_history (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    ip_address INET,\n    user_agent TEXT,\n    login_type VARCHAR(20) DEFAULT 'password', -- 'password', 'oauth', 'sso'\n    login_result VARCHAR(20) NOT NULL, -- 'success', 'failure'\n    failure_reason VARCHAR(100),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 管理员设备表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_devices (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    device_id VARCHAR(100) NOT NULL,\n    device_name VARCHAR(100),\n    device_type VARCHAR(20), -- 'mobile', 'desktop', 'tablet'\n    platform VARCHAR(20), -- 'ios', 'android', 'windows', 'macos'\n    is_trusted BOOLEAN DEFAULT false,\n    is_active BOOLEAN DEFAULT true,\n    last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(admin_id, device_id)\n);\n\n-- 补充表 - 管理员安全设置表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_security_settings (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    two_factor_enabled BOOLEAN DEFAULT false,\n    two_factor_secret VARCHAR(255),\n    backup_codes JSONB,\n    password_change_required BOOLEAN DEFAULT false,\n    password_last_changed_at TIMESTAMP,\n    session_timeout_minutes INTEGER DEFAULT 60,\n    ip_whitelist JSONB, -- 允许的IP地址数组\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(admin_id)\n);\n\n-- 补充表 - 管理员安全日志表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE admin_security_logs (\n    id SERIAL PRIMARY KEY,\n    admin_id INTEGER REFERENCES admins(id),\n    event_type VARCHAR(50) NOT NULL, -- 'login', 'logout', 'password_change', '2fa_enabled', '2fa_disabled'\n    event_details JSONB,\n    ip_address INET,\n    user_agent TEXT,\n    success BOOLEAN,\n    failure_reason VARCHAR(255),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统API密钥表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_api_keys (\n    id SERIAL PRIMARY KEY,\n    key_name VARCHAR(100) NOT NULL,\n    api_key VARCHAR(255) UNIQUE NOT NULL,\n    key_permissions JSONB, -- 权限数组\n    key_type VARCHAR(20) NOT NULL, -- 'read', 'write', 'admin'\n    is_active BOOLEAN DEFAULT true,\n    expires_at TIMESTAMP,\n    last_used_at TIMESTAMP,\n    usage_count INTEGER DEFAULT 0,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统API使用记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_api_usage_logs (\n    id SERIAL PRIMARY KEY,\n    api_key_id INTEGER REFERENCES system_api_keys(id),\n    endpoint VARCHAR(255) NOT NULL,\n    method VARCHAR(10) NOT NULL,\n    request_ip INET,\n    user_agent TEXT,\n    request_size INTEGER,\n    response_size INTEGER,\n    response_status INTEGER,\n    response_time_ms INTEGER,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统缓存统计表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_cache_statistics (\n    id SERIAL PRIMARY KEY,\n    cache_name VARCHAR(100) NOT NULL,\n    cache_type VARCHAR(50) NOT NULL, -- 'redis', 'memcached', 'memory'\n    hit_count INTEGER DEFAULT 0,\n    miss_count INTEGER DEFAULT 0,\n    hit_rate DECIMAL(5,2),\n    memory_usage BIGINT,\n    key_count INTEGER,\n    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统数据库统计表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_database_statistics (\n    id SERIAL PRIMARY KEY,\n    database_name VARCHAR(100) NOT NULL,\n    table_name VARCHAR(100),\n    table_size BIGINT,\n    index_size BIGINT,\n    row_count BIGINT,\n    avg_row_length INTEGER,\n    auto_increment_value BIGINT,\n    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统队列统计表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_queue_statistics (\n    id SERIAL PRIMARY KEY,\n    queue_name VARCHAR(100) NOT NULL,\n    pending_jobs INTEGER DEFAULT 0,\n    processing_jobs INTEGER DEFAULT 0,\n    completed_jobs INTEGER DEFAULT 0,\n    failed_jobs INTEGER DEFAULT 0,\n    avg_processing_time_ms INTEGER,\n    max_processing_time_ms INTEGER,\n    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统任务调度表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_scheduled_tasks (\n    id SERIAL PRIMARY KEY,\n    task_name VARCHAR(100) NOT NULL,\n    task_type VARCHAR(50) NOT NULL, -- 'cleanup', 'report', 'backup', 'notification'\n    task_expression VARCHAR(100) NOT NULL, -- cron表达式\n    task_config JSONB,\n    is_active BOOLEAN DEFAULT true,\n    last_run_at TIMESTAMP,\n    next_run_at TIMESTAMP,\n    run_count INTEGER DEFAULT 0,\n    success_count INTEGER DEFAULT 0,\n    failure_count INTEGER DEFAULT 0,\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统任务执行记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_task_executions (\n    id SERIAL PRIMARY KEY,\n    task_id INTEGER REFERENCES system_scheduled_tasks(id),\n    execution_status VARCHAR(20) NOT NULL, -- 'started', 'running', 'completed', 'failed'\n    start_time TIMESTAMP,\n    end_time TIMESTAMP,\n    execution_time_ms INTEGER,\n    execution_details JSONB,\n    error_message TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统健康检查表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_health_checks (\n    id SERIAL PRIMARY KEY,\n    check_name VARCHAR(100) NOT NULL,\n    check_type VARCHAR(50) NOT NULL, -- 'database', 'cache', 'queue', 'api', 'disk'\n    check_status VARCHAR(20) NOT NULL, -- 'healthy', 'warning', 'critical'\n    check_details JSONB,\n    response_time_ms INTEGER,\n    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统告警规则表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_alert_rules (\n    id SERIAL PRIMARY KEY,\n    rule_name VARCHAR(100) NOT NULL,\n    rule_type VARCHAR(50) NOT NULL, -- 'metric', 'log', 'error_rate', 'response_time'\n    rule_condition JSONB NOT NULL,\n    rule_threshold DECIMAL(15,2),\n    rule_operator VARCHAR(10), -- '>', '<', '>=', '<=', '=', '!='\n    rule_time_window INTEGER, -- 时间窗口（分钟）\n    rule_severity VARCHAR(20) NOT NULL, -- 'info', 'warning', 'critical'\n    is_active BOOLEAN DEFAULT true,\n    notification_channels JSONB, -- 通知渠道数组\n    created_by INTEGER REFERENCES admins(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表 - 系统告警记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_alerts (\n    id SERIAL PRIMARY KEY,\n    rule_id INTEGER REFERENCES system_alert_rules(id),\n    alert_title VARCHAR(255) NOT NULL,\n    alert_message TEXT,\n    alert_severity VARCHAR(20) NOT NULL, -- 'info', 'warning', 'critical'\n    alert_status VARCHAR(20) DEFAULT 'open', -- 'open', 'acknowledged', 'resolved'\n    alert_data JSONB,\n    triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    acknowledged_at TIMESTAMP,\n    acknowledged_by INTEGER REFERENCES admins(id),\n    resolved_at TIMESTAMP,\n    resolved_by INTEGER REFERENCES admins(id)\n);\n\n-- 补充表 - 系统告警通知记录表"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TABLE system_alert_notifications (\n    id SERIAL PRIMARY KEY,\n    alert_id INTEGER REFERENCES system_alerts(id),\n    notification_channel VARCHAR(50) NOT NULL, -- 'email', 'sms', 'webhook', 'push'\n    notification_target VARCHAR(255) NOT NULL,\n    notification_status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'sent', 'failed'\n    notification_content TEXT,\n    sent_at TIMESTAMP,\n    error_message TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 创建索引以提高查询性能"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE users (\n    id SERIAL PRIMARY KEY,\n    username VARCHAR(50) UNIQUE NOT NULL,\n    email VARCHAR(100) UNIQUE NOT NULL,\n    password_hash VARCHAR(255) NOT NULL,\n    avatar_url VARCHAR(255),\n    phone VARCHAR(20),\n    status VARCHAR(20) DEFAULT 'active', -- 'active', 'inactive', 'suspended'\n    email_verified BOOLEAN DEFAULT false,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_tokens (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    access_token TEXT NOT NULL,\n    refresh_token TEXT NOT NULL,\n    expires_at TIMESTAMP NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_profiles (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id) UNIQUE,\n    full_name VARCHAR(100),\n    nickname VARCHAR(50),\n    gender VARCHAR(10),\n    birth_date DATE,\n    location VARCHAR(100),\n    bio TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_settings (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id) UNIQUE,\n    language VARCHAR(10) DEFAULT 'zh-CN',\n    timezone VARCHAR(50) DEFAULT 'Asia/Shanghai',\n    currency VARCHAR(10) DEFAULT 'CNY',\n    notification_email BOOLEAN DEFAULT true,\n    notification_push BOOLEAN DEFAULT true,\n    privacy_level VARCHAR(20) DEFAULT 'friends',\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE third_party_accounts (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    provider VARCHAR(50) NOT NULL,\n    provider_user_id VARCHAR(100) NOT NULL,\n    access_token TEXT,\n    refresh_token TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(provider, provider_user_id)\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE notifications (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    title VARCHAR(255) NOT NULL,\n    content TEXT NOT NULL,\n    type VARCHAR(50) NOT NULL,\n    is_read BOOLEAN DEFAULT false,\n    related_entity_type VARCHAR(50),\n    related_entity_id INTEGER,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_activity_logs (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    action VARCHAR(100) NOT NULL,\n    resource_type VARCHAR(50),\n    resource_id INTEGER,\n    ip_address INET,\n    user_agent TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 账单管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_categories (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    description TEXT,\n    icon VARCHAR(50),\n    color VARCHAR(20),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bills (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    description TEXT,\n    amount DECIMAL(15,2) NOT NULL,\n    currency VARCHAR(10) DEFAULT 'CNY',\n    category_id INTEGER REFERENCES bill_categories(id),\n    creator_id INTEGER REFERENCES users(id),\n    room_id INTEGER, -- 将在后面创建rooms表后添加外键\n    status VARCHAR(20) DEFAULT 'pending',\n    due_date DATE,\n    settled_at TIMESTAMP,\n    version INTEGER DEFAULT 1, -- 版本号，用于乐观锁\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_comments (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    user_id INTEGER REFERENCES users(id),\n    content TEXT NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_splits (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    user_id INTEGER REFERENCES users(id),\n    amount DECIMAL(15,2) NOT NULL,\n    percentage DECIMAL(5,2),\n    status VARCHAR(20) DEFAULT 'pending',\n    settled_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE payment_transfers (\n    id SERIAL PRIMARY KEY,\n    from_user_id INTEGER REFERENCES users(id),\n    to_user_id INTEGER REFERENCES users(id),\n    amount DECIMAL(15,2) NOT NULL,\n    currency VARCHAR(10) DEFAULT 'CNY',\n    description TEXT,\n    status VARCHAR(20) DEFAULT 'pending',\n    confirmed_at TIMESTAMP,\n    cancelled_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 费用管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_categories (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    description TEXT,\n    parent_id INTEGER REFERENCES expense_categories(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expenses (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    description TEXT,\n    amount DECIMAL(15,2) NOT NULL,\n    currency VARCHAR(10) DEFAULT 'CNY',\n    category_id INTEGER REFERENCES expense_categories(id),\n    payer_id INTEGER REFERENCES users(id),\n    room_id INTEGER, -- 将在后面创建rooms表后添加外键\n    expense_date DATE NOT NULL,\n    -- 补充字段\n    calculation_method VARCHAR(20) DEFAULT 'amount', -- 'amount' 或 'reading'\n    meter_type VARCHAR(50), -- 电表、水表等\n    current_reading DECIMAL(10,2), -- 本次读数\n    previous_reading DECIMAL(10,2), -- 上次读数\n    unit_price DECIMAL(10,2), -- 单价\n    split_method VARCHAR(20) DEFAULT 'equal', -- 'equal' 或 'custom'\n    split_members JSONB, -- 分摊成员ID数组\n    split_ratios JSONB, -- 分摊比例\n    receipt_url VARCHAR(255), -- 凭证URL\n    version INTEGER DEFAULT 1, -- 版本号，用于乐观锁\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_splits (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    user_id INTEGER REFERENCES users(id),\n    amount DECIMAL(15,2) NOT NULL,\n    percentage DECIMAL(5,2),\n    status VARCHAR(20) DEFAULT 'pending',\n    settled_at TIMESTAMP,\n    version INTEGER DEFAULT 1, -- 版本号，用于乐观锁\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_receipts (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    file_url VARCHAR(255) NOT NULL,\n    file_name VARCHAR(255),\n    file_size INTEGER,\n    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 房间管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE rooms (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    description TEXT,\n    cover_image VARCHAR(255),\n    creator_id INTEGER REFERENCES users(id),\n    invite_code VARCHAR(50) UNIQUE,\n    status VARCHAR(20) DEFAULT 'active',\n    settings JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE room_members (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    user_id INTEGER REFERENCES users(id),\n    role VARCHAR(20) DEFAULT 'member', -- 'member', 'admin', 'leader'\n    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(room_id, user_id)\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE room_invitations (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    inviter_id INTEGER REFERENCES users(id),\n    invitee_email VARCHAR(100),\n    invitee_id INTEGER REFERENCES users(id),\n    token VARCHAR(100) UNIQUE NOT NULL,\n    status VARCHAR(20) DEFAULT 'pending',\n    expires_at TIMESTAMP NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 支付管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE payments (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    payer_id INTEGER REFERENCES users(id),\n    payee_id INTEGER REFERENCES users(id),\n    amount DECIMAL(15,2) NOT NULL,\n    currency VARCHAR(10) DEFAULT 'CNY',\n    payment_method VARCHAR(50),\n    payment_details JSONB, -- 支付详情\n    status VARCHAR(20) DEFAULT 'pending',\n    confirmed_at TIMESTAMP,\n    cancelled_at TIMESTAMP,\n    version INTEGER DEFAULT 1, -- 版本号，用于乐观锁\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 邀请码管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE invite_codes (\n    id SERIAL PRIMARY KEY,\n    code VARCHAR(50) UNIQUE NOT NULL,\n    room_id INTEGER REFERENCES rooms(id),\n    creator_id INTEGER REFERENCES users(id),\n    max_uses INTEGER,\n    used_count INTEGER DEFAULT 0,\n    expires_at TIMESTAMP,\n    status VARCHAR(20) DEFAULT 'active',\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE invite_code_usage (\n    id SERIAL PRIMARY KEY,\n    invite_code_id INTEGER REFERENCES invite_codes(id),\n    user_id INTEGER REFERENCES users(id),\n    ip_address INET,\n    user_agent TEXT,\n    used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 二维码管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE qr_codes (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    name VARCHAR(100),\n    image_url VARCHAR(255) NOT NULL,\n    payment_method VARCHAR(50),\n    is_default BOOLEAN DEFAULT false,\n    status VARCHAR(20) DEFAULT 'active',\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 争议管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE disputes (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    description TEXT,\n    bill_id INTEGER REFERENCES bills(id),\n    expense_id INTEGER REFERENCES expenses(id),\n    creator_id INTEGER REFERENCES users(id),\n    status VARCHAR(20) DEFAULT 'open',\n    resolution TEXT,\n    resolved_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE dispute_participants (\n    id SERIAL PRIMARY KEY,\n    dispute_id INTEGER REFERENCES disputes(id),\n    user_id INTEGER REFERENCES users(id),\n    role VARCHAR(20) DEFAULT 'participant',\n    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(dispute_id, user_id)\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE dispute_evidence (\n    id SERIAL PRIMARY KEY,\n    dispute_id INTEGER REFERENCES disputes(id),\n    file_url VARCHAR(255) NOT NULL,\n    file_name VARCHAR(255),\n    uploaded_by INTEGER REFERENCES users(id),\n    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 评论管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE reviews (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255),\n    content TEXT NOT NULL,\n    rating INTEGER CHECK (rating >= 1 AND rating <= 5),\n    bill_id INTEGER REFERENCES bills(id),\n    room_id INTEGER REFERENCES rooms(id),\n    reviewer_id INTEGER REFERENCES users(id),\n    status VARCHAR(20) DEFAULT 'pending',\n    approved_at TIMESTAMP,\n    rejected_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE review_images (\n    id SERIAL PRIMARY KEY,\n    review_id INTEGER REFERENCES reviews(id),\n    image_url VARCHAR(255) NOT NULL,\n    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 特殊支付规则相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_types (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    description TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE special_payment_rules (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    name VARCHAR(100) NOT NULL,\n    description TEXT,\n    condition_type VARCHAR(50) NOT NULL,\n    condition_value JSONB,\n    payment_type VARCHAR(50) NOT NULL,\n    payment_config JSONB,\n    is_active BOOLEAN DEFAULT true,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE room_payment_rules (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    rule_type VARCHAR(50) NOT NULL,\n    rule_config JSONB NOT NULL,\n    is_active BOOLEAN DEFAULT true,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 活动管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE activities (\n    id SERIAL PRIMARY KEY,\n    title VARCHAR(255) NOT NULL,\n    description TEXT,\n    activity_type VARCHAR(50) NOT NULL,\n    start_time TIMESTAMP NOT NULL,\n    end_time TIMESTAMP,\n    location VARCHAR(255),\n    creator_id INTEGER REFERENCES users(id),\n    room_id INTEGER REFERENCES rooms(id),\n    status VARCHAR(20) DEFAULT 'planned',\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE activity_participants (\n    id SERIAL PRIMARY KEY,\n    activity_id INTEGER REFERENCES activities(id),\n    user_id INTEGER REFERENCES users(id),\n    status VARCHAR(20) DEFAULT 'invited',\n    responded_at TIMESTAMP,\n    UNIQUE(activity_id, user_id)\n);\n\n-- 权限管理相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE permissions (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) UNIQUE NOT NULL,\n    description TEXT,\n    resource_type VARCHAR(50),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_permissions (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    permission_id INTEGER REFERENCES permissions(id),\n    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    granted_by INTEGER REFERENCES users(id),\n    UNIQUE(user_id, permission_id)\n);\n\n-- 密码重置相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE password_reset_tokens (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    token VARCHAR(100) UNIQUE NOT NULL,\n    expires_at TIMESTAMP NOT NULL,\n    used_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 补充表结构\n\n-- 1. 多线路费用计算相关表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_lines (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    name VARCHAR(100) NOT NULL,\n    calculation_method VARCHAR(20) NOT NULL, -- 'amount' 或 'reading'\n    amount DECIMAL(15,2),\n    current_reading DECIMAL(10,2),\n    previous_reading DECIMAL(10,2),\n    unit_price DECIMAL(10,2),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 2. 费用审核状态表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_approval_status (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    status VARCHAR(20) NOT NULL, -- 'pending', 'approved', 'rejected'\n    approved_by INTEGER REFERENCES users(id),\n    approved_at TIMESTAMP,\n    rejection_reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 3. 费用限制表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_limits (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    category_id INTEGER REFERENCES expense_categories(id),\n    max_amount DECIMAL(15,2),\n    min_amount DECIMAL(15,2),\n    warning_amount DECIMAL(15,2),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 4. 历史费用数据表，用于对比验证"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE historical_expense_stats (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    category_id INTEGER REFERENCES expense_categories(id),\n    month DATE NOT NULL, -- 年月\n    avg_amount DECIMAL(15,2),\n    max_amount DECIMAL(15,2),\n    min_amount DECIMAL(15,2),\n    count INTEGER,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(room_id, category_id, month)\n);\n\n-- 5. 历史读数数据表，用于对比验证"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE historical_reading_stats (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    meter_type VARCHAR(50),\n    month DATE NOT NULL, -- 年月\n    avg_usage DECIMAL(10,2),\n    avg_unit_price DECIMAL(10,2),\n    count INTEGER,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(room_id, meter_type, month)\n);\n\n-- 6. 费用争议状态表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_dispute_status (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    status VARCHAR(20) NOT NULL, -- 'open', 'investigating', 'resolved'\n    assigned_to INTEGER REFERENCES users(id),\n    resolution TEXT,\n    resolved_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 7. 账单结算状态表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_settlement_status (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    status VARCHAR(20) NOT NULL, -- 'pending', 'processing', 'completed', 'failed'\n    settlement_date DATE,\n    total_amount DECIMAL(15,2),\n    settled_amount DECIMAL(15,2),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 8. 支付码扫描记录表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE qr_payment_records (\n    id SERIAL PRIMARY KEY,\n    qr_code_id INTEGER REFERENCES qr_codes(id),\n    payer_id INTEGER REFERENCES users(id),\n    amount DECIMAL(15,2) NOT NULL,\n    currency VARCHAR(10) DEFAULT 'CNY',\n    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'completed', 'failed'\n    payment_method VARCHAR(50),\n    transaction_id VARCHAR(100),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    completed_at TIMESTAMP\n);\n\n-- 9. 房间费用设置表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE room_expense_settings (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    allowed_categories JSONB, -- 允许的费用类别ID数组\n    default_split_method VARCHAR(20) DEFAULT 'equal',\n    require_receipt BOOLEAN DEFAULT false,\n    max_monthly_expense DECIMAL(15,2),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(room_id)\n);\n\n-- 10. 用户支付偏好表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_payment_preferences (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    preferred_payment_method VARCHAR(50),\n    default_qr_code_id INTEGER REFERENCES qr_codes(id),\n    auto_settle_bills BOOLEAN DEFAULT false,\n    notification_threshold DECIMAL(15,2),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(user_id)\n);\n\n-- 11. 费用分摊历史表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_split_history (\n    id SERIAL PRIMARY KEY,\n    expense_split_id INTEGER REFERENCES expense_splits(id),\n    old_amount DECIMAL(15,2),\n    new_amount DECIMAL(15,2),\n    old_percentage DECIMAL(5,2),\n    new_percentage DECIMAL(5,2),\n    changed_by INTEGER REFERENCES users(id),\n    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 12. 账单支付提醒表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_payment_reminders (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    user_id INTEGER REFERENCES users(id),\n    reminder_type VARCHAR(20) NOT NULL, -- 'email', 'push', 'sms'\n    scheduled_at TIMESTAMP NOT NULL,\n    sent_at TIMESTAMP,\n    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'sent', 'failed'\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 13. 费用标签表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_tags (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(50) NOT NULL,\n    color VARCHAR(20),\n    room_id INTEGER REFERENCES rooms(id),\n    created_by INTEGER REFERENCES users(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(name, room_id)\n);\n\n-- 14. 费用标签关联表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_tag_relations (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    tag_id INTEGER REFERENCES expense_tags(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(expense_id, tag_id)\n);\n\n-- 15. 费用统计表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_statistics (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    user_id INTEGER REFERENCES users(id),\n    category_id INTEGER REFERENCES expense_categories(id),\n    month DATE NOT NULL, -- 年月\n    total_amount DECIMAL(15,2),\n    count INTEGER,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(room_id, user_id, category_id, month)\n);\n\n-- 16. 账单统计表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_statistics (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    user_id INTEGER REFERENCES users(id),\n    month DATE NOT NULL, -- 年月\n    total_amount DECIMAL(15,2),\n    paid_amount DECIMAL(15,2),\n    pending_amount DECIMAL(15,2),\n    count INTEGER,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(room_id, user_id, month)\n);\n\n-- 17. 用户活动统计表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_activity_statistics (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    activity_date DATE NOT NULL,\n    login_count INTEGER DEFAULT 0,\n    expense_created_count INTEGER DEFAULT 0,\n    bill_created_count INTEGER DEFAULT 0,\n    payment_count INTEGER DEFAULT 0,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(user_id, activity_date)\n);\n\n-- 18. 房间活动统计表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE room_activity_statistics (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    activity_date DATE NOT NULL,\n    expense_count INTEGER DEFAULT 0,\n    bill_count INTEGER DEFAULT 0,\n    payment_count INTEGER DEFAULT 0,\n    new_user_count INTEGER DEFAULT 0,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(room_id, activity_date)\n);\n\n-- 19. 系统通知模板表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE notification_templates (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) UNIQUE NOT NULL,\n    title_template TEXT NOT NULL,\n    content_template TEXT NOT NULL,\n    notification_type VARCHAR(50) NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 20. 用户通知偏好表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_notification_preferences (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    notification_type VARCHAR(50) NOT NULL,\n    email_enabled BOOLEAN DEFAULT true,\n    push_enabled BOOLEAN DEFAULT true,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(user_id, notification_type)\n);\n\n-- 21. 费用验证规则表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_validation_rules (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    rule_name VARCHAR(100) NOT NULL,\n    rule_type VARCHAR(50) NOT NULL, -- 'amount_range', 'required_fields', 'custom'\n    rule_config JSONB NOT NULL,\n    is_active BOOLEAN DEFAULT true,\n    created_by INTEGER REFERENCES users(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 22. 费用验证结果表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_validation_results (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    rule_id INTEGER REFERENCES expense_validation_rules(id),\n    validation_status VARCHAR(20) NOT NULL, -- 'passed', 'failed', 'warning'\n    validation_message TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 23. 费用导入记录表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_import_records (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    room_id INTEGER REFERENCES rooms(id),\n    file_name VARCHAR(255),\n    file_size INTEGER,\n    total_records INTEGER,\n    success_count INTEGER DEFAULT 0,\n    failure_count INTEGER DEFAULT 0,\n    status VARCHAR(20) DEFAULT 'processing', -- 'processing', 'completed', 'failed'\n    error_details JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    completed_at TIMESTAMP\n);\n\n-- 24. 费用导入错误表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_import_errors (\n    id SERIAL PRIMARY KEY,\n    import_record_id INTEGER REFERENCES expense_import_records(id),\n    row_number INTEGER,\n    error_message TEXT,\n    raw_data JSONB,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 25. 费用导出记录表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_export_records (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    room_id INTEGER REFERENCES rooms(id),\n    export_type VARCHAR(50) NOT NULL, -- 'csv', 'excel', 'pdf'\n    filters JSONB,\n    file_name VARCHAR(255),\n    file_size INTEGER,\n    file_url VARCHAR(500),\n    status VARCHAR(20) DEFAULT 'processing', -- 'processing', 'completed', 'failed'\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    completed_at TIMESTAMP\n);\n\n-- 26. 费用分享记录表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_shares (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    shared_by INTEGER REFERENCES users(id),\n    share_token VARCHAR(100) UNIQUE NOT NULL,\n    share_type VARCHAR(20) DEFAULT 'public', -- 'public', 'password', 'limited'\n    share_password VARCHAR(100),\n    expires_at TIMESTAMP,\n    view_count INTEGER DEFAULT 0,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 27. 费用分享访问记录表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_share_access_logs (\n    id SERIAL PRIMARY KEY,\n    share_id INTEGER REFERENCES expense_shares(id),\n    ip_address INET,\n    user_agent TEXT,\n    accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 28. 费用评论表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_comments (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    user_id INTEGER REFERENCES users(id),\n    content TEXT NOT NULL,\n    parent_id INTEGER REFERENCES expense_comments(id), -- 支持回复\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 29. 费用评论点赞表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_comment_likes (\n    id SERIAL PRIMARY KEY,\n    comment_id INTEGER REFERENCES expense_comments(id),\n    user_id INTEGER REFERENCES users(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(comment_id, user_id)\n);\n\n-- 30. 费用附件表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_attachments (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    file_name VARCHAR(255) NOT NULL,\n    file_url VARCHAR(500) NOT NULL,\n    file_type VARCHAR(50),\n    file_size INTEGER,\n    uploaded_by INTEGER REFERENCES users(id),\n    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 31. 费用版本历史表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_version_history (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    version INTEGER NOT NULL,\n    title VARCHAR(255),\n    description TEXT,\n    amount DECIMAL(15,2),\n    category_id INTEGER REFERENCES expense_categories(id),\n    changed_by INTEGER REFERENCES users(id),\n    change_reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(expense_id, version)\n);\n\n-- 32. 账单版本历史表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_version_history (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    version INTEGER NOT NULL,\n    title VARCHAR(255),\n    description TEXT,\n    amount DECIMAL(15,2),\n    status VARCHAR(20),\n    changed_by INTEGER REFERENCES users(id),\n    change_reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(bill_id, version)\n);\n\n-- 33. 费用分摊版本历史表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_split_version_history (\n    id SERIAL PRIMARY KEY,\n    expense_split_id INTEGER REFERENCES expense_splits(id),\n    version INTEGER NOT NULL,\n    amount DECIMAL(15,2),\n    percentage DECIMAL(5,2),\n    status VARCHAR(20),\n    changed_by INTEGER REFERENCES users(id),\n    change_reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(expense_split_id, version)\n);\n\n-- 34. 支付版本历史表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE payment_version_history (\n    id SERIAL PRIMARY KEY,\n    payment_id INTEGER REFERENCES payments(id),\n    version INTEGER NOT NULL,\n    amount DECIMAL(15,2),\n    status VARCHAR(20),\n    payment_method VARCHAR(50),\n    changed_by INTEGER REFERENCES users(id),\n    change_reason TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(payment_id, version)\n);\n\n-- 35. 房间成员变更历史表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE room_member_history (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    user_id INTEGER REFERENCES users(id),\n    action VARCHAR(20) NOT NULL, -- 'joined', 'left', 'role_changed'\n    old_role VARCHAR(20),\n    new_role VARCHAR(20),\n    changed_by INTEGER REFERENCES users(id),\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 36. 用户登录历史表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_login_history (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    ip_address INET,\n    user_agent TEXT,\n    login_type VARCHAR(20) DEFAULT 'password', -- 'password', 'oauth', 'qr'\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 37. 用户设备表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE user_devices (\n    id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(id),\n    device_id VARCHAR(100) NOT NULL,\n    device_name VARCHAR(100),\n    device_type VARCHAR(20), -- 'mobile', 'desktop', 'tablet'\n    platform VARCHAR(20), -- 'ios', 'android', 'windows', 'macos'\n    push_token VARCHAR(255),\n    is_active BOOLEAN DEFAULT true,\n    last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(user_id, device_id)\n);\n\n-- 38. 费用提醒表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_reminders (\n    id SERIAL PRIMARY KEY,\n    expense_id INTEGER REFERENCES expenses(id),\n    user_id INTEGER REFERENCES users(id),\n    reminder_type VARCHAR(20) NOT NULL, -- 'payment', 'review', 'custom'\n    reminder_time TIMESTAMP NOT NULL,\n    message TEXT,\n    is_sent BOOLEAN DEFAULT false,\n    sent_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 39. 账单提醒表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE bill_reminders (\n    id SERIAL PRIMARY KEY,\n    bill_id INTEGER REFERENCES bills(id),\n    user_id INTEGER REFERENCES users(id),\n    reminder_type VARCHAR(20) NOT NULL, -- 'payment', 'review', 'custom'\n    reminder_time TIMESTAMP NOT NULL,\n    message TEXT,\n    is_sent BOOLEAN DEFAULT false,\n    sent_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 40. 费用预算表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_budgets (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    user_id INTEGER REFERENCES users(id),\n    category_id INTEGER REFERENCES expense_categories(id),\n    budget_type VARCHAR(20) NOT NULL, -- 'monthly', 'yearly', 'custom'\n    budget_amount DECIMAL(15,2) NOT NULL,\n    budget_period_start DATE NOT NULL,\n    budget_period_end DATE NOT NULL,\n    spent_amount DECIMAL(15,2) DEFAULT 0,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 41. 费用预算警告表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE expense_budget_warnings (\n    id SERIAL PRIMARY KEY,\n    budget_id INTEGER REFERENCES expense_budgets(id),\n    warning_type VARCHAR(20) NOT NULL, -- 'threshold', 'exceeded'\n    warning_percentage DECIMAL(5,2),\n    current_spent DECIMAL(15,2),\n    budget_amount DECIMAL(15,2),\n    is_sent BOOLEAN DEFAULT false,\n    sent_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 42. 费用定期支付表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE recurring_expenses (\n    id SERIAL PRIMARY KEY,\n    room_id INTEGER REFERENCES rooms(id),\n    title VARCHAR(255) NOT NULL,\n    description TEXT,\n    amount DECIMAL(15,2) NOT NULL,\n    category_id INTEGER REFERENCES expense_categories(id),\n    payer_id INTEGER REFERENCES users(id),\n    split_method VARCHAR(20) DEFAULT 'equal',\n    split_members JSONB,\n    split_ratios JSONB,\n    recurrence_type VARCHAR(20) NOT NULL, -- 'daily', 'weekly', 'monthly', 'yearly'\n    recurrence_interval INTEGER DEFAULT 1,\n    recurrence_end_date DATE,\n    next_due_date DATE NOT NULL,\n    is_active BOOLEAN DEFAULT true,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 43. 费用定期支付实例表"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TABLE recurring_expense_instances (\n    id SERIAL PRIMARY KEY,\n    recurring_expense_id INTEGER REFERENCES recurring_expenses(id),\n    expense_id INTEGER REFERENCES expenses(id),\n    due_date DATE NOT NULL,\n    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'generated', 'skipped', 'cancelled'\n    generated_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- 现在添加之前未完成的外键约束"
+    }
+  ],
+  "CreateIndex": [
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admins_email ON admins(email);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admins_username ON admins(username);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admins_status ON admins(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admins_last_login_at ON admins(last_login_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admins_locked_until ON admins(locked_until);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_tokens_admin_id ON admin_tokens(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_tokens_device_type ON admin_tokens(device_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_tokens_ip_address ON admin_tokens(ip_address);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_user_roles_admin_id ON admin_user_roles(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_user_roles_role_id ON admin_user_roles(role_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_roles_version ON admin_roles(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_permissions_version ON admin_permissions(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_roles_version ON user_roles(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_status_logs_admin_id ON user_status_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_reviews_expense_id ON expense_reviews(expense_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_reviews_status ON expense_reviews(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_reviews_admin_id ON expense_reviews(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_reviews_version ON expense_reviews(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_abnormal_expenses_expense_id ON abnormal_expenses(expense_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_abnormal_expenses_status ON abnormal_expenses(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_abnormal_expenses_admin_id ON abnormal_expenses(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_abnormal_expenses_version ON abnormal_expenses(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bill_admin_logs_admin_id ON bill_admin_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_configs_version ON system_configs(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_feature_flags_version ON feature_flags(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_logs_admin_id ON admin_operation_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_logs_resource_type ON admin_operation_logs(resource_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_logs_created_at ON admin_operation_logs(created_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_logs_operation_result ON admin_operation_logs(operation_result);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_logs_ip_address ON admin_operation_logs(ip_address);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_change_audits_table_name ON data_change_audits(table_name);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_change_audits_record_id ON data_change_audits(record_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_change_audits_admin_id ON data_change_audits(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_change_audits_ip_address ON data_change_audits(ip_address);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_batch_jobs_status ON batch_jobs(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_batch_jobs_created_at ON batch_jobs(created_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_batch_jobs_admin_id ON batch_jobs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_batch_jobs_version ON batch_jobs(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_report_definitions_version ON report_definitions(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_report_snapshots_admin_id ON report_snapshots(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_export_tasks_admin_id ON export_tasks(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_export_tasks_version ON export_tasks(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_moderation_queue_status ON moderation_queue(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_moderation_queue_content_type ON moderation_queue(content_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_moderation_queue_admin_id ON moderation_queue(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_moderation_queue_version ON moderation_queue(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_support_tickets_status ON support_tickets(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_support_tickets_priority ON support_tickets(priority);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_support_tickets_created_at ON support_tickets(created_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_support_tickets_admin_id ON support_tickets(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_support_tickets_version ON support_tickets(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_ticket_comments_admin_id ON ticket_comments(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_ticket_comments_version ON ticket_comments(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_webhooks_is_active ON webhooks(is_active);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_webhooks_version ON webhooks(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_webhook_events_version ON webhook_events(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_dispute_assignments_admin_id ON dispute_assignments(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_dispute_assignments_version ON dispute_assignments(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_dispute_handling_logs_admin_id ON dispute_handling_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_dorm_admin_logs_admin_id ON dorm_admin_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_leaders_admin_id ON room_leaders(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_leaders_version ON room_leaders(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_documents_document_type ON documents(document_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_documents_status ON documents(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_documents_slug ON documents(slug);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_documents_admin_id ON documents(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_documents_version ON documents(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_document_histories_admin_id ON document_histories(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_document_types_version ON document_types(version);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_sessions_admin_id ON admin_sessions(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_sessions_session_token ON admin_sessions(session_token);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_sessions_is_active ON admin_sessions(is_active);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_permission_history_admin_id ON admin_permission_history(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_permission_history_role_id ON admin_permission_history(role_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_permission_history_permission_id ON admin_permission_history(permission_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_permission_history_granted_by ON admin_permission_history(granted_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_restrictions_admin_id ON admin_operation_restrictions(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_restrictions_is_active ON admin_operation_restrictions(is_active);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_statistics_admin_id ON admin_operation_statistics(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_statistics_operation_date ON admin_operation_statistics(operation_date);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_operation_statistics_operation_type ON admin_operation_statistics(operation_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_performance_metrics_metric_name ON system_performance_metrics(metric_name);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_performance_metrics_recorded_at ON system_performance_metrics(recorded_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_resource_usage_recorded_at ON system_resource_usage(recorded_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_error_logs_error_level ON system_error_logs(error_level);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_error_logs_admin_id ON system_error_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_error_logs_occurred_at ON system_error_logs(occurred_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_audit_logs_event_type ON system_audit_logs(event_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_audit_logs_admin_id ON system_audit_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_audit_logs_occurred_at ON system_audit_logs(occurred_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_backup_records_backup_type ON data_backup_records(backup_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_backup_records_backup_status ON data_backup_records(backup_status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_backup_records_created_by ON data_backup_records(created_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_restore_records_backup_id ON data_restore_records(backup_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_restore_records_restore_type ON data_restore_records(restore_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_restore_records_restore_status ON data_restore_records(restore_status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_data_restore_records_created_by ON data_restore_records(created_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_maintenance_plans_plan_type ON system_maintenance_plans(plan_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_maintenance_plans_status ON system_maintenance_plans(status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_maintenance_plans_created_by ON system_maintenance_plans(created_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_maintenance_executions_plan_id ON system_maintenance_executions(plan_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_maintenance_executions_task_status ON system_maintenance_executions(task_status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_maintenance_executions_executed_by ON system_maintenance_executions(executed_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_notifications_notification_type ON system_notifications(notification_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_notifications_target_type ON system_notifications(target_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_notifications_is_read ON system_notifications(is_read);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_notifications_created_by ON system_notifications(created_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_notification_reads_notification_id ON system_notification_reads(notification_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_notification_reads_admin_id ON system_notification_reads(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_config_history_config_id ON system_config_history(config_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_config_history_changed_by ON system_config_history(changed_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_feature_flag_history_flag_id ON feature_flag_history(flag_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_feature_flag_history_changed_by ON feature_flag_history(changed_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_login_history_admin_id ON admin_login_history(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_login_history_login_time ON admin_login_history(login_time);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_login_history_login_result ON admin_login_history(login_result);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_devices_admin_id ON admin_devices(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_devices_device_id ON admin_devices(device_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_devices_is_active ON admin_devices(is_active);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_security_settings_admin_id ON admin_security_settings(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_security_logs_admin_id ON admin_security_logs(admin_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_security_logs_event_type ON admin_security_logs(event_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_admin_security_logs_success ON admin_security_logs(success);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_api_keys_is_active ON system_api_keys(is_active);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_api_keys_created_by ON system_api_keys(created_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_api_usage_logs_api_key_id ON system_api_usage_logs(api_key_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_api_usage_logs_endpoint ON system_api_usage_logs(endpoint);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_api_usage_logs_response_status ON system_api_usage_logs(response_status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_cache_statistics_cache_name ON system_cache_statistics(cache_name);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_cache_statistics_recorded_at ON system_cache_statistics(recorded_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_database_statistics_database_name ON system_database_statistics(database_name);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_database_statistics_table_name ON system_database_statistics(table_name);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_database_statistics_recorded_at ON system_database_statistics(recorded_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_queue_statistics_queue_name ON system_queue_statistics(queue_name);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_queue_statistics_recorded_at ON system_queue_statistics(recorded_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_scheduled_tasks_task_type ON system_scheduled_tasks(task_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_scheduled_tasks_is_active ON system_scheduled_tasks(is_active);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_scheduled_tasks_next_run_at ON system_scheduled_tasks(next_run_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_scheduled_tasks_created_by ON system_scheduled_tasks(created_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_task_executions_task_id ON system_task_executions(task_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_task_executions_execution_status ON system_task_executions(execution_status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_health_checks_check_type ON system_health_checks(check_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_health_checks_check_status ON system_health_checks(check_status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_health_checks_checked_at ON system_health_checks(checked_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alert_rules_rule_type ON system_alert_rules(rule_type);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alert_rules_is_active ON system_alert_rules(is_active);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alert_rules_created_by ON system_alert_rules(created_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alerts_rule_id ON system_alerts(rule_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alerts_alert_severity ON system_alerts(alert_severity);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alerts_alert_status ON system_alerts(alert_status);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alerts_triggered_at ON system_alerts(triggered_at);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alerts_acknowledged_by ON system_alerts(acknowledged_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alerts_resolved_by ON system_alerts(resolved_by);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alert_notifications_alert_id ON system_alert_notifications(alert_id);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alert_notifications_notification_channel ON system_alert_notifications(notification_channel);"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_system_alert_notifications_notification_status ON system_alert_notifications(notification_status);\n\n-- 创建更新时间触发器函数"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_users_email ON users(email);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_users_username ON users(username);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_tokens_user_id ON user_tokens(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_tokens_refresh_token ON user_tokens(refresh_token);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_notifications_user_id ON notifications(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_notifications_is_read ON notifications(is_read);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bills_room_id ON bills(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bills_creator_id ON bills(creator_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bills_status ON bills(status);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expenses_room_id ON expenses(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expenses_payer_id ON expenses(payer_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_members_room_id ON room_members(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_members_user_id ON room_members(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_payments_bill_id ON payments(bill_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_payments_payer_id ON payments(payer_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_invite_codes_code ON invite_codes(code);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_invite_codes_room_id ON invite_codes(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_disputes_bill_id ON disputes(bill_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_disputes_creator_id ON disputes(creator_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_reviews_room_id ON reviews(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_reviews_reviewer_id ON reviews(reviewer_id);\n\n-- 新增索引"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expenses_calculation_method ON expenses(calculation_method);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expenses_meter_type ON expenses(meter_type);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expenses_split_method ON expenses(split_method);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expenses_version ON expenses(version);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bills_version ON bills(version);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_splits_version ON expense_splits(version);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_payments_version ON payments(version);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_users_status ON users(status);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_members_role ON room_members(role);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_lines_expense_id ON expense_lines(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_approval_status_expense_id ON expense_approval_status(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_limits_room_category ON expense_limits(room_id, category_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_historical_expense_stats_room_category_month ON historical_expense_stats(room_id, category_id, month);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_historical_reading_stats_room_meter_month ON historical_reading_stats(room_id, meter_type, month);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_dispute_status_expense_id ON expense_dispute_status(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bill_settlement_status_bill_id ON bill_settlement_status(bill_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_qr_payment_records_qr_code_id ON qr_payment_records(qr_code_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_invite_code_usage_ip_address ON invite_code_usage(ip_address);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_expense_settings_room_id ON room_expense_settings(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_payment_preferences_user_id ON user_payment_preferences(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_split_history_expense_split_id ON expense_split_history(expense_split_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bill_payment_reminders_bill_id ON bill_payment_reminders(bill_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_tags_room_id ON expense_tags(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_tag_relations_expense_id ON expense_tag_relations(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_tag_relations_tag_id ON expense_tag_relations(tag_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_statistics_room_user_category_month ON expense_statistics(room_id, user_id, category_id, month);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bill_statistics_room_user_month ON bill_statistics(room_id, user_id, month);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_activity_statistics_user_date ON user_activity_statistics(user_id, activity_date);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_activity_statistics_room_date ON room_activity_statistics(room_id, activity_date);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_notification_preferences_user_type ON user_notification_preferences(user_id, notification_type);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_validation_rules_room_id ON expense_validation_rules(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_validation_results_expense_id ON expense_validation_results(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_import_records_user_id ON expense_import_records(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_import_errors_import_record_id ON expense_import_errors(import_record_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_export_records_user_id ON expense_export_records(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_shares_expense_id ON expense_shares(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_shares_share_token ON expense_shares(share_token);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_share_access_logs_share_id ON expense_share_access_logs(share_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_comments_expense_id ON expense_comments(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_comments_parent_id ON expense_comments(parent_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_comment_likes_comment_id ON expense_comment_likes(comment_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_attachments_expense_id ON expense_attachments(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_version_history_expense_id ON expense_version_history(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bill_version_history_bill_id ON bill_version_history(bill_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_split_version_history_expense_split_id ON expense_split_version_history(expense_split_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_payment_version_history_payment_id ON payment_version_history(payment_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_room_member_history_room_user ON room_member_history(room_id, user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_login_history_user_id ON user_login_history(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_devices_user_id ON user_devices(user_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_user_devices_device_id ON user_devices(device_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_reminders_expense_id ON expense_reminders(expense_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_bill_reminders_bill_id ON bill_reminders(bill_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_budgets_room_user_category ON expense_budgets(room_id, user_id, category_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_expense_budget_warnings_budget_id ON expense_budget_warnings(budget_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_recurring_expenses_room_id ON recurring_expenses(room_id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE INDEX idx_recurring_expense_instances_recurring_expense_id ON recurring_expense_instances(recurring_expense_id);\n\n-- 创建更新时间触发器函数"
+    }
+  ],
+  "AlterTable": [
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "ALTER TABLE bills ADD CONSTRAINT fk_bills_room FOREIGN KEY (room_id) REFERENCES rooms(id);"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "ALTER TABLE expenses ADD CONSTRAINT fk_expenses_room FOREIGN KEY (room_id) REFERENCES rooms(id);\n\n-- 创建索引以提高查询性能"
+    }
+  ],
+  "CreateTrigger": [
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_admins_updated_at BEFORE UPDATE ON admins FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_admin_roles_updated_at BEFORE UPDATE ON admin_roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_system_configs_updated_at BEFORE UPDATE ON system_configs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_feature_flags_updated_at BEFORE UPDATE ON feature_flags FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_maintenance_windows_updated_at BEFORE UPDATE ON maintenance_windows FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_announcements_updated_at BEFORE UPDATE ON announcements FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_batch_jobs_updated_at BEFORE UPDATE ON batch_jobs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_report_definitions_updated_at BEFORE UPDATE ON report_definitions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_support_tickets_updated_at BEFORE UPDATE ON support_tickets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_webhooks_updated_at BEFORE UPDATE ON webhooks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_document_statistics_updated_at BEFORE UPDATE ON document_statistics FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_admin_operation_restrictions_updated_at BEFORE UPDATE ON admin_operation_restrictions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_system_maintenance_plans_updated_at BEFORE UPDATE ON system_maintenance_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_admin_security_settings_updated_at BEFORE UPDATE ON admin_security_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_system_api_keys_updated_at BEFORE UPDATE ON system_api_keys FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_system_scheduled_tasks_updated_at BEFORE UPDATE ON system_scheduled_tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_system_alert_rules_updated_at BEFORE UPDATE ON system_alert_rules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\n-- 插入初始管理员数据"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_user_settings_updated_at BEFORE UPDATE ON user_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_bills_updated_at BEFORE UPDATE ON bills FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_bill_comments_updated_at BEFORE UPDATE ON bill_comments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_rooms_updated_at BEFORE UPDATE ON rooms FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\n-- 为新增的包含updated_at字段的表创建触发器"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_expense_limits_updated_at BEFORE UPDATE ON expense_limits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_bill_settlement_status_updated_at BEFORE UPDATE ON bill_settlement_status FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_room_expense_settings_updated_at BEFORE UPDATE ON room_expense_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_user_payment_preferences_updated_at BEFORE UPDATE ON user_payment_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_expense_statistics_updated_at BEFORE UPDATE ON expense_statistics FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_bill_statistics_updated_at BEFORE UPDATE ON bill_statistics FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_notification_templates_updated_at BEFORE UPDATE ON notification_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_user_notification_preferences_updated_at BEFORE UPDATE ON user_notification_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_expense_validation_rules_updated_at BEFORE UPDATE ON expense_validation_rules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_expense_comments_updated_at BEFORE UPDATE ON expense_comments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_expense_budgets_updated_at BEFORE UPDATE ON expense_budgets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE TRIGGER update_recurring_expenses_updated_at BEFORE UPDATE ON recurring_expenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\n-- 插入初始数据"
+    }
+  ],
+  "Insert": [
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO admins (username, email, password_hash, full_name, status) VALUES\n('admin', 'admin@system.com', '$2b$10$ExampleHashedPassword', '系统管理员', 'active');\n\n-- 插入默认角色和权限"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO admin_roles (name, description, is_system) VALUES\n('super_admin', '超级管理员', true),\n('content_admin', '内容管理员', false),\n('support_admin', '客服管理员', false),\n('audit_admin', '审计管理员', false);\n\n-- 插入默认权限"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO admin_permissions (code, name, description, module) VALUES\n('user:read', '查看用户', '查看用户列表和详情', 'user'),\n('user:write', '管理用户', '创建、编辑、删除用户', 'user'),\n('user:status', '管理用户状态', '启用/禁用用户账户', 'user'),\n('bill:read', '查看账单', '查看账单列表和详情', 'bill'),\n('bill:write', '管理账单', '创建、编辑、删除账单', 'bill'),\n('expense:review', '审核费用', '审核用户提交的费用', 'expense'),\n('system:config', '系统配置', '管理系统配置项', 'system'),\n('audit:read', '查看审计日志', '查看操作和变更日志', 'audit'),\n('report:generate', '生成报表', '生成和导出报表', 'report'),\n('ticket:manage', '管理工单', '处理用户工单', 'support'),\n('document:manage', '管理文档', '创建、编辑文档', 'document');\n\n-- 为超级管理员分配所有权限"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO admin_role_permissions (role_id, permission_id)\nSELECT 1, id FROM admin_permissions;\n\n-- 为管理员分配角色"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO admin_user_roles (admin_id, role_id, assigned_by) VALUES (1, 1, 1);\n\n-- 插入默认文档类型"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO document_types (name, description) VALUES\n('用户指南', '用户使用指南和教程'),\n('API文档', '接口API文档'),\n('系统文档', '系统配置和运维文档'),\n('常见问题', '常见问题解答'),\n('更新日志', '系统版本更新记录');\n\n-- 插入管理员安全设置初始数据"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO admin_security_settings (admin_id, two_factor_enabled, password_change_required, session_timeout_minutes)\nSELECT id, false, false, 60 FROM admins;\n\n-- 插入系统调度任务初始数据"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO system_scheduled_tasks (task_name, task_type, task_expression, task_config, is_active, created_by)\nVALUES\n('系统日志清理', 'cleanup', '0 2 * * *', '{\"retention_days\": 90}', true, 1),\n('数据库备份', 'backup', '0 3 * * 0', '{\"backup_type\": \"full\"}', true, 1),\n('性能指标收集', 'report', '*/5 * * * *', '{\"metrics\": [\"cpu\", \"memory\", \"disk\"]}', true, 1),\n('缓存统计', 'report', '*/10 * * * *', '{\"cache_types\": [\"redis\", \"memcached\"]}', true, 1);\n\n-- 插入系统告警规则初始数据"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO system_alert_rules (rule_name, rule_type, rule_condition, rule_threshold, rule_operator, rule_time_window, rule_severity, is_active, notification_channels, created_by)\nVALUES\n('CPU使用率过高', 'metric', '{\"metric\": \"cpu_usage\"}', 80, '>', 5, 'warning', true, '[\"email\"]', 1),\n('内存使用率过高', 'metric', '{\"metric\": \"memory_usage\"}', 85, '>', 5, 'warning', true, '[\"email\"]', 1),\n('磁盘空间不足', 'metric', '{\"metric\": \"disk_usage\"}', 90, '>', 5, 'critical', true, '[\"email\", \"sms\"]', 1),\n('错误率过高', 'error_rate', '{\"endpoint\": \"/api/*\"}', 5, '>', 10, 'warning', true, '[\"email\"]', 1),\n('API响应时间过长', 'response_time', '{\"endpoint\": \"/api/*\"}', 2000, '>', 5, 'warning', true, '[\"email\"]', 1);\n\n-- 插入系统健康检查初始数据"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO system_health_checks (check_name, check_type, check_status, check_details, response_time_ms)\nVALUES\n('数据库连接', 'database', 'healthy', '{\"database\": \"postgresql\"}', 10),\n('Redis缓存', 'cache', 'healthy', '{\"cache\": \"redis\"}', 5),\n('消息队列', 'queue', 'healthy', '{\"queue\": \"rabbitmq\"}', 8),\n('磁盘空间', 'disk', 'healthy', '{\"usage\": \"45%\"}', 2);\n\n-- 插入系统性能指标初始数据"
+    },
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "INSERT INTO system_performance_metrics (metric_name, metric_value, metric_unit, additional_data)\nVALUES\n('cpu_usage', 25.5, '%', '{\"cores\": 4}'),\n('memory_usage', 60.2, '%', '{\"total\": \"8GB\", \"used\": \"4.8GB\"}'),\n('disk_usage', 45.8, '%', '{\"total\": \"100GB\", \"used\": \"45.8GB\"}');"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "INSERT INTO bill_categories (name, description, icon, color) VALUES\n('餐饮', '食品、饮料等相关消费', 'restaurant', '#FF6B6B'),\n('购物', '商品购买消费', 'shopping_cart', '#4ECDC4'),\n('交通', '出行交通费用', 'directions_car', '#45B7D1'),\n('娱乐', '休闲娱乐消费', 'entertainment', '#96CEB4'),\n('医疗', '医疗健康相关', 'local_hospital', '#FECA57'),\n('教育', '学习培训费用', 'school', '#FF9FF3'),\n('住房', '房租、房贷等', 'home', '#54A0FF'),\n('水电', '水电燃气费用', 'flash_on', '#5F27CD'),\n('通讯', '电话、网络费用', 'phone', '#00D2D3'),\n('其他', '其他未分类消费', 'more', '#C8D6E5');\n"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "INSERT INTO expense_categories (name, description) VALUES\n('日常开销', '日常生活必需的开销'),\n('娱乐活动', '娱乐休闲相关开销'),\n('学习发展', '个人学习成长开销'),\n('医疗健康', '医疗保健相关开销'),\n('交通出行', '交通相关费用'),\n('住房相关', '房租、物业等费用'),\n('通讯网络', '通讯和网络费用'),\n('其他', '其他未分类开销');\n\n-- 插入通知模板初始数据"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "INSERT INTO notification_templates (name, title_template, content_template, notification_type) VALUES\n('expense_created', '新费用创建', '{user} 创建了一笔新费用：{title}，金额 {amount}', 'expense'),\n('bill_created', '新账单创建', '{user} 创建了一笔新账单：{title}，金额 {amount}', 'bill'),\n('payment_reminder', '付款提醒', '您的账单 {title} 将于 {due_date} 到期，请及时付款', 'payment'),\n('expense_approved', '费用已批准', '您提交的费用 {title} 已被批准', 'expense_approval'),\n('expense_rejected', '费用已拒绝', '您提交的费用 {title} 已被拒绝，原因：{reason}', 'expense_approval'),\n('budget_warning', '预算警告', '您的 {category} 类别支出已达到预算的 {percentage}%', 'budget'),\n('room_invitation', '房间邀请', '{user} 邀请您加入房间：{room_name}', 'room');"
+    }
+  ],
+  "Other": [
+    {
+      "file": "管理端数据库表-完整版.sql",
+      "sql": "CREATE OR REPLACE FUNCTION update_updated_at_column()\nRETURNS TRIGGER AS $$\nBEGIN\n    NEW.updated_at = CURRENT_TIMESTAMP;\n    RETURN NEW;\nEND;\n$$ language 'plpgsql';\n\n-- 为需要updated_at字段的表创建触发器"
+    },
+    {
+      "file": "前端数据库表-完整版.sql",
+      "sql": "CREATE OR REPLACE FUNCTION update_updated_at_column()\nRETURNS TRIGGER AS $$\nBEGIN\n    NEW.updated_at = CURRENT_TIMESTAMP;\n    RETURN NEW;\nEND;\n$$ language 'plpgsql';\n\n-- 为需要updated_at字段的表创建触发器"
+    }
+  ]
+}

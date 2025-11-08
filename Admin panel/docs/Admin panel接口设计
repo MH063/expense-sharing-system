@@ -1,0 +1,6944 @@
+# Admin Panel 接口设计文档
+
+## 文档概述
+
+本文档详细描述了记账系统管理端(Admin Panel)的API接口设计，包括接口路径、请求方法、请求参数、响应格式、错误处理机制及安全性设计。所有接口设计均基于管理端数据库表结构，确保数据一致性和系统稳定性。
+
+## 接口基础信息
+
+- **基础URL**: `http://localhost:4000/api/admin`
+- **API版本**: v1
+- **数据格式**: JSON
+- **字符编码**: UTF-8
+- **认证方式**: JWT Bearer Token
+
+## 接口设计规范
+
+### 通用响应格式
+
+所有接口响应遵循统一的JSON格式：
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "操作成功",
+  "data": {}, // 具体数据内容
+  "timestamp": "2023-12-31T23:59:59Z"
+}
+```
+
+### 分页响应格式
+
+列表接口采用统一分页格式：
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "获取成功",
+  "data": {
+    "items": [], // 数据列表
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total": 100,
+      "total_pages": 5,
+      "has_next": true,
+      "has_prev": false
+    }
+  },
+  "timestamp": "2023-12-31T23:59:59Z"
+}
+```
+
+### 错误响应格式
+
+错误响应采用统一格式：
+
+```json
+{
+  "success": false,
+  "code": 400,
+  "message": "请求参数错误",
+  "error": {
+    "type": "ValidationError",
+    "details": "具体错误信息"
+  },
+  "timestamp": "2023-12-31T23:59:59Z"
+}
+```
+
+### HTTP状态码规范
+
+- `200 OK`: 请求成功
+- `201 Created`: 资源创建成功
+- `204 No Content`: 请求成功但无返回内容
+- `400 Bad Request`: 请求参数错误
+- `401 Unauthorized`: 未授权访问
+- `403 Forbidden`: 禁止访问
+- `404 Not Found`: 资源不存在
+- `409 Conflict`: 资源冲突
+- `422 Unprocessable Entity`: 请求格式正确但语义错误
+- `500 Internal Server Error`: 服务器内部错误
+
+### 业务错误码规范
+
+- `1000-1999`: 认证与授权相关错误
+- `2000-2999`: 参数验证相关错误
+- `3000-3999`: 业务逻辑相关错误
+- `4000-4999`: 系统与资源相关错误
+- `5000-5999`: 第三方服务相关错误
+
+## 安全性设计
+
+### 认证机制
+
+1. **登录认证**: 管理员通过用户名/密码进行登录，获取JWT访问令牌
+2. **令牌验证**: 所有接口请求需在Header中携带有效的JWT令牌
+3. **令牌刷新**: 访问令牌过期后可使用刷新令牌获取新的访问令牌
+4. **多设备管理**: 支持同一管理员在多个设备同时登录
+
+### 权限控制
+
+1. **角色权限**: 基于RBAC模型，管理员分配角色，角色关联权限
+2. **接口权限**: 每个接口定义所需权限代码，无权限则拒绝访问
+3. **数据权限**: 支持基于数据范围的权限控制
+4. **操作审计**: 记录所有管理员的操作日志
+
+### 安全防护
+
+1. **请求限流**: 对API请求进行频率限制，防止恶意攻击
+2. **参数验证**: 严格验证所有输入参数，防止注入攻击
+3. **敏感数据**: 敏感信息加密存储和传输
+4. **日志审计**: 记录所有关键操作日志，便于安全审计
+
+## 性能优化设计
+
+1. **分页查询**: 所有列表接口支持分页，避免一次性加载大量数据
+2. **字段选择**: 支持指定返回字段，减少不必要的数据传输
+3. **缓存策略**: 对不经常变化的数据进行缓存
+4. **异步处理**: 耗时操作采用异步处理，提高接口响应速度
+
+## 接口列表
+
+### 1. 管理员认证相关接口 (adminAuthApi)
+
+#### 1.1 管理员登录
+- **接口地址**: `POST /admin/auth/login`
+- **请求方法**: POST
+- **请求参数**:
+  ```json
+  {
+    "username": "string", // 用户名，必填
+    "password": "string", // 密码，必填
+    "device_name": "string", // 设备名称，可选
+    "device_type": "string", // 设备类型(mobile/desktop/tablet)，可选
+    "remember_me": "boolean" // 是否记住登录状态，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "access_token": "string", // 访问令牌
+      "refresh_token": "string", // 刷新令牌
+      "expires_in": "number", // 令牌过期时间(秒)
+      "admin_info": {
+        "id": "number",
+        "username": "string",
+        "email": "string",
+        "full_name": "string",
+        "phone": "string",
+        "status": "string",
+        "roles": ["string"], // 角色列表
+        "permissions": ["string"] // 权限列表
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 用户名或密码错误
+  - 403: 账户被锁定或禁用
+  - 500: 服务器内部错误
+- **说明**: 管理员登录接口，验证用户名和密码，返回访问令牌和刷新令牌，同时记录登录日志和设备信息
+
+#### 1.2 管理员登出
+- **接口地址**: `POST /admin/auth/logout`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "登出成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 500: 服务器内部错误
+- **说明**: 管理员登出接口，使当前访问令牌失效
+
+#### 1.3 刷新令牌
+- **接口地址**: `POST /admin/auth/refresh`
+- **请求方法**: POST
+- **请求参数**:
+  ```json
+  {
+    "refresh_token": "string" // 刷新令牌，必填
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "access_token": "string", // 新的访问令牌
+      "refresh_token": "string", // 新的刷新令牌
+      "expires_in": "number" // 令牌过期时间(秒)
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 刷新令牌无效或已过期
+  - 500: 服务器内部错误
+- **说明**: 使用刷新令牌获取新的访问令牌和刷新令牌
+
+#### 1.4 获取当前管理员信息
+- **接口地址**: `GET /admin/auth/profile`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "username": "string",
+      "email": "string",
+      "full_name": "string",
+      "phone": "string",
+      "status": "string",
+      "last_login_at": "string",
+      "login_count": "number",
+      "roles": [
+        {
+          "id": "number",
+          "name": "string",
+          "description": "string"
+        }
+      ],
+      "permissions": ["string"]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 500: 服务器内部错误
+- **说明**: 获取当前登录管理员的详细信息，包括角色和权限
+
+#### 1.5 修改密码
+- **接口地址**: `PUT /admin/auth/password`
+- **请求方法**: PUT
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "current_password": "string", // 当前密码，必填
+    "new_password": "string", // 新密码，必填
+    "confirm_password": "string" // 确认新密码，必填
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "密码修改成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 当前密码错误
+  - 500: 服务器内部错误
+- **说明**: 管理员修改自己的登录密码
+
+#### 1.6 获取登录设备列表
+- **接口地址**: `GET /admin/auth/devices`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "devices": [
+        {
+          "id": "number",
+          "device_name": "string",
+          "device_type": "string",
+          "ip_address": "string",
+          "user_agent": "string",
+          "created_at": "string",
+          "last_active_at": "string",
+          "is_current": "boolean" // 是否为当前设备
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 500: 服务器内部错误
+- **说明**: 获取管理员所有已登录的设备列表
+
+#### 1.7 移除登录设备
+- **接口地址**: `DELETE /admin/auth/devices/{deviceId}`
+- **请求方法**: DELETE
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "设备已移除"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 404: 设备不存在
+  - 500: 服务器内部错误
+- **说明**: 移除指定的登录设备，使其令牌失效
+
+#### 1.8 验证令牌有效性
+- **接口地址**: `GET /admin/auth/verify`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "valid": true,
+      "expires_in": "number" // 令牌剩余有效时间(秒)
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 令牌无效或已过期
+  - 500: 服务器内部错误
+- **说明**: 验证当前访问令牌是否有效
+
+### 2. 角色管理相关接口 (roleApi)
+
+#### 2.1 获取角色列表
+- **接口地址**: `GET /admin/roles`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  page: number, // 页码，可选，默认1
+  limit: number, // 每页数量，可选，默认20
+  search: string, // 搜索关键词，可选
+  is_system: boolean, // 是否系统角色，可选
+  sort: string, // 排序字段，可选，默认created_at
+  order: string // 排序方向，可选，默认desc
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "roles": [
+        {
+          "id": "number",
+          "name": "string",
+          "description": "string",
+          "is_system": "boolean",
+          "admin_count": "number", // 拥有此角色的管理员数量
+          "permission_count": "number", // 此角色拥有的权限数量
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取角色列表，支持分页、搜索和排序
+
+#### 2.2 获取角色详情
+- **接口地址**: `GET /admin/roles/{id}`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "name": "string",
+      "description": "string",
+      "is_system": "boolean",
+      "version": "number",
+      "permissions": [
+        {
+          "id": "number",
+          "code": "string",
+          "name": "string",
+          "description": "string",
+          "module": "string"
+        }
+      ],
+      "admin_users": [
+        {
+          "id": "number",
+          "username": "string",
+          "full_name": "string",
+          "email": "string",
+          "assigned_at": "string"
+        }
+      ],
+      "created_at": "string",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 角色不存在
+  - 500: 服务器内部错误
+- **说明**: 获取指定角色的详细信息，包括权限列表和拥有此角色的管理员列表
+
+#### 2.3 创建角色
+- **接口地址**: `POST /admin/roles`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // 角色名称，必填
+    "description": "string", // 角色描述，可选
+    "permission_ids": ["number"] // 权限ID列表，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "name": "string",
+      "description": "string",
+      "is_system": "boolean",
+      "version": "number",
+      "created_at": "string",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 409: 角色名称已存在
+  - 500: 服务器内部错误
+- **说明**: 创建新角色，可以同时分配权限
+
+#### 2.4 更新角色
+- **接口地址**: `PUT /admin/roles/{id}`
+- **请求方法**: PUT
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // 角色名称，可选
+    "description": "string", // 角色描述，可选
+    "permission_ids": ["number"] // 权限ID列表，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "name": "string",
+      "description": "string",
+      "is_system": "boolean",
+      "version": "number",
+      "created_at": "string",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足或无法修改系统角色
+  - 404: 角色不存在
+  - 409: 角色名称已存在
+  - 500: 服务器内部错误
+- **说明**: 更新角色信息，包括名称、描述和权限列表
+
+#### 2.5 删除角色
+- **接口地址**: `DELETE /admin/roles/{id}`
+- **请求方法**: DELETE
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "角色删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足或无法删除系统角色
+  - 404: 角色不存在
+  - 409: 角色正在被使用，无法删除
+  - 500: 服务器内部错误
+- **说明**: 删除指定角色，系统角色不能删除，正在被使用的角色不能删除
+
+#### 2.6 获取权限列表
+- **接口地址**: `GET /admin/permissions`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  module: string, // 模块名称，可选
+  search: string, // 搜索关键词，可选
+  sort: string, // 排序字段，可选，默认module
+  order: string // 排序方向，可选，默认asc
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "permissions": [
+        {
+          "id": "number",
+          "code": "string",
+          "name": "string",
+          "description": "string",
+          "module": "string",
+          "version": "number",
+          "created_at": "string"
+        }
+      ],
+      "modules": ["string"] // 所有模块名称列表
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取所有权限列表，可以按模块筛选
+
+#### 2.7 为角色分配权限
+- **接口地址**: `POST /admin/roles/{id}/permissions`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "permission_ids": ["number"] // 权限ID列表，必填
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "权限分配成功",
+      "assigned_count": "number" // 已分配的权限数量
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足或无法修改系统角色
+  - 404: 角色不存在
+  - 500: 服务器内部错误
+- **说明**: 为指定角色分配权限，会覆盖原有权限
+
+#### 2.8 移除角色权限
+- **接口地址**: `DELETE /admin/roles/{id}/permissions/{permissionId}`
+- **请求方法**: DELETE
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "权限移除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足或无法修改系统角色
+  - 404: 角色或权限不存在
+  - 500: 服务器内部错误
+- **说明**: 从指定角色中移除某个权限
+
+#### 2.9 获取角色权限
+- **接口地址**: `GET /admin/roles/{id}/permissions`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "permissions": [
+        {
+          "id": "number",
+          "code": "string",
+          "name": "string",
+          "description": "string",
+          "module": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 角色不存在
+  - 500: 服务器内部错误
+- **说明**: 获取指定角色的所有权限
+
+#### 2.10 批量操作角色
+- **接口地址**: `POST /admin/roles/batch`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "action": "string", // 操作类型(delete/enable/disable)，必填
+    "role_ids": ["number"] // 角色ID列表，必填
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "批量操作成功",
+      "success_count": "number", // 成功数量
+      "failure_count": "number", // 失败数量
+      "details": [
+        {
+          "id": "number",
+          "success": "boolean",
+          "message": "string" // 错误信息，如果失败
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 批量删除、启用或禁用角色
+
+### 3. 用户管理相关接口 (userApi)
+
+#### 3.1 获取用户列表
+- **接口地址**: `GET /admin/users`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  page: number, // 页码，可选，默认1
+  limit: number, // 每页数量，可选，默认20
+  search: string, // 搜索关键词，可选
+  status: string, // 用户状态筛选，可选
+  room_id: number, // 房间ID筛选，可选
+  sort: string, // 排序字段，可选，默认created_at
+  order: string // 排序方向，可选，默认desc
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "users": [
+        {
+          "id": "number",
+          "username": "string",
+          "email": "string",
+          "full_name": "string",
+          "phone": "string",
+          "avatar": "string",
+          "status": "string",
+          "room_id": "number",
+          "room_name": "string",
+          "balance": "number",
+          "created_at": "string",
+          "last_login_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_users": "number",
+        "active_users": "number",
+        "inactive_users": "number",
+        "suspended_users": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取用户列表，支持分页、搜索和筛选
+
+#### 3.2 获取用户详情
+- **接口地址**: `GET /admin/users/{id}`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "username": "string",
+      "email": "string",
+      "full_name": "string",
+      "phone": "string",
+      "avatar": "string",
+      "status": "string",
+      "room_id": "number",
+      "room_name": "string",
+      "balance": "number",
+      "created_at": "string",
+      "updated_at": "string",
+      "last_login_at": "string",
+      "roles": [
+        {
+          "id": "number",
+          "role_name": "string",
+          "assigned_by": "string",
+          "assigned_at": "string",
+          "expires_at": "string"
+        }
+      ],
+      "status_logs": [
+        {
+          "id": "number",
+          "old_status": "string",
+          "new_status": "string",
+          "reason": "string",
+          "changed_by": "string",
+          "changed_at": "string"
+        }
+      ],
+      "stats": {
+        "total_bills": "number",
+        "total_expenses": "number",
+        "total_payments": "number",
+        "total_disputes": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 500: 服务器内部错误
+- **说明**: 获取指定用户的详细信息，包括角色、状态变更记录和统计数据
+
+#### 3.3 创建用户
+- **接口地址**: `POST /admin/users`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "username": "string", // 用户名，必填
+    "email": "string", // 邮箱，必填
+    "password": "string", // 密码，必填
+    "full_name": "string", // 全名，可选
+    "phone": "string", // 电话，可选
+    "room_id": "number", // 房间ID，可选
+    "status": "string", // 状态，可选，默认active
+    "role_ids": ["number"] // 角色ID列表，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "username": "string",
+      "email": "string",
+      "full_name": "string",
+      "phone": "string",
+      "status": "string",
+      "room_id": "number",
+      "created_at": "string",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 409: 用户名或邮箱已存在
+  - 500: 服务器内部错误
+- **说明**: 创建新用户，可以同时分配角色和房间
+
+#### 3.4 更新用户信息
+- **接口地址**: `PUT /admin/users/{id}`
+- **请求方法**: PUT
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "email": "string", // 邮箱，可选
+    "full_name": "string", // 全名，可选
+    "phone": "string", // 电话，可选
+    "avatar": "string", // 头像URL，可选
+    "room_id": "number", // 房间ID，可选
+    "balance": "number" // 余额，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "username": "string",
+      "email": "string",
+      "full_name": "string",
+      "phone": "string",
+      "avatar": "string",
+      "status": "string",
+      "room_id": "number",
+      "balance": "number",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 409: 邮箱已存在
+  - 500: 服务器内部错误
+- **说明**: 更新用户基本信息
+
+#### 3.5 更新用户状态
+- **接口地址**: `PUT /admin/users/{id}/status`
+- **请求方法**: PUT
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "status": "string", // 新状态，必填(active/inactive/suspended)
+    "reason": "string" // 状态变更原因，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "old_status": "string",
+      "new_status": "string",
+      "reason": "string",
+      "changed_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 500: 服务器内部错误
+- **说明**: 更新用户状态，记录状态变更日志
+
+#### 3.6 重置用户密码
+- **接口地址**: `POST /admin/users/{id}/reset-password`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "new_password": "string", // 新密码，必填
+    "send_email": "boolean", // 是否发送邮件通知，可选，默认true
+    "reason": "string" // 重置原因，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "密码重置成功",
+      "email_sent": "boolean" // 是否已发送邮件通知
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 500: 服务器内部错误
+- **说明**: 重置用户密码，可选择是否发送邮件通知
+
+#### 3.7 删除用户
+- **接口地址**: `DELETE /admin/users/{id}`
+- **请求方法**: DELETE
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "reason": "string", // 删除原因，可选
+    "transfer_data_to": "number" // 数据转移给的用户ID，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "用户删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 409: 用户有关联数据未处理
+  - 500: 服务器内部错误
+- **说明**: 删除用户，可选择将数据转移给其他用户
+
+#### 3.8 为用户分配角色
+- **接口地址**: `POST /admin/users/{userId}/roles`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "role_ids": ["number"], // 角色ID列表，必填
+    "expires_at": "string" // 角色过期时间，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "角色分配成功",
+      "assigned_roles": [
+        {
+          "id": "number",
+          "role_name": "string",
+          "assigned_at": "string",
+          "expires_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 500: 服务器内部错误
+- **说明**: 为用户分配角色，可以设置角色过期时间
+
+#### 3.9 获取用户角色
+- **接口地址**: `GET /admin/users/{userId}/roles`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "roles": [
+        {
+          "id": "number",
+          "role_name": "string",
+          "assigned_by": "string",
+          "assigned_at": "string",
+          "expires_at": "string",
+          "is_expired": "boolean"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 500: 服务器内部错误
+- **说明**: 获取用户的所有角色，包括已过期的角色
+
+#### 3.10 移除用户角色
+- **接口地址**: `DELETE /admin/users/{userId}/roles/{roleId}`
+- **请求方法**: DELETE
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "角色移除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户或角色不存在
+  - 500: 服务器内部错误
+- **说明**: 从用户中移除指定角色
+
+#### 3.11 获取可分配用户列表
+- **接口地址**: `GET /admin/users/available`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  search: string, // 搜索关键词，可选
+  limit: number, // 返回数量限制，可选，默认20
+  exclude_ids: ["number"] // 排除的用户ID列表，可选
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "users": [
+        {
+          "id": "number",
+          "username": "string",
+          "full_name": "string",
+          "email": "string",
+          "avatar": "string",
+          "status": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取可用于分配的用户列表，支持搜索和排除特定用户
+
+#### 3.12 批量操作用户
+- **接口地址**: `POST /admin/users/batch`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "action": "string", // 操作类型(delete/activate/deactivate/suspend/assign_role/remove_role)，必填
+    "user_ids": ["number"], // 用户ID列表，必填
+    "role_id": "number", // 角色ID，当操作为assign_role或remove_role时必填
+    "reason": "string" // 操作原因，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "批量操作成功",
+      "success_count": "number", // 成功数量
+      "failure_count": "number", // 失败数量
+      "details": [
+        {
+          "id": "number",
+          "success": "boolean",
+          "message": "string" // 错误信息，如果失败
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 批量操作用户，支持删除、激活、停用、挂起、分配角色和移除角色
+
+## 4. 账单管理相关接口 (billApi)
+
+### 4.1 获取账单列表
+- **接口地址**: `GET /admin/bills`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  page: number, // 页码，可选，默认1
+  limit: number, // 每页数量，可选，默认20
+  search: string, // 搜索关键词，可选
+  status: string, // 账单状态筛选，可选
+  user_id: number, // 用户ID筛选，可选
+  room_id: number, // 房间ID筛选，可选
+  start_date: string, // 开始日期，可选
+  end_date: string, // 结束日期，可选
+  sort: string, // 排序字段，可选，默认created_at
+  order: string // 排序方向，可选，默认desc
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "bills": [
+        {
+          "id": "number",
+          "user_id": "number",
+          "username": "string",
+          "room_id": "number",
+          "room_name": "string",
+          "title": "string",
+          "description": "string",
+          "amount": "number",
+          "status": "string",
+          "type": "string",
+          "due_date": "string",
+          "created_at": "string",
+          "updated_at": "string",
+          "paid_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_amount": "number",
+        "paid_amount": "number",
+        "unpaid_amount": "number",
+        "overdue_amount": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取账单列表，支持分页、搜索和筛选
+
+### 4.2 获取账单详情
+- **接口地址**: `GET /admin/bills/{id}`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "user_id": "number",
+      "username": "string",
+      "room_id": "number",
+      "room_name": "string",
+      "title": "string",
+      "description": "string",
+      "amount": "number",
+      "status": "string",
+      "type": "string",
+      "due_date": "string",
+      "created_at": "string",
+      "updated_at": "string",
+      "paid_at": "string",
+      "payments": [
+        {
+          "id": "number",
+          "amount": "number",
+          "payment_method": "string",
+          "payment_date": "string",
+          "transaction_id": "string"
+        }
+      ],
+      "disputes": [
+        {
+          "id": "number",
+          "reason": "string",
+          "status": "string",
+          "created_at": "string"
+        }
+      ],
+      "history": [
+        {
+          "id": "number",
+          "action": "string",
+          "old_status": "string",
+          "new_status": "string",
+          "changed_by": "string",
+          "changed_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 账单不存在
+  - 500: 服务器内部错误
+- **说明**: 获取指定账单的详细信息，包括支付记录、争议记录和状态变更历史
+
+### 4.3 创建账单
+- **接口地址**: `POST /admin/bills`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "user_id": "number", // 用户ID，必填
+    "room_id": "number", // 房间ID，可选
+    "title": "string", // 账单标题，必填
+    "description": "string", // 账单描述，可选
+    "amount": "number", // 金额，必填
+    "type": "string", // 账单类型，可选
+    "due_date": "string", // 到期日期，可选
+    "auto_reminder": "boolean", // 是否自动提醒，可选，默认true
+    "reminder_days": "number" // 提前提醒天数，可选，默认3
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "user_id": "number",
+      "username": "string",
+      "room_id": "number",
+      "title": "string",
+      "description": "string",
+      "amount": "number",
+      "status": "string",
+      "type": "string",
+      "due_date": "string",
+      "created_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 用户不存在
+  - 500: 服务器内部错误
+- **说明**: 创建新账单，可以设置自动提醒
+
+### 4.4 更新账单信息
+- **接口地址**: `PUT /admin/bills/{id}`
+- **请求方法**: PUT
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "title": "string", // 账单标题，可选
+    "description": "string", // 账单描述，可选
+    "amount": "number", // 金额，可选
+    "type": "string", // 账单类型，可选
+    "due_date": "string", // 到期日期，可选
+    "auto_reminder": "boolean", // 是否自动提醒，可选
+    "reminder_days": "number" // 提前提醒天数，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "title": "string",
+      "description": "string",
+      "amount": "number",
+      "type": "string",
+      "due_date": "string",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 账单不存在
+  - 500: 服务器内部错误
+- **说明**: 更新账单基本信息
+
+### 4.5 更新账单状态
+- **接口地址**: `PUT /admin/bills/{id}/status`
+- **请求方法**: PUT
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "status": "string", // 新状态，必填(paid/cancelled/overdue)
+    "payment_method": "string", // 支付方式，当状态为paid时必填
+    "payment_date": "string", // 支付日期，当状态为paid时可选，默认当前日期
+    "transaction_id": "string", // 交易ID，当状态为paid时可选
+    "reason": "string" // 状态变更原因，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "old_status": "string",
+      "new_status": "string",
+      "payment_method": "string",
+      "payment_date": "string",
+      "transaction_id": "string",
+      "changed_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 账单不存在
+  - 409: 状态变更冲突
+  - 500: 服务器内部错误
+- **说明**: 更新账单状态，记录状态变更日志
+
+### 4.6 删除账单
+- **接口地址**: `DELETE /admin/bills/{id}`
+- **请求方法**: DELETE
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "reason": "string" // 删除原因，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "账单删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 账单不存在
+  - 409: 账单已支付或有关联数据
+  - 500: 服务器内部错误
+- **说明**: 删除账单，只能删除未支付的账单
+
+### 4.7 批量创建账单
+- **接口地址**: `POST /admin/bills/batch`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "bills": [
+      {
+        "user_id": "number", // 用户ID，必填
+        "room_id": "number", // 房间ID，可选
+        "title": "string", // 账单标题，必填
+        "description": "string", // 账单描述，可选
+        "amount": "number", // 金额，必填
+        "type": "string", // 账单类型，可选
+        "due_date": "string" // 到期日期，可选
+      }
+    ],
+    "auto_reminder": "boolean", // 是否自动提醒，可选，默认true
+    "reminder_days": "number" // 提前提醒天数，可选，默认3
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "批量创建账单成功",
+      "success_count": "number", // 成功数量
+      "failure_count": "number", // 失败数量
+      "details": [
+        {
+          "index": "number", // 数组索引
+          "success": "boolean",
+          "bill_id": "number", // 成功时的账单ID
+          "message": "string" // 错误信息，如果失败
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 批量创建账单，适用于为多个用户创建相同类型的账单
+
+### 4.8 发送账单提醒
+- **接口地址**: `POST /admin/bills/{id}/remind`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "message": "string", // 自定义提醒消息，可选
+    "channels": ["string"] // 提醒渠道，可选，默认["email"]
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "账单提醒发送成功",
+      "channels_sent": ["string"] // 已发送的渠道
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 账单不存在
+  - 409: 账单已支付或已取消
+  - 500: 服务器内部错误
+- **说明**: 向用户发送账单提醒，支持多种提醒渠道
+
+### 4.9 批量发送账单提醒
+- **接口地址**: `POST /admin/bills/remind/batch`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "bill_ids": ["number"], // 账单ID列表，可选
+    "filters": { // 筛选条件，与bill_ids二选一
+      "status": "string", // 状态筛选，可选
+      "user_id": "number", // 用户ID筛选，可选
+      "room_id": "number", // 房间ID筛选，可选
+      "days_overdue": "number" // 逾期天数筛选，可选
+    },
+    "message": "string", // 自定义提醒消息，可选
+    "channels": ["string"] // 提醒渠道，可选，默认["email"]
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "批量账单提醒发送成功",
+      "total_bills": "number", // 总账单数
+      "sent_count": "number", // 发送成功数量
+      "failure_count": "number", // 发送失败数量
+      "details": [
+        {
+          "bill_id": "number",
+          "success": "boolean",
+          "message": "string" // 错误信息，如果失败
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 批量发送账单提醒，可以按账单ID或筛选条件发送
+
+### 4.10 导出账单数据
+- **接口地址**: `GET /admin/bills/export`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  format: string, // 导出格式，可选，默认csv，支持csv/xlsx/pdf
+  filters: { // 筛选条件，可选
+    status: string, // 状态筛选
+    user_id: number, // 用户ID筛选
+    room_id: number, // 房间ID筛选
+    start_date: string, // 开始日期
+    end_date: string // 结束日期
+  },
+  fields: ["string"] // 导出字段，可选，默认导出所有字段
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "download_url": "string", // 下载链接
+      "expires_at": "string", // 链接过期时间
+      "file_size": "number", // 文件大小(字节)
+      "record_count": "number" // 记录数量
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 导出账单数据，支持多种格式和自定义字段
+
+## 5. 费用审核相关接口 (expenseApi)
+
+### 5.1 获取费用申请列表
+- **接口地址**: `GET /admin/expenses`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  page: number, // 页码，可选，默认1
+  limit: number, // 每页数量，可选，默认20
+  search: string, // 搜索关键词，可选
+  status: string, // 审核状态筛选，可选
+  user_id: number, // 用户ID筛选，可选
+  room_id: number, // 房间ID筛选，可选
+  category: string, // 费用类别筛选，可选
+  start_date: string, // 开始日期，可选
+  end_date: string, // 结束日期，可选
+  sort: string, // 排序字段，可选，默认created_at
+  order: string // 排序方向，可选，默认desc
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "expenses": [
+        {
+          "id": "number",
+          "user_id": "number",
+          "username": "string",
+          "room_id": "number",
+          "room_name": "string",
+          "title": "string",
+          "description": "string",
+          "amount": "number",
+          "category": "string",
+          "status": "string",
+          "receipt_url": "string",
+          "created_at": "string",
+          "updated_at": "string",
+          "reviewed_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_amount": "number",
+        "pending_amount": "number",
+        "approved_amount": "number",
+        "rejected_amount": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取费用申请列表，支持分页、搜索和筛选
+
+### 5.2 获取费用申请详情
+- **接口地址**: `GET /admin/expenses/{id}`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "user_id": "number",
+      "username": "string",
+      "room_id": "number",
+      "room_name": "string",
+      "title": "string",
+      "description": "string",
+      "amount": "number",
+      "category": "string",
+      "status": "string",
+      "receipt_url": "string",
+      "receipt_thumbnails": ["string"], // 收据缩略图
+      "created_at": "string",
+      "updated_at": "string",
+      "reviewed_at": "string",
+      "review_history": [
+        {
+          "id": "number",
+          "reviewer_id": "number",
+          "reviewer_name": "string",
+          "action": "string", // 审核动作(approved/rejected/returned)
+          "comment": "string",
+          "created_at": "string"
+        }
+      ],
+      "attachments": [
+        {
+          "id": "number",
+          "file_name": "string",
+          "file_url": "string",
+          "file_size": "number",
+          "uploaded_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 费用申请不存在
+  - 500: 服务器内部错误
+- **说明**: 获取指定费用申请的详细信息，包括审核历史和附件
+
+### 5.3 审核费用申请
+- **接口地址**: `POST /admin/expenses/{id}/review`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "action": "string", // 审核动作(approved/rejected/returned)，必填
+    "comment": "string", // 审核意见，可选
+    "amount": "number", // 批准金额，当action为approved时可选，默认为申请金额
+    "notify_user": "boolean" // 是否通知用户，可选，默认true
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "old_status": "string",
+      "new_status": "string",
+      "action": "string",
+      "comment": "string",
+      "amount": "number",
+      "reviewed_by": "string",
+      "reviewed_at": "string",
+      "notification_sent": "boolean"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 费用申请不存在
+  - 409: 费用申请已审核或状态不允许此操作
+  - 500: 服务器内部错误
+- **说明**: 审核费用申请，支持批准、拒绝和退回修改
+
+### 5.4 批量审核费用申请
+- **接口地址**: `POST /admin/expenses/batch-review`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "expense_ids": ["number"], // 费用申请ID列表，必填
+    "action": "string", // 审核动作(approved/rejected/returned)，必填
+    "comment": "string", // 审核意见，可选
+    "notify_users": "boolean" // 是否通知用户，可选，默认true
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "批量审核完成",
+      "success_count": "number", // 成功数量
+      "failure_count": "number", // 失败数量
+      "details": [
+        {
+          "expense_id": "number",
+          "success": "boolean",
+          "message": "string" // 错误信息，如果失败
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 批量审核费用申请，适用于批量处理相同类型的费用申请
+
+### 5.5 获取费用类别列表
+- **接口地址**: `GET /admin/expenses/categories`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "categories": [
+        {
+          "id": "number",
+          "name": "string",
+          "description": "string",
+          "icon": "string",
+          "color": "string",
+          "is_active": "boolean",
+          "expense_count": "number", // 该类别下的费用数量
+          "total_amount": "number" // 该类别下的总金额
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取所有费用类别，包括统计信息
+
+### 5.6 创建费用类别
+- **接口地址**: `POST /admin/expenses/categories`
+- **请求方法**: POST
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // 类别名称，必填
+    "description": "string", // 类别描述，可选
+    "icon": "string", // 图标，可选
+    "color": "string", // 颜色，可选
+    "is_active": "boolean" // 是否启用，可选，默认true
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "name": "string",
+      "description": "string",
+      "icon": "string",
+      "color": "string",
+      "is_active": "boolean",
+      "created_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 409: 类别名称已存在
+  - 500: 服务器内部错误
+- **说明**: 创建新的费用类别
+
+### 5.7 更新费用类别
+- **接口地址**: `PUT /admin/expenses/categories/{id}`
+- **请求方法**: PUT
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // 类别名称，可选
+    "description": "string", // 类别描述，可选
+    "icon": "string", // 图标，可选
+    "color": "string", // 颜色，可选
+    "is_active": "boolean" // 是否启用，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "name": "string",
+      "description": "string",
+      "icon": "string",
+      "color": "string",
+      "is_active": "boolean",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 费用类别不存在
+  - 409: 类别名称已存在
+  - 500: 服务器内部错误
+- **说明**: 更新费用类别信息
+
+### 5.8 删除费用类别
+- **接口地址**: `DELETE /admin/expenses/categories/{id}`
+- **请求方法**: DELETE
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```json
+  {
+    "replace_with": "number" // 替换为的类别ID，当该类别下有费用时必填
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "费用类别删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 费用类别不存在
+  - 409: 费用类别下有费用且未提供替换类别
+  - 500: 服务器内部错误
+- **说明**: 删除费用类别，如果类别下有费用，需要提供替换类别
+
+### 5.9 导出费用审核数据
+- **接口地址**: `GET /admin/expenses/export`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  format: string, // 导出格式，可选，默认csv，支持csv/xlsx/pdf
+  filters: { // 筛选条件，可选
+    status: string, // 状态筛选
+    user_id: number, // 用户ID筛选
+    room_id: number, // 房间ID筛选
+    category: string, // 类别筛选
+    start_date: string, // 开始日期
+    end_date: string // 结束日期
+  },
+  fields: ["string"] // 导出字段，可选，默认导出所有字段
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "download_url": "string", // 下载链接
+      "expires_at": "string", // 链接过期时间
+      "file_size": "number", // 文件大小(字节)
+      "record_count": "number" // 记录数量
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 导出费用审核数据，支持多种格式和自定义字段
+
+### 5.10 获取费用审核统计
+- **接口地址**: `GET /admin/expenses/stats`
+- **请求方法**: GET
+- **请求头**: `Authorization: Bearer <access_token>`
+- **请求参数**:
+  ```
+  period: string, // 统计周期，可选，默认month，支持week/month/quarter/year
+  start_date: string, // 开始日期，可选
+  end_date: string, // 结束日期，可选
+  group_by: string // 分组方式，可选，默认status，支持status/category/user
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "summary": {
+        "total_expenses": "number",
+        "total_amount": "number",
+        "pending_expenses": "number",
+        "pending_amount": "number",
+        "approved_expenses": "number",
+        "approved_amount": "number",
+        "rejected_expenses": "number",
+        "rejected_amount": "number"
+      },
+      "trends": [
+        {
+          "period": "string", // 周期标识
+          "total_count": "number",
+          "total_amount": "number",
+          "approved_count": "number",
+          "approved_amount": "number",
+          "rejected_count": "number",
+          "rejected_amount": "number"
+        }
+      ],
+      "grouped_data": [
+        {
+          "group_key": "string", // 分组键值
+          "count": "number",
+          "amount": "number",
+          "percentage": "number" // 占比
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 获取费用审核统计数据，包括汇总、趋势和分组数据
+
+## 6. 数据统计相关接口 (statsApi)
+
+### 6.1 获取用户统计
+- **接口地址**: `/admin/stats/users`
+- **请求方法**: `GET`
+- **接口描述**: 获取用户相关的统计数据，包括总用户数、活跃用户数、新增用户数等
+- **请求参数**:
+  ```json
+  {
+    "period": "string", // 统计周期: day, week, month, year
+    "start_date": "string", // 开始日期 YYYY-MM-DD
+    "end_date": "string" // 结束日期 YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "total_users": 1000, // 总用户数
+      "active_users": 800, // 活跃用户数
+      "new_users": 50, // 新增用户数
+      "user_growth_rate": 5.2, // 用户增长率(%)
+      "user_trend": [ // 用户趋势数据
+        {
+          "date": "2023-01-01",
+          "count": 950
+        },
+        {
+          "date": "2023-01-02",
+          "count": 960
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或统计查看权限
+
+### 6.2 获取账单统计
+- **接口地址**: `/admin/stats/bills`
+- **请求方法**: `GET`
+- **接口描述**: 获取账单相关的统计数据，包括总账单数、总金额、分类统计等
+- **请求参数**:
+  ```json
+  {
+    "period": "string", // 统计周期: day, week, month, year
+    "start_date": "string", // 开始日期 YYYY-MM-DD
+    "end_date": "string", // 结束日期 YYYY-MM-DD
+    "category_id": "number" // 账单分类ID，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "total_bills": 5000, // 总账单数
+      "total_amount": 100000.00, // 总金额
+      "average_amount": 20.00, // 平均金额
+      "category_stats": [ // 分类统计
+        {
+          "category_id": 1,
+          "category_name": "餐饮",
+          "count": 2000,
+          "amount": 40000.00
+        }
+      ],
+      "bill_trend": [ // 账单趋势数据
+        {
+          "date": "2023-01-01",
+          "count": 100,
+          "amount": 2000.00
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或统计查看权限
+
+### 6.3 获取费用统计
+- **接口地址**: `/admin/stats/expenses`
+- **请求方法**: `GET`
+- **接口描述**: 获取费用相关的统计数据，包括总费用数、总金额、审核状态统计等
+- **请求参数**:
+  ```json
+  {
+    "period": "string", // 统计周期: day, week, month, year
+    "start_date": "string", // 开始日期 YYYY-MM-DD
+    "end_date": "string", // 结束日期 YYYY-MM-DD
+    "status": "string" // 审核状态，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "total_expenses": 500, // 总费用数
+      "total_amount": 50000.00, // 总金额
+      "pending_expenses": 50, // 待审核费用数
+      "approved_expenses": 400, // 已批准费用数
+      "rejected_expenses": 50, // 已拒绝费用数
+      "expense_trend": [ // 费用趋势数据
+        {
+          "date": "2023-01-01",
+          "count": 10,
+          "amount": 1000.00
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或统计查看权限
+
+### 6.4 获取系统概览
+- **接口地址**: `/admin/stats/overview`
+- **请求方法**: `GET`
+- **接口描述**: 获取系统整体概览数据，包括用户、账单、费用等核心指标
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "users": {
+        "total": 1000,
+        "active_today": 200,
+        "new_this_month": 50
+      },
+      "bills": {
+        "total": 5000,
+        "today": 100,
+        "this_month": 3000
+      },
+      "expenses": {
+        "total": 500,
+        "pending": 50,
+        "approved_this_month": 200
+      },
+      "system": {
+        "uptime": "99.9%",
+        "response_time": "120ms",
+        "error_rate": "0.1%"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或统计查看权限
+
+### 4. 账单管理相关接口
+- 获取账单列表
+- 获取账单详情
+- 更新账单
+- 删除账单
+
+### 5. 费用审核相关接口
+- 获取待审核费用列表
+- 获取费用详情
+- 审核费用
+- 获取异常支出列表
+- 更新异常支出状态
+- 获取异常支出统计
+- 导出异常支出报告
+
+### 6. 数据统计相关接口
+- 获取系统概览数据
+- 获取用户统计数据
+- 获取寝室统计数据
+- 获取预测数据
+
+## 7. 系统设置相关接口 (settingsApi)
+
+### 7.1 获取系统配置
+- **接口地址**: `/admin/settings/config`
+- **请求方法**: `GET`
+- **接口描述**: 获取系统配置信息
+- **请求参数**:
+  ```json
+  {
+    "category": "string" // 配置分类，可选，如system/email/notification等
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "configs": [
+        {
+          "id": "number",
+          "key": "string",
+          "value": "string",
+          "type": "string", // 配置类型: string/number/boolean/json
+          "category": "string",
+          "description": "string",
+          "is_public": "boolean", // 是否为公开配置
+          "updated_at": "string",
+          "updated_by": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或系统设置查看权限
+
+### 7.2 更新系统配置
+- **接口地址**: `/admin/settings/config`
+- **请求方法**: `PUT`
+- **接口描述**: 更新系统配置
+- **请求参数**:
+  ```json
+  {
+    "configs": [
+      {
+        "key": "string", // 配置键，必填
+        "value": "string" // 配置值，必填
+      }
+    ]
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "配置更新成功",
+      "updated_count": "number", // 更新的配置数量
+      "details": [
+        {
+          "key": "string",
+          "old_value": "string",
+          "new_value": "string",
+          "success": "boolean",
+          "message": "string" // 错误信息，如果失败
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或系统设置编辑权限
+
+### 7.3 获取功能开关
+- **接口地址**: `/admin/settings/features`
+- **请求方法**: `GET`
+- **接口描述**: 获取系统功能开关状态
+- **请求参数**:
+  ```json
+  {
+    "category": "string" // 功能分类，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "features": [
+        {
+          "id": "number",
+          "name": "string",
+          "key": "string",
+          "description": "string",
+          "is_enabled": "boolean",
+          "category": "string",
+          "updated_at": "string",
+          "updated_by": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或功能开关查看权限
+
+### 7.4 更新功能开关
+- **接口地址**: `/admin/settings/features`
+- **请求方法**: `PUT`
+- **接口描述**: 更新系统功能开关状态
+- **请求参数**:
+  ```json
+  {
+    "features": [
+      {
+        "key": "string", // 功能键，必填
+        "is_enabled": "boolean" // 开关状态，必填
+      }
+    ]
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "功能开关更新成功",
+      "updated_count": "number", // 更新的功能数量
+      "details": [
+        {
+          "key": "string",
+          "old_status": "boolean",
+          "new_status": "boolean",
+          "success": "boolean",
+          "message": "string" // 错误信息，如果失败
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或功能开关编辑权限
+
+### 7.5 获取维护窗口
+- **接口地址**: `/admin/settings/maintenance-windows`
+- **请求方法**: `GET`
+- **接口描述**: 获取系统维护窗口列表
+- **请求参数**:
+  ```json
+  {
+    "status": "string", // 维护状态，可选：active/scheduled/completed
+    "start_date": "string", // 开始日期，可选
+    "end_date": "string" // 结束日期，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "windows": [
+        {
+          "id": "number",
+          "title": "string",
+          "description": "string",
+          "start_time": "string",
+          "end_time": "string",
+          "status": "string", // scheduled/active/completed/cancelled
+          "impact": "string", // 影响范围描述
+          "created_by": "string",
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或维护窗口查看权限
+
+### 7.6 创建维护窗口
+- **接口地址**: `/admin/settings/maintenance-windows`
+- **请求方法**: `POST`
+- **接口描述**: 创建系统维护窗口
+- **请求参数**:
+  ```json
+  {
+    "title": "string", // 维护标题，必填
+    "description": "string", // 维护描述，必填
+    "start_time": "string", // 开始时间，必填，格式：YYYY-MM-DD HH:mm:ss
+    "end_time": "string", // 结束时间，必填，格式：YYYY-MM-DD HH:mm:ss
+    "impact": "string", // 影响范围描述，可选
+    "notify_users": "boolean" // 是否通知用户，可选，默认true
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "title": "string",
+      "description": "string",
+      "start_time": "string",
+      "end_time": "string",
+      "status": "string",
+      "impact": "string",
+      "created_by": "string",
+      "created_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 409: 维护时间冲突
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或维护窗口创建权限
+
+### 7.7 获取公告列表
+- **接口地址**: `/admin/settings/announcements`
+- **请求方法**: `GET`
+- **接口描述**: 获取系统公告列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "status": "string", // 公告状态，可选：draft/published/expired
+    "type": "string", // 公告类型，可选：info/warning/error/maintenance
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "announcements": [
+        {
+          "id": "number",
+          "title": "string",
+          "content": "string",
+          "type": "string",
+          "status": "string",
+          "priority": "string", // low/medium/high/critical
+          "start_time": "string",
+          "end_time": "string",
+          "view_count": "number",
+          "created_by": "string",
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或公告查看权限
+
+### 7.8 创建公告
+- **接口地址**: `/admin/settings/announcements`
+- **请求方法**: `POST`
+- **接口描述**: 创建系统公告
+- **请求参数**:
+  ```json
+  {
+    "title": "string", // 公告标题，必填
+    "content": "string", // 公告内容，必填
+    "type": "string", // 公告类型，必填：info/warning/error/maintenance
+    "priority": "string", // 优先级，必填：low/medium/high/critical
+    "start_time": "string", // 开始时间，可选，默认当前时间
+    "end_time": "string", // 结束时间，可选
+    "is_popup": "boolean", // 是否弹窗显示，可选，默认false
+    "target_users": ["string"] // 目标用户，可选，all表示所有用户
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "title": "string",
+      "content": "string",
+      "type": "string",
+      "status": "string",
+      "priority": "string",
+      "start_time": "string",
+      "end_time": "string",
+      "is_popup": "boolean",
+      "created_by": "string",
+      "created_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或公告创建权限
+
+### 7.9 更新公告
+- **接口地址**: `/admin/settings/announcements/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新系统公告
+- **请求参数**:
+  ```json
+  {
+    "title": "string", // 公告标题，可选
+    "content": "string", // 公告内容，可选
+    "type": "string", // 公告类型，可选：info/warning/error/maintenance
+    "priority": "string", // 优先级，可选：low/medium/high/critical
+    "status": "string", // 状态，可选：draft/published/expired
+    "start_time": "string", // 开始时间，可选
+    "end_time": "string" // 结束时间，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "number",
+      "title": "string",
+      "content": "string",
+      "type": "string",
+      "status": "string",
+      "priority": "string",
+      "start_time": "string",
+      "end_time": "string",
+      "updated_by": "string",
+      "updated_at": "string"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 公告不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或公告编辑权限
+
+### 7.10 删除公告
+- **接口地址**: `/admin/settings/announcements/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除系统公告
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "公告删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 公告不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或公告删除权限
+
+## 8. 操作日志相关接口 (logApi)
+
+### 8.1 获取操作日志
+- **接口地址**: `/admin/logs/operations`
+- **请求方法**: `GET`
+- **接口描述**: 获取系统操作日志列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "admin_id": "number", // 管理员ID筛选，可选
+    "module": "string", // 模块筛选，可选
+    "action": "string", // 操作类型筛选，可选
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "ip_address": "string", // IP地址筛选，可选
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "logs": [
+        {
+          "id": "number",
+          "admin_id": "number",
+          "admin_name": "string",
+          "module": "string",
+          "action": "string",
+          "description": "string",
+          "target_id": "string", // 目标ID
+          "target_type": "string", // 目标类型
+          "ip_address": "string",
+          "user_agent": "string",
+          "request_data": "object", // 请求数据
+          "response_data": "object", // 响应数据
+          "status": "string", // 操作状态：success/failure
+          "error_message": "string", // 错误信息，如果有
+          "created_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_operations": "number",
+        "success_operations": "number",
+        "failure_operations": "number",
+        "unique_admins": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或操作日志查看权限
+
+### 8.2 获取数据变更审计日志
+- **接口地址**: `/admin/logs/audits`
+- **请求方法**: `GET`
+- **接口描述**: 获取数据变更审计日志列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "admin_id": "number", // 管理员ID筛选，可选
+    "table_name": "string", // 表名筛选，可选
+    "record_id": "string", // 记录ID筛选，可选
+    "action": "string", // 操作类型筛选，可选：create/update/delete
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "audits": [
+        {
+          "id": "number",
+          "admin_id": "number",
+          "admin_name": "string",
+          "table_name": "string",
+          "record_id": "string",
+          "action": "string",
+          "old_values": "object", // 旧值
+          "new_values": "object", // 新值
+          "changed_fields": ["string"], // 变更字段列表
+          "ip_address": "string",
+          "user_agent": "string",
+          "created_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_changes": "number",
+        "create_operations": "number",
+        "update_operations": "number",
+        "delete_operations": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或审计日志查看权限
+
+### 8.3 获取登录日志
+- **接口地址**: `/admin/logs/logins`
+- **请求方法**: `GET`
+- **接口描述**: 获取管理员登录日志列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "admin_id": "number", // 管理员ID筛选，可选
+    "status": "string", // 登录状态筛选，可选：success/failure
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "ip_address": "string", // IP地址筛选，可选
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "logs": [
+        {
+          "id": "number",
+          "admin_id": "number",
+          "admin_name": "string",
+          "ip_address": "string",
+          "user_agent": "string",
+          "status": "string", // 登录状态：success/failure
+          "failure_reason": "string", // 失败原因，如果有
+          "location": "string", // 地理位置
+          "created_at": "string",
+          "logout_at": "string" // 登出时间，如果有
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_logins": "number",
+        "success_logins": "number",
+        "failure_logins": "number",
+        "unique_admins": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或登录日志查看权限
+
+### 8.4 导出操作日志
+- **接口地址**: `/admin/logs/operations/export`
+- **请求方法**: `GET`
+- **接口描述**: 导出操作日志数据
+- **请求参数**:
+  ```json
+  {
+    "format": "string", // 导出格式，可选，默认csv，支持csv/xlsx/pdf
+    "filters": { // 筛选条件，可选
+      "admin_id": "number",
+      "module": "string",
+      "action": "string",
+      "start_date": "string",
+      "end_date": "string",
+      "ip_address": "string"
+    },
+    "fields": ["string"] // 导出字段，可选，默认导出所有字段
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "download_url": "string", // 下载链接
+      "expires_at": "string", // 链接过期时间
+      "file_size": "number", // 文件大小(字节)
+      "record_count": "number" // 记录数量
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或操作日志导出权限
+
+### 8.5 导出审计日志
+- **接口地址**: `/admin/logs/audits/export`
+- **请求方法**: `GET`
+- **接口描述**: 导出数据变更审计日志
+- **请求参数**:
+  ```json
+  {
+    "format": "string", // 导出格式，可选，默认csv，支持csv/xlsx/pdf
+    "filters": { // 筛选条件，可选
+      "admin_id": "number",
+      "table_name": "string",
+      "record_id": "string",
+      "action": "string",
+      "start_date": "string",
+      "end_date": "string"
+    },
+    "fields": ["string"] // 导出字段，可选，默认导出所有字段
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "download_url": "string", // 下载链接
+      "expires_at": "string", // 链接过期时间
+      "file_size": "number", // 文件大小(字节)
+      "record_count": "number" // 记录数量
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或审计日志导出权限
+
+### 8.6 获取日志统计
+- **接口地址**: `/admin/logs/stats`
+- **请求方法**: `GET`
+- **接口描述**: 获取日志统计数据
+- **请求参数**:
+  ```json
+  {
+    "type": "string", // 日志类型，可选：operations/audits/logins
+    "period": "string", // 统计周期，可选，默认day，支持hour/day/week/month
+    "start_date": "string", // 开始日期，可选
+    "end_date": "string", // 结束日期，可选
+    "group_by": "string" // 分组方式，可选，默认action，支持action/module/admin/status
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "summary": {
+        "total_logs": "number",
+        "success_operations": "number",
+        "failure_operations": "number",
+        "unique_admins": "number"
+      },
+      "trends": [
+        {
+          "period": "string", // 周期标识
+          "total_count": "number",
+          "success_count": "number",
+          "failure_count": "number"
+        }
+      ],
+      "grouped_data": [
+        {
+          "group_key": "string", // 分组键值
+          "count": "number",
+          "percentage": "number" // 占比
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或日志统计查看权限
+
+## 9. 批量任务与报表相关接口 (taskApi)
+
+### 9.1 获取批量任务列表
+- **接口地址**: `/admin/tasks/batch`
+- **请求方法**: `GET`
+- **接口描述**: 获取批量任务列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "type": "string", // 任务类型筛选，可选
+    "status": "string", // 任务状态筛选，可选：pending/running/completed/failed/cancelled
+    "created_by": "number", // 创建人ID筛选，可选
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "tasks": [
+        {
+          "id": "number",
+          "name": "string",
+          "type": "string", // 任务类型
+          "description": "string",
+          "status": "string", // 任务状态
+          "progress": "number", // 进度百分比
+          "total_items": "number", // 总项目数
+          "processed_items": "number", // 已处理项目数
+          "failed_items": "number", // 失败项目数
+          "created_by": "number",
+          "created_by_name": "string",
+          "started_at": "string",
+          "completed_at": "string",
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_tasks": "number",
+        "pending_tasks": "number",
+        "running_tasks": "number",
+        "completed_tasks": "number",
+        "failed_tasks": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或批量任务查看权限
+
+### 9.2 获取批量任务详情
+- **接口地址**: `/admin/tasks/batch/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定批量任务的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 任务ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "task": {
+        "id": "number",
+        "name": "string",
+        "type": "string",
+        "description": "string",
+        "status": "string",
+        "progress": "number",
+        "total_items": "number",
+        "processed_items": "number",
+        "failed_items": "number",
+        "created_by": "number",
+        "created_by_name": "string",
+        "started_at": "string",
+        "completed_at": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "config": "object", // 任务配置
+        "result": "object", // 任务结果
+        "error_message": "string" // 错误信息，如果有
+      },
+      "items": [
+        {
+          "id": "number",
+          "task_id": "number",
+          "item_id": "string", // 项目ID
+          "item_type": "string", // 项目类型
+          "status": "string", // 项目状态：pending/processing/completed/failed
+          "result": "object", // 处理结果
+          "error_message": "string", // 错误信息，如果有
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 任务不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或批量任务查看权限
+
+### 9.3 创建批量任务
+- **接口地址**: `/admin/tasks/batch`
+- **请求方法**: `POST`
+- **接口描述**: 创建新的批量任务
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // 任务名称，必填
+    "type": "string", // 任务类型，必填
+    "description": "string", // 任务描述，可选
+    "config": "object", // 任务配置，必填
+    "items": [ // 处理项目列表，必填
+      {
+        "item_id": "string", // 项目ID
+        "item_type": "string", // 项目类型
+        "data": "object" // 项目数据
+      }
+    ],
+    "scheduled_at": "string" // 计划执行时间，可选，格式：YYYY-MM-DD HH:mm:ss
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "task": {
+        "id": "number",
+        "name": "string",
+        "type": "string",
+        "description": "string",
+        "status": "string", // 默认为pending
+        "progress": "number", // 默认为0
+        "total_items": "number",
+        "processed_items": "number", // 默认为0
+        "failed_items": "number", // 默认为0
+        "created_by": "number",
+        "created_by_name": "string",
+        "scheduled_at": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "config": "object"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或批量任务创建权限
+
+### 9.4 取消批量任务
+- **接口地址**: `/admin/tasks/batch/{id}/cancel`
+- **请求方法**: `POST`
+- **接口描述**: 取消正在执行或等待执行的批量任务
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 任务ID（路径参数）
+    "reason": "string" // 取消原因，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "task": {
+        "id": "number",
+        "name": "string",
+        "type": "string",
+        "status": "string", // 更新为cancelled
+        "cancelled_at": "string",
+        "cancel_reason": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 任务不存在
+  - 409: 任务已完成或已取消，无法取消
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或批量任务管理权限
+
+### 9.5 重试失败的批量任务
+- **接口地址**: `/admin/tasks/batch/{id}/retry`
+- **请求方法**: `POST`
+- **接口描述**: 重试失败的批量任务或失败的项目
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 任务ID（路径参数）
+    "item_ids": ["string"] // 要重试的项目ID列表，可选，不填则重试所有失败项目
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "task": {
+        "id": "number",
+        "name": "string",
+        "type": "string",
+        "status": "string", // 更新为running
+        "retry_count": "number", // 重试次数
+        "updated_at": "string"
+      },
+      "retried_items": "number" // 重试的项目数量
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 任务不存在
+  - 409: 任务正在运行或已完成，无法重试
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或批量任务管理权限
+
+### 9.6 获取报表列表
+- **接口地址**: `/admin/reports`
+- **请求方法**: `GET`
+- **接口描述**: 获取系统报表列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "type": "string", // 报表类型筛选，可选
+    "category": "string", // 报表分类筛选，可选
+    "created_by": "number", // 创建人ID筛选，可选
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "reports": [
+        {
+          "id": "number",
+          "name": "string",
+          "type": "string", // 报表类型
+          "category": "string", // 报表分类
+          "description": "string",
+          "file_path": "string", // 文件路径
+          "file_size": "number", // 文件大小(字节)
+          "format": "string", // 文件格式：pdf/xlsx/csv
+          "status": "string", // 报表状态：generating/completed/failed
+          "created_by": "number",
+          "created_by_name": "string",
+          "generated_at": "string",
+          "expires_at": "string", // 过期时间，如果有
+          "created_at": "string",
+          "download_count": "number" // 下载次数
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_reports": "number",
+        "generating_reports": "number",
+        "completed_reports": "number",
+        "failed_reports": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或报表查看权限
+
+### 9.7 生成报表
+- **接口地址**: `/admin/reports/generate`
+- **请求方法**: `POST`
+- **接口描述**: 生成新的系统报表
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // 报表名称，必填
+    "type": "string", // 报表类型，必填
+    "category": "string", // 报表分类，可选
+    "description": "string", // 报表描述，可选
+    "format": "string", // 文件格式，可选，默认pdf，支持pdf/xlsx/csv
+    "template": "string", // 报表模板，可选
+    "filters": { // 筛选条件，可选
+      "start_date": "string",
+      "end_date": "string",
+      "user_id": "number",
+      "status": "string",
+      "custom_filters": "object"
+    },
+    "columns": ["string"], // 报表列，可选
+    "scheduled": "boolean", // 是否计划生成，可选，默认false
+    "schedule_config": { // 计划配置，scheduled为true时必填
+      "frequency": "string", // 频率：daily/weekly/monthly
+      "day_of_week": "number", // 星期几，weekly时必填
+      "day_of_month": "number", // 月份中的第几天，monthly时必填
+      "time": "string" // 时间，格式：HH:mm
+    }
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "report": {
+        "id": "number",
+        "name": "string",
+        "type": "string",
+        "category": "string",
+        "description": "string",
+        "format": "string",
+        "status": "string", // 默认为generating
+        "created_by": "number",
+        "created_by_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "filters": "object",
+        "columns": ["string"],
+        "scheduled": "boolean",
+        "schedule_config": "object"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或报表生成权限
+
+### 9.8 下载报表
+- **接口地址**: `/admin/reports/{id}/download`
+- **请求方法**: `GET`
+- **接口描述**: 下载指定的报表文件
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 报表ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "download_url": "string", // 下载链接
+      "expires_at": "string", // 链接过期时间
+      "file_name": "string", // 文件名
+      "file_size": "number" // 文件大小(字节)
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 报表不存在
+  - 409: 报表正在生成中或已过期
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或报表下载权限
+
+### 9.9 删除报表
+- **接口地址**: `/admin/reports/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除指定的报表
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 报表ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "报表删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 报表不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或报表删除权限
+
+### 9.10 获取报表模板列表
+- **接口地址**: `/admin/reports/templates`
+- **请求方法**: `GET`
+- **接口描述**: 获取可用的报表模板列表
+- **请求参数**:
+  ```json
+  {
+    "type": "string", // 报表类型筛选，可选
+    "category": "string" // 报表分类筛选，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "templates": [
+        {
+          "id": "string",
+          "name": "string",
+          "type": "string",
+          "category": "string",
+          "description": "string",
+          "preview_image": "string", // 预览图URL
+          "supported_formats": ["string"], // 支持的格式
+          "required_filters": ["string"], // 必需的筛选条件
+          "optional_filters": ["string"], // 可选的筛选条件
+          "default_columns": ["string"] // 默认列
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或报表查看权限
+
+## 10. 内容审核与工单相关接口 (moderationApi)
+
+### 10.1 获取审核队列
+- **接口地址**: `/admin/moderation/queue`
+- **请求方法**: `GET`
+- **接口描述**: 获取待审核内容队列
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "type": "string", // 内容类型筛选，可选
+    "status": "string", // 审核状态筛选，可选：pending/approved/rejected
+    "priority": "string", // 优先级筛选，可选：high/medium/low
+    "assigned_to": "number", // 分配给的管理员ID，可选
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "items": [
+        {
+          "id": "number",
+          "type": "string", // 内容类型
+          "content_id": "string", // 内容ID
+          "content": "object", // 内容数据
+          "status": "string", // 审核状态
+          "priority": "string", // 优先级
+          "submitted_by": "number", // 提交人ID
+          "submitted_by_name": "string",
+          "assigned_to": "number", // 分配给的管理员ID
+          "assigned_to_name": "string",
+          "submitted_at": "string",
+          "assigned_at": "string",
+          "due_date": "string", // 截止日期
+          "tags": ["string"], // 标签
+          "reports": "number", // 举报数量
+          "auto_flags": ["string"] // 自动标记的问题
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_items": "number",
+        "pending_items": "number",
+        "approved_items": "number",
+        "rejected_items": "number",
+        "overdue_items": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或内容审核权限
+
+### 10.2 获取审核详情
+- **接口地址**: `/admin/moderation/item/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定审核项的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 审核项ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "item": {
+        "id": "number",
+        "type": "string",
+        "content_id": "string",
+        "content": "object",
+        "status": "string",
+        "priority": "string",
+        "submitted_by": "number",
+        "submitted_by_name": "string",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "submitted_at": "string",
+        "assigned_at": "string",
+        "due_date": "string",
+        "tags": ["string"],
+        "reports": "number",
+        "auto_flags": ["string"],
+        "similar_items": [ // 相似内容
+          {
+            "id": "number",
+            "content_id": "string",
+            "similarity_score": "number"
+          }
+        ],
+        "history": [ // 审核历史
+          {
+            "id": "number",
+            "action": "string",
+            "admin_id": "number",
+            "admin_name": "string",
+            "comment": "string",
+            "created_at": "string"
+          }
+        ]
+      },
+      "reports": [ // 举报详情
+        {
+          "id": "number",
+          "reporter_id": "number",
+          "reporter_name": "string",
+          "reason": "string",
+          "description": "string",
+          "created_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 审核项不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或内容审核权限
+
+### 10.3 处理审核
+- **接口地址**: `/admin/moderation/item/{id}/process`
+- **请求方法**: `POST`
+- **接口描述**: 处理内容审核
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 审核项ID（路径参数）
+    "action": "string", // 操作类型，必填：approve/reject/escalate
+    "comment": "string", // 审核意见，可选
+    "tags": ["string"], // 标签，可选
+    "priority": "string", // 优先级，可选
+    "escalate_to": "number", // 上报给的管理员ID，escalate时必填
+    "notify_user": "boolean", // 是否通知用户，可选，默认true
+    "reason": "string", // 拒绝原因，reject时必填
+    "auto_flags": ["string"] // 自动标记的问题，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "item": {
+        "id": "number",
+        "status": "string", // 更新后的状态
+        "processed_by": "number",
+        "processed_by_name": "string",
+        "processed_at": "string",
+        "comment": "string",
+        "tags": ["string"],
+        "priority": "string"
+      },
+      "message": "审核处理成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 审核项不存在
+  - 409: 审核项已处理
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或内容审核权限
+
+### 10.4 批量处理审核
+- **接口地址**: `/admin/moderation/batch-process`
+- **请求方法**: `POST`
+- **接口描述**: 批量处理内容审核
+- **请求参数**:
+  ```json
+  {
+    "item_ids": ["number"], // 审核项ID列表，必填
+    "action": "string", // 操作类型，必填：approve/reject/escalate
+    "comment": "string", // 审核意见，可选
+    "tags": ["string"], // 标签，可选
+    "priority": "string", // 优先级，可选
+    "escalate_to": "number", // 上报给的管理员ID，escalate时必填
+    "notify_user": "boolean", // 是否通知用户，可选，默认true
+    "reason": "string", // 拒绝原因，reject时必填
+    "auto_flags": ["string"] // 自动标记的问题，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "processed_count": "number", // 成功处理数量
+      "failed_count": "number", // 处理失败数量
+      "failed_items": [ // 处理失败的项目
+        {
+          "id": "number",
+          "error": "string"
+        }
+      ],
+      "message": "批量审核处理完成"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或内容审核权限
+
+### 10.5 获取工单列表
+- **接口地址**: `/admin/tickets`
+- **请求方法**: `GET`
+- **接口描述**: 获取工单列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "status": "string", // 工单状态筛选，可选：open/in_progress/pending/closed
+    "priority": "string", // 优先级筛选，可选：high/medium/low
+    "category": "string", // 工单分类筛选，可选
+    "assigned_to": "number", // 分配给的管理员ID，可选
+    "created_by": "number", // 创建人ID，可选
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "tickets": [
+        {
+          "id": "number",
+          "title": "string",
+          "description": "string",
+          "status": "string",
+          "priority": "string",
+          "category": "string",
+          "created_by": "number",
+          "created_by_name": "string",
+          "assigned_to": "number",
+          "assigned_to_name": "string",
+          "created_at": "string",
+          "updated_at": "string",
+          "due_date": "string",
+          "tags": ["string"],
+          "attachments_count": "number",
+          "replies_count": "number"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_tickets": "number",
+        "open_tickets": "number",
+        "in_progress_tickets": "number",
+        "pending_tickets": "number",
+        "closed_tickets": "number",
+        "overdue_tickets": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或工单查看权限
+
+### 10.6 获取工单详情
+- **接口地址**: `/admin/tickets/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定工单的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 工单ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "ticket": {
+        "id": "number",
+        "title": "string",
+        "description": "string",
+        "status": "string",
+        "priority": "string",
+        "category": "string",
+        "created_by": "number",
+        "created_by_name": "string",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "due_date": "string",
+        "closed_at": "string",
+        "tags": ["string"],
+        "custom_fields": "object" // 自定义字段
+      },
+      "replies": [ // 回复列表
+        {
+          "id": "number",
+          "ticket_id": "number",
+          "content": "string",
+          "is_internal": "boolean", // 是否为内部回复
+          "author_id": "number",
+          "author_name": "string",
+          "author_type": "string", // 作者类型：admin/user
+          "created_at": "string",
+          "attachments": [ // 附件
+            {
+              "id": "number",
+              "name": "string",
+              "url": "string",
+              "size": "number"
+            }
+          ]
+        }
+      ],
+      "activities": [ // 活动记录
+        {
+          "id": "number",
+          "action": "string",
+          "description": "string",
+          "admin_id": "number",
+          "admin_name": "string",
+          "created_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 工单不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或工单查看权限
+
+### 10.7 创建工单
+- **接口地址**: `/admin/tickets`
+- **请求方法**: `POST`
+- **接口描述**: 创建新的工单
+- **请求参数**:
+  ```json
+  {
+    "title": "string", // 工单标题，必填
+    "description": "string", // 工单描述，必填
+    "priority": "string", // 优先级，可选，默认medium
+    "category": "string", // 工单分类，可选
+    "assigned_to": "number", // 分配给的管理员ID，可选
+    "tags": ["string"], // 标签，可选
+    "custom_fields": "object", // 自定义字段，可选
+    "attachments": [ // 附件，可选
+      {
+        "name": "string",
+        "url": "string",
+        "size": "number"
+      }
+    ],
+    "due_date": "string" // 截止日期，可选，格式：YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "ticket": {
+        "id": "number",
+        "title": "string",
+        "description": "string",
+        "status": "string", // 默认为open
+        "priority": "string",
+        "category": "string",
+        "created_by": "number",
+        "created_by_name": "string",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "due_date": "string",
+        "tags": ["string"],
+        "custom_fields": "object"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或工单创建权限
+
+### 10.8 更新工单
+- **接口地址**: `/admin/tickets/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新工单信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 工单ID（路径参数）
+    "title": "string", // 工单标题，可选
+    "description": "string", // 工单描述，可选
+    "status": "string", // 工单状态，可选
+    "priority": "string", // 优先级，可选
+    "category": "string", // 工单分类，可选
+    "assigned_to": "number", // 分配给的管理员ID，可选
+    "tags": ["string"], // 标签，可选
+    "custom_fields": "object", // 自定义字段，可选
+    "due_date": "string" // 截止日期，可选，格式：YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "ticket": {
+        "id": "number",
+        "title": "string",
+        "description": "string",
+        "status": "string",
+        "priority": "string",
+        "category": "string",
+        "created_by": "number",
+        "created_by_name": "string",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "due_date": "string",
+        "tags": ["string"],
+        "custom_fields": "object"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 工单不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或工单管理权限
+
+### 10.9 添加工单回复
+- **接口地址**: `/admin/tickets/{id}/replies`
+- **请求方法**: `POST`
+- **接口描述**: 添加工单回复
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 工单ID（路径参数）
+    "content": "string", // 回复内容，必填
+    "is_internal": "boolean", // 是否为内部回复，可选，默认false
+    "attachments": [ // 附件，可选
+      {
+        "name": "string",
+        "url": "string",
+        "size": "number"
+      }
+    ]
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "reply": {
+        "id": "number",
+        "ticket_id": "number",
+        "content": "string",
+        "is_internal": "boolean",
+        "author_id": "number",
+        "author_name": "string",
+        "author_type": "string",
+        "created_at": "string",
+        "attachments": [
+          {
+            "id": "number",
+            "name": "string",
+            "url": "string",
+            "size": "number"
+          }
+        ]
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 工单不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或工单管理权限
+
+### 10.10 获取工单分类列表
+- **接口地址**: `/admin/tickets/categories`
+- **请求方法**: `GET`
+- **接口描述**: 获取工单分类列表
+- **请求参数**:
+  ```json
+  {
+    "active": "boolean" // 是否只获取启用的分类，可选，默认true
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "categories": [
+        {
+          "id": "number",
+          "name": "string",
+          "description": "string",
+          "color": "string", // 颜色代码
+          "icon": "string", // 图标
+          "is_active": "boolean",
+          "sort_order": "number",
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或工单查看权限
+
+## 11. 集成与回调相关接口 (integrationApi)
+
+### 11.1 获取Webhook列表
+- **接口地址**: `/admin/webhooks`
+- **请求方法**: `GET`
+- **接口描述**: 获取Webhook列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "status": "string", // 状态筛选，可选：active/inactive
+    "event_type": "string", // 事件类型筛选，可选
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "webhooks": [
+        {
+          "id": "number",
+          "name": "string",
+          "url": "string",
+          "event_types": ["string"], // 订阅的事件类型
+          "secret": "string", // 签名密钥（脱敏显示）
+          "status": "string",
+          "retry_count": "number",
+          "timeout": "number", // 超时时间（秒）
+          "created_by": "number",
+          "created_by_name": "string",
+          "created_at": "string",
+          "updated_at": "string",
+          "last_triggered_at": "string",
+          "success_count": "number",
+          "failure_count": "number"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成管理权限
+
+### 11.2 创建Webhook
+- **接口地址**: `/admin/webhooks`
+- **请求方法**: `POST`
+- **接口描述**: 创建新的Webhook
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // Webhook名称，必填
+    "url": "string", // 回调URL，必填
+    "event_types": ["string"], // 订阅的事件类型，必填
+    "secret": "string", // 签名密钥，可选，不填则自动生成
+    "retry_count": "number", // 重试次数，可选，默认3
+    "timeout": "number", // 超时时间（秒），可选，默认30
+    "description": "string", // 描述，可选
+    "headers": "object" // 自定义请求头，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "webhook": {
+        "id": "number",
+        "name": "string",
+        "url": "string",
+        "event_types": ["string"],
+        "secret": "string", // 完整密钥，只在创建时返回
+        "status": "string", // 默认为active
+        "retry_count": "number",
+        "timeout": "number",
+        "description": "string",
+        "headers": "object",
+        "created_by": "number",
+        "created_by_name": "string",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 409: URL已存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成管理权限
+
+### 11.3 获取Webhook详情
+- **接口地址**: `/admin/webhooks/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定Webhook的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // Webhook ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "webhook": {
+        "id": "number",
+        "name": "string",
+        "url": "string",
+        "event_types": ["string"],
+        "secret": "string", // 脱敏显示
+        "status": "string",
+        "retry_count": "number",
+        "timeout": "number",
+        "description": "string",
+        "headers": "object",
+        "created_by": "number",
+        "created_by_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "last_triggered_at": "string",
+        "success_count": "number",
+        "failure_count": "number"
+      },
+      "recent_deliveries": [ // 最近交付记录
+        {
+          "id": "number",
+          "event_type": "string",
+          "event_data": "object",
+          "status": "string", // success/failure/pending
+          "http_status": "number",
+          "response_body": "string",
+          "attempt_count": "number",
+          "created_at": "string",
+          "delivered_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: Webhook不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成查看权限
+
+### 11.4 更新Webhook
+- **接口地址**: `/admin/webhooks/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新Webhook信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // Webhook ID（路径参数）
+    "name": "string", // Webhook名称，可选
+    "url": "string", // 回调URL，可选
+    "event_types": ["string"], // 订阅的事件类型，可选
+    "secret": "string", // 签名密钥，可选
+    "status": "string", // 状态，可选
+    "retry_count": "number", // 重试次数，可选
+    "timeout": "number", // 超时时间（秒），可选
+    "description": "string", // 描述，可选
+    "headers": "object" // 自定义请求头，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "webhook": {
+        "id": "number",
+        "name": "string",
+        "url": "string",
+        "event_types": ["string"],
+        "secret": "string", // 脱敏显示
+        "status": "string",
+        "retry_count": "number",
+        "timeout": "number",
+        "description": "string",
+        "headers": "object",
+        "created_by": "number",
+        "created_by_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "last_triggered_at": "string",
+        "success_count": "number",
+        "failure_count": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: Webhook不存在
+  - 409: URL已存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成管理权限
+
+### 11.5 删除Webhook
+- **接口地址**: `/admin/webhooks/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除Webhook
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // Webhook ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "Webhook删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: Webhook不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成管理权限
+
+### 11.6 测试Webhook
+- **接口地址**: `/admin/webhooks/{id}/test`
+- **请求方法**: `POST`
+- **接口描述**: 测试Webhook连接
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // Webhook ID（路径参数）
+    "event_type": "string", // 测试事件类型，可选
+    "test_data": "object" // 测试数据，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "delivery": {
+        "id": "number",
+        "webhook_id": "number",
+        "event_type": "string",
+        "event_data": "object",
+        "status": "string", // success/failure/pending
+        "http_status": "number",
+        "response_body": "string",
+        "attempt_count": "number",
+        "created_at": "string",
+        "delivered_at": "string"
+      },
+      "message": "测试完成"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: Webhook不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成管理权限
+
+### 11.7 获取Webhook事件列表
+- **接口地址**: `/admin/webhooks/events`
+- **请求方法**: `GET`
+- **接口描述**: 获取可订阅的Webhook事件列表
+- **请求参数**:
+  ```json
+  {
+    "category": "string" // 事件分类筛选，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "events": [
+        {
+          "name": "string", // 事件名称
+          "description": "string", // 事件描述
+          "category": "string", // 事件分类
+          "payload_schema": "object" // 事件数据结构
+        }
+      ],
+      "categories": ["string"] // 所有事件分类
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成查看权限
+
+### 11.8 获取Webhook交付历史
+- **接口地址**: `/admin/webhooks/{id}/deliveries`
+- **请求方法**: `GET`
+- **接口描述**: 获取Webhook交付历史
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // Webhook ID（路径参数）
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "status": "string", // 状态筛选，可选：success/failure/pending
+    "event_type": "string", // 事件类型筛选，可选
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string" // 结束日期，可选，格式：YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "deliveries": [
+        {
+          "id": "number",
+          "webhook_id": "number",
+          "event_type": "string",
+          "event_data": "object",
+          "status": "string",
+          "http_status": "number",
+          "response_body": "string",
+          "attempt_count": "number",
+          "created_at": "string",
+          "delivered_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_deliveries": "number",
+        "success_deliveries": "number",
+        "failure_deliveries": "number",
+        "pending_deliveries": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: Webhook不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成查看权限
+
+### 11.9 重新发送Webhook
+- **接口地址**: `/admin/webhooks/deliveries/{delivery_id}/redeliver`
+- **请求方法**: `POST`
+- **接口描述**: 重新发送失败的Webhook
+- **请求参数**:
+  ```json
+  {
+    "delivery_id": "number" // 交付记录ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "delivery": {
+        "id": "number",
+        "webhook_id": "number",
+        "event_type": "string",
+        "event_data": "object",
+        "status": "string", // success/failure/pending
+        "http_status": "number",
+        "response_body": "string",
+        "attempt_count": "number",
+        "created_at": "string",
+        "delivered_at": "string"
+      },
+      "message": "重新发送成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 交付记录不存在
+  - 409: 交付记录状态不允许重新发送
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成管理权限
+
+### 11.10 获取集成配置列表
+- **接口地址**: `/admin/integrations`
+- **请求方法**: `GET`
+- **接口描述**: 获取第三方集成配置列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "type": "string", // 集成类型筛选，可选
+    "status": "string", // 状态筛选，可选：active/inactive
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "integrations": [
+        {
+          "id": "number",
+          "name": "string",
+          "type": "string", // 集成类型
+          "status": "string",
+          "config": "object", // 配置信息（脱敏）
+          "created_by": "number",
+          "created_by_name": "string",
+          "created_at": "string",
+          "updated_at": "string",
+          "last_sync_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或集成管理权限
+
+## 12. 争议管理相关接口 (disputeApi)
+
+### 12.1 获取争议列表
+- **接口地址**: `/admin/disputes`
+- **请求方法**: `GET`
+- **接口描述**: 获取争议列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "status": "string", // 争议状态筛选，可选：open/investigating/resolved/closed
+    "priority": "string", // 优先级筛选，可选：high/medium/low
+    "type": "string", // 争议类型筛选，可选
+    "assigned_to": "number", // 分配给的管理员ID，可选
+    "created_by": "number", // 创建人ID，可选
+    "related_to": "string", // 关联对象类型，可选：bill/expense/user
+    "related_id": "number", // 关联对象ID，可选
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "disputes": [
+        {
+          "id": "number",
+          "title": "string",
+          "description": "string",
+          "status": "string",
+          "priority": "string",
+          "type": "string",
+          "created_by": "number",
+          "created_by_name": "string",
+          "assigned_to": "number",
+          "assigned_to_name": "string",
+          "related_to": "string", // 关联对象类型
+          "related_id": "number", // 关联对象ID
+          "related_object": "object", // 关联对象详情
+          "created_at": "string",
+          "updated_at": "string",
+          "due_date": "string",
+          "resolved_at": "string",
+          "tags": ["string"],
+          "attachments_count": "number",
+          "comments_count": "number"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_disputes": "number",
+        "open_disputes": "number",
+        "investigating_disputes": "number",
+        "resolved_disputes": "number",
+        "closed_disputes": "number",
+        "overdue_disputes": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议查看权限
+
+### 12.2 获取争议详情
+- **接口地址**: `/admin/disputes/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定争议的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 争议ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dispute": {
+        "id": "number",
+        "title": "string",
+        "description": "string",
+        "status": "string",
+        "priority": "string",
+        "type": "string",
+        "created_by": "number",
+        "created_by_name": "string",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "related_to": "string",
+        "related_id": "number",
+        "related_object": "object",
+        "created_at": "string",
+        "updated_at": "string",
+        "due_date": "string",
+        "resolved_at": "string",
+        "resolution": "string", // 解决方案
+        "tags": ["string"],
+        "custom_fields": "object" // 自定义字段
+      },
+      "attachments": [ // 附件列表
+        {
+          "id": "number",
+          "name": "string",
+          "url": "string",
+          "size": "number",
+          "uploaded_by": "number",
+          "uploaded_by_name": "string",
+          "uploaded_at": "string"
+        }
+      ],
+      "comments": [ // 评论列表
+        {
+          "id": "number",
+          "dispute_id": "number",
+          "content": "string",
+          "is_internal": "boolean", // 是否为内部评论
+          "author_id": "number",
+          "author_name": "string",
+          "author_type": "string", // 作者类型：admin/user
+          "created_at": "string"
+        }
+      ],
+      "activities": [ // 活动记录
+        {
+          "id": "number",
+          "action": "string",
+          "description": "string",
+          "admin_id": "number",
+          "admin_name": "string",
+          "created_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 争议不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议查看权限
+
+### 12.3 创建争议
+- **接口地址**: `/admin/disputes`
+- **请求方法**: `POST`
+- **接口描述**: 创建新的争议
+- **请求参数**:
+  ```json
+  {
+    "title": "string", // 争议标题，必填
+    "description": "string", // 争议描述，必填
+    "priority": "string", // 优先级，可选，默认medium
+    "type": "string", // 争议类型，可选
+    "assigned_to": "number", // 分配给的管理员ID，可选
+    "related_to": "string", // 关联对象类型，可选
+    "related_id": "number", // 关联对象ID，可选
+    "tags": ["string"], // 标签，可选
+    "custom_fields": "object", // 自定义字段，可选
+    "attachments": [ // 附件，可选
+      {
+        "name": "string",
+        "url": "string",
+        "size": "number"
+      }
+    ],
+    "due_date": "string" // 截止日期，可选，格式：YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dispute": {
+        "id": "number",
+        "title": "string",
+        "description": "string",
+        "status": "string", // 默认为open
+        "priority": "string",
+        "type": "string",
+        "created_by": "number",
+        "created_by_name": "string",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "related_to": "string",
+        "related_id": "number",
+        "created_at": "string",
+        "updated_at": "string",
+        "due_date": "string",
+        "tags": ["string"],
+        "custom_fields": "object"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议创建权限
+
+### 12.4 更新争议
+- **接口地址**: `/admin/disputes/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新争议信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 争议ID（路径参数）
+    "title": "string", // 争议标题，可选
+    "description": "string", // 争议描述，可选
+    "status": "string", // 争议状态，可选
+    "priority": "string", // 优先级，可选
+    "type": "string", // 争议类型，可选
+    "assigned_to": "number", // 分配给的管理员ID，可选
+    "tags": ["string"], // 标签，可选
+    "custom_fields": "object", // 自定义字段，可选
+    "due_date": "string" // 截止日期，可选，格式：YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dispute": {
+        "id": "number",
+        "title": "string",
+        "description": "string",
+        "status": "string",
+        "priority": "string",
+        "type": "string",
+        "created_by": "number",
+        "created_by_name": "string",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "related_to": "string",
+        "related_id": "number",
+        "created_at": "string",
+        "updated_at": "string",
+        "due_date": "string",
+        "tags": ["string"],
+        "custom_fields": "object"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 争议不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议管理权限
+
+### 12.5 删除争议
+- **接口地址**: `/admin/disputes/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除争议
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 争议ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "争议删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 争议不存在
+  - 409: 争议已解决，无法删除
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议删除权限
+
+### 12.6 分配处理人
+- **接口地址**: `/admin/disputes/{id}/assign`
+- **请求方法**: `POST`
+- **接口描述**: 分配争议处理人
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 争议ID（路径参数）
+    "assigned_to": "number", // 分配给的管理员ID，必填
+    "comment": "string", // 分配说明，可选
+    "notify": "boolean" // 是否通知处理人，可选，默认true
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dispute": {
+        "id": "number",
+        "assigned_to": "number",
+        "assigned_to_name": "string",
+        "assigned_at": "string",
+        "assigned_by": "number",
+        "assigned_by_name": "string"
+      },
+      "message": "争议处理人分配成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 争议不存在
+  - 404: 处理人不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议管理权限
+
+### 12.7 处理争议
+- **接口地址**: `/admin/disputes/{id}/process`
+- **请求方法**: `POST`
+- **接口描述**: 处理争议
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 争议ID（路径参数）
+    "action": "string", // 操作类型，必填：investigate/escalate/resolve/close/reopen
+    "comment": "string", // 处理说明，可选
+    "resolution": "string", // 解决方案，resolve时必填
+    "escalate_to": "number", // 上报给的管理员ID，escalate时必填
+    "notify_parties": "boolean", // 是否通知相关方，可选，默认true
+    "tags": ["string"], // 标签，可选
+    "custom_fields": "object" // 自定义字段，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dispute": {
+        "id": "number",
+        "status": "string", // 更新后的状态
+        "processed_by": "number",
+        "processed_by_name": "string",
+        "processed_at": "string",
+        "comment": "string",
+        "resolution": "string", // 解决方案
+        "tags": ["string"],
+        "custom_fields": "object"
+      },
+      "message": "争议处理成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 争议不存在
+  - 409: 争议状态不允许此操作
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议处理权限
+
+### 12.8 解决争议
+- **接口地址**: `/admin/disputes/{id}/resolve`
+- **请求方法**: `POST`
+- **接口描述**: 解决争议
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 争议ID（路径参数）
+    "resolution": "string", // 解决方案，必填
+    "comment": "string", // 解决说明，可选
+    "notify_parties": "boolean", // 是否通知相关方，可选，默认true
+    "tags": ["string"], // 标签，可选
+    "custom_fields": "object" // 自定义字段，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dispute": {
+        "id": "number",
+        "status": "string", // 更新为resolved
+        "resolved_by": "number",
+        "resolved_by_name": "string",
+        "resolved_at": "string",
+        "resolution": "string",
+        "comment": "string",
+        "tags": ["string"],
+        "custom_fields": "object"
+      },
+      "message": "争议解决成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 争议不存在
+  - 409: 争议已解决或关闭
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议处理权限
+
+### 12.9 获取可分配的处理人列表
+- **接口地址**: `/admin/disputes/assignable-users`
+- **请求方法**: `GET`
+- **接口描述**: 获取可分配的争议处理人列表
+- **请求参数**:
+  ```json
+  {
+    "role": "string", // 角色筛选，可选
+    "department": "string", // 部门筛选，可选
+    "active": "boolean" // 是否只获取活跃用户，可选，默认true
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "users": [
+        {
+          "id": "number",
+          "username": "string",
+          "name": "string",
+          "email": "string",
+          "avatar": "string",
+          "role": "string",
+          "department": "string",
+          "active_disputes_count": "number", // 当前处理的争议数量
+          "resolved_disputes_count": "number", // 已解决的争议数量
+          "is_available": "boolean" // 是否可分配
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议管理权限
+
+### 12.10 获取争议统计数据
+- **接口地址**: `/admin/disputes/stats`
+- **请求方法**: `GET`
+- **接口描述**: 获取争议统计数据
+- **请求参数**:
+  ```json
+  {
+    "period": "string", // 统计周期，可选：week/month/quarter/year，默认month
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式：YYYY-MM-DD
+    "type": "string" // 争议类型筛选，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "summary": {
+        "total_disputes": "number",
+        "open_disputes": "number",
+        "investigating_disputes": "number",
+        "resolved_disputes": "number",
+        "closed_disputes": "number",
+        "average_resolution_time": "number", // 平均解决时间（小时）
+        "resolution_rate": "number" // 解决率（百分比）
+      },
+      "trends": [
+        {
+          "period": "string",
+          "total": "number",
+          "resolved": "number",
+          "resolution_rate": "number"
+        }
+      ],
+      "by_type": [
+        {
+          "type": "string",
+          "count": "number",
+          "percentage": "number"
+        }
+      ],
+      "by_priority": [
+        {
+          "priority": "string",
+          "count": "number",
+          "percentage": "number"
+        }
+      ],
+      "top_handlers": [ // 处理争议最多的管理员
+        {
+          "admin_id": "number",
+          "admin_name": "string",
+          "handled_count": "number",
+          "resolved_count": "number",
+          "resolution_rate": "number"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或争议查看权限
+
+## 13. 寝室管理相关接口 (dormitoryApi)
+
+### 13.1 获取寝室列表
+- **接口地址**: `/admin/dormitories`
+- **请求方法**: `GET`
+- **接口描述**: 获取寝室列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "building": "string", // 楼栋筛选，可选
+    "floor": "number", // 楼层筛选，可选
+    "room_number": "string", // 寝室号筛选，可选
+    "status": "string", // 状态筛选，可选：active/inactive/maintenance
+    "capacity": "number", // 容量筛选，可选
+    "occupied_count": "number", // 已住人数筛选，可选
+    "gender": "string", // 性别筛选，可选：male/female/mixed
+    "type": "string", // 寝室类型筛选，可选
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dormitories": [
+        {
+          "id": "number",
+          "building": "string",
+          "floor": "number",
+          "room_number": "string",
+          "capacity": "number",
+          "occupied_count": "number",
+          "available_count": "number",
+          "status": "string",
+          "gender": "string",
+          "type": "string",
+          "manager_id": "number",
+          "manager_name": "string",
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "stats": {
+        "total_dormitories": "number",
+        "active_dormitories": "number",
+        "total_capacity": "number",
+        "total_occupied": "number",
+        "total_available": "number",
+        "occupancy_rate": "number" // 入住率（百分比）
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室管理权限
+
+### 13.2 获取寝室详情
+- **接口地址**: `/admin/dormitories/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定寝室的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 寝室ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dormitory": {
+        "id": "number",
+        "building": "string",
+        "floor": "number",
+        "room_number": "string",
+        "capacity": "number",
+        "occupied_count": "number",
+        "available_count": "number",
+        "status": "string",
+        "gender": "string",
+        "type": "string",
+        "manager_id": "number",
+        "manager_name": "string",
+        "description": "string",
+        "facilities": ["string"], // 设施列表
+        "rules": "string", // 寝室规定
+        "created_at": "string",
+        "updated_at": "string"
+      },
+      "members": [ // 寝室成员列表
+        {
+          "id": "number",
+          "user_id": "number",
+          "username": "string",
+          "name": "string",
+          "email": "string",
+          "phone": "string",
+          "avatar": "string",
+          "role": "string", // 成员角色：member/manager
+          "joined_at": "string",
+          "left_at": "string",
+          "is_active": "boolean"
+        }
+      ],
+      "history": [ // 变更历史
+        {
+          "id": "number",
+          "action": "string",
+          "description": "string",
+          "admin_id": "number",
+          "admin_name": "string",
+          "created_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 寝室不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室查看权限
+
+### 13.3 创建寝室
+- **接口地址**: `/admin/dormitories`
+- **请求方法**: `POST`
+- **接口描述**: 创建新的寝室
+- **请求参数**:
+  ```json
+  {
+    "building": "string", // 楼栋，必填
+    "floor": "number", // 楼层，必填
+    "room_number": "string", // 寝室号，必填
+    "capacity": "number", // 容量，必填
+    "gender": "string", // 性别，必填：male/female/mixed
+    "type": "string", // 寝室类型，可选
+    "manager_id": "number", // 寝室长ID，可选
+    "description": "string", // 描述，可选
+    "facilities": ["string"], // 设施列表，可选
+    "rules": "string" // 寝室规定，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dormitory": {
+        "id": "number",
+        "building": "string",
+        "floor": "number",
+        "room_number": "string",
+        "capacity": "number",
+        "occupied_count": "number",
+        "available_count": "number",
+        "status": "string", // 默认为active
+        "gender": "string",
+        "type": "string",
+        "manager_id": "number",
+        "manager_name": "string",
+        "description": "string",
+        "facilities": ["string"],
+        "rules": "string",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 409: 寝室已存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室创建权限
+
+### 13.4 更新寝室
+- **接口地址**: `/admin/dormitories/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新寝室信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 寝室ID（路径参数）
+    "building": "string", // 楼栋，可选
+    "floor": "number", // 楼层，可选
+    "room_number": "string", // 寝室号，可选
+    "capacity": "number", // 容量，可选
+    "status": "string", // 状态，可选
+    "gender": "string", // 性别，可选
+    "type": "string", // 寝室类型，可选
+    "manager_id": "number", // 寝室长ID，可选
+    "description": "string", // 描述，可选
+    "facilities": ["string"], // 设施列表，可选
+    "rules": "string" // 寝室规定，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dormitory": {
+        "id": "number",
+        "building": "string",
+        "floor": "number",
+        "room_number": "string",
+        "capacity": "number",
+        "occupied_count": "number",
+        "available_count": "number",
+        "status": "string",
+        "gender": "string",
+        "type": "string",
+        "manager_id": "number",
+        "manager_name": "string",
+        "description": "string",
+        "facilities": ["string"],
+        "rules": "string",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 寝室不存在
+  - 409: 寝室号已存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室管理权限
+
+### 13.5 删除寝室
+- **接口地址**: `/admin/dormitories/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除寝室
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 寝室ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "寝室删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 寝室不存在
+  - 409: 寝室仍有成员，无法删除
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室删除权限
+
+### 13.6 获取寝室成员列表
+- **接口地址**: `/admin/dormitories/{id}/members`
+- **请求方法**: `GET`
+- **接口描述**: 获取寝室成员列表
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 寝室ID（路径参数）
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "role": "string", // 角色筛选，可选：member/manager
+    "is_active": "boolean", // 是否只获取活跃成员，可选，默认true
+    "search": "string" // 搜索关键词，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "members": [
+        {
+          "id": "number",
+          "user_id": "number",
+          "username": "string",
+          "name": "string",
+          "email": "string",
+          "phone": "string",
+          "avatar": "string",
+          "role": "string",
+          "joined_at": "string",
+          "left_at": "string",
+          "is_active": "boolean"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 寝室不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室查看权限
+
+### 13.7 添加寝室成员
+- **接口地址**: `/admin/dormitories/{id}/members`
+- **请求方法**: `POST`
+- **接口描述**: 添加寝室成员
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 寝室ID（路径参数）
+    "user_id": "number", // 用户ID，必填
+    "role": "string", // 角色，可选，默认member
+    "joined_at": "string" // 入住日期，可选，默认当前日期
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "member": {
+        "id": "number",
+        "user_id": "number",
+        "username": "string",
+        "name": "string",
+        "email": "string",
+        "phone": "string",
+        "avatar": "string",
+        "role": "string",
+        "joined_at": "string",
+        "left_at": "string",
+        "is_active": "boolean"
+      },
+      "message": "寝室成员添加成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 寝室不存在
+  - 404: 用户不存在
+  - 409: 用户已在其他寝室
+  - 409: 寝室已满员
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室管理权限
+
+### 13.8 移除寝室成员
+- **接口地址**: `/admin/dormitories/{id}/members/{member_id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 移除寝室成员
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 寝室ID（路径参数）
+    "member_id": "number" // 成员ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "寝室成员移除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 寝室不存在
+  - 404: 成员不存在
+  - 409: 无法移除寝室长
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室管理权限
+
+### 13.9 设置寝室长
+- **接口地址**: `/admin/dormitories/{id}/manager`
+- **请求方法**: `PUT`
+- **接口描述**: 设置寝室长
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 寝室ID（路径参数）
+    "member_id": "number", // 成员ID，必填
+    "comment": "string" // 设置说明，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "dormitory": {
+        "id": "number",
+        "manager_id": "number",
+        "manager_name": "string"
+      },
+      "message": "寝室长设置成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 寝室不存在
+  - 404: 成员不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室管理权限
+
+### 13.10 获取寝室统计数据
+- **接口地址**: `/admin/dormitories/stats`
+- **请求方法**: `GET`
+- **接口描述**: 获取寝室统计数据
+- **请求参数**:
+  ```json
+  {
+    "building": "string", // 楼栋筛选，可选
+    "gender": "string", // 性别筛选，可选
+    "type": "string" // 寝室类型筛选，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "summary": {
+        "total_dormitories": "number",
+        "active_dormitories": "number",
+        "total_capacity": "number",
+        "total_occupied": "number",
+        "total_available": "number",
+        "occupancy_rate": "number" // 入住率（百分比）
+      },
+      "by_building": [
+        {
+          "building": "string",
+          "dormitories_count": "number",
+          "capacity": "number",
+          "occupied": "number",
+          "occupancy_rate": "number"
+        }
+      ],
+      "by_gender": [
+        {
+          "gender": "string",
+          "dormitories_count": "number",
+          "capacity": "number",
+          "occupied": "number",
+          "occupancy_rate": "number"
+        }
+      ],
+      "by_type": [
+        {
+          "type": "string",
+          "dormitories_count": "number",
+          "capacity": "number",
+          "occupied": "number",
+          "occupancy_rate": "number"
+        }
+      ],
+      "occupancy_trends": [ // 入住率趋势
+        {
+          "period": "string",
+          "occupancy_rate": "number"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或寝室查看权限
+
+## 14. 文档管理相关接口 (documentApi)
+
+### 14.1 获取文档列表
+- **接口地址**: `/admin/documents`
+- **请求方法**: `GET`
+- **接口描述**: 获取文档列表
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "category": "string", // 文档分类筛选，可选
+    "type": "string", // 文档类型筛选，可选
+    "status": "string", // 状态筛选，可选：published/draft/archived
+    "search": "string", // 搜索关键词，可选
+    "sort": "string", // 排序字段，可选：created_at/updated_at/title
+    "order": "string" // 排序方向，可选：asc/desc，默认desc
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "documents": [
+        {
+          "id": "number",
+          "title": "string",
+          "content": "string", // 摘要内容
+          "category": "string",
+          "type": "string",
+          "status": "string",
+          "author_id": "number",
+          "author_name": "string",
+          "created_at": "string",
+          "updated_at": "string",
+          "view_count": "number",
+          "like_count": "number",
+          "comment_count": "number",
+          "tags": ["string"],
+          "is_featured": "boolean"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "categories": ["string"], // 所有分类
+      "types": ["string"] // 所有类型
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档查看权限
+
+### 14.2 获取文档详情
+- **接口地址**: `/admin/documents/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定文档的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 文档ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "document": {
+        "id": "number",
+        "title": "string",
+        "content": "string", // 完整内容
+        "category": "string",
+        "type": "string",
+        "status": "string",
+        "author_id": "number",
+        "author_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "published_at": "string",
+        "view_count": "number",
+        "like_count": "number",
+        "comment_count": "number",
+        "tags": ["string"],
+        "is_featured": "boolean",
+        "seo_title": "string",
+        "seo_description": "string",
+        "seo_keywords": ["string"],
+        "attachments": [ // 附件列表
+          {
+            "id": "number",
+            "name": "string",
+            "url": "string",
+            "size": "number",
+            "type": "string"
+          }
+        ]
+      },
+      "related_documents": [ // 相关文档
+        {
+          "id": "number",
+          "title": "string",
+          "category": "string",
+          "created_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档查看权限
+
+### 14.3 创建文档
+- **接口地址**: `/admin/documents`
+- **请求方法**: `POST`
+- **接口描述**: 创建新文档
+- **请求参数**:
+  ```json
+  {
+    "title": "string", // 标题，必填
+    "content": "string", // 内容，必填
+    "category": "string", // 分类，必填
+    "type": "string", // 类型，必填
+    "status": "string", // 状态，可选，默认draft
+    "tags": ["string"], // 标签，可选
+    "is_featured": "boolean", // 是否推荐，可选，默认false
+    "seo_title": "string", // SEO标题，可选
+    "seo_description": "string", // SEO描述，可选
+    "seo_keywords": ["string"], // SEO关键词，可选
+    "attachments": [ // 附件，可选
+      {
+        "name": "string",
+        "url": "string",
+        "size": "number",
+        "type": "string"
+      }
+    ]
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "document": {
+        "id": "number",
+        "title": "string",
+        "content": "string",
+        "category": "string",
+        "type": "string",
+        "status": "string",
+        "author_id": "number",
+        "author_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "tags": ["string"],
+        "is_featured": "boolean",
+        "seo_title": "string",
+        "seo_description": "string",
+        "seo_keywords": ["string"]
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档创建权限
+
+### 14.4 更新文档
+- **接口地址**: `/admin/documents/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新文档信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 文档ID（路径参数）
+    "title": "string", // 标题，可选
+    "content": "string", // 内容，可选
+    "category": "string", // 分类，可选
+    "type": "string", // 类型，可选
+    "status": "string", // 状态，可选
+    "tags": ["string"], // 标签，可选
+    "is_featured": "boolean", // 是否推荐，可选
+    "seo_title": "string", // SEO标题，可选
+    "seo_description": "string", // SEO描述，可选
+    "seo_keywords": ["string"], // SEO关键词，可选
+    "attachments": [ // 附件，可选
+      {
+        "id": "number", // 附件ID，更新时需要
+        "name": "string",
+        "url": "string",
+        "size": "number",
+        "type": "string"
+      }
+    ]
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "document": {
+        "id": "number",
+        "title": "string",
+        "content": "string",
+        "category": "string",
+        "type": "string",
+        "status": "string",
+        "author_id": "number",
+        "author_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "published_at": "string",
+        "tags": ["string"],
+        "is_featured": "boolean",
+        "seo_title": "string",
+        "seo_description": "string",
+        "seo_keywords": ["string"]
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档编辑权限
+
+### 14.5 删除文档
+- **接口地址**: `/admin/documents/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除文档
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 文档ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "文档删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 409: 文档状态不允许删除
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档删除权限
+
+### 14.6 获取文档历史记录
+- **接口地址**: `/admin/documents/{id}/history`
+- **请求方法**: `GET`
+- **接口描述**: 获取文档修改历史记录
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 文档ID（路径参数）
+    "page": "number", // 页码，可选，默认1
+    "limit": "number" // 每页数量，可选，默认20
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "history": [
+        {
+          "id": "number",
+          "document_id": "number",
+          "version": "number",
+          "title": "string",
+          "content": "string", // 修改后的内容
+          "changes": "string", // 修改摘要
+          "editor_id": "number",
+          "editor_name": "string",
+          "created_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档查看权限
+
+### 14.7 获取文档统计
+- **接口地址**: `/admin/documents/stats`
+- **请求方法**: `GET`
+- **接口描述**: 获取文档统计数据
+- **请求参数**:
+  ```json
+  {
+    "start_date": "string", // 开始日期，可选，格式：YYYY-MM-DD
+    "end_date": "string" // 结束日期，可选，格式：YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "total_documents": "number",
+      "published_documents": "number",
+      "draft_documents": "number",
+      "archived_documents": "number",
+      "total_views": "number",
+      "total_likes": "number",
+      "total_comments": "number",
+      "category_stats": [
+        {
+          "category": "string",
+          "count": "number"
+        }
+      ],
+      "type_stats": [
+        {
+          "type": "string",
+          "count": "number"
+        }
+      ],
+      "popular_documents": [ // 热门文档
+        {
+          "id": "number",
+          "title": "string",
+          "view_count": "number",
+          "like_count": "number"
+        }
+      ],
+      "recent_documents": [ // 最近文档
+        {
+          "id": "number",
+          "title": "string",
+          "created_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档统计权限
+
+### 14.8 搜索文档
+- **接口地址**: `/admin/documents/search`
+- **请求方法**: `GET`
+- **接口描述**: 搜索文档
+- **请求参数**:
+  ```json
+  {
+    "q": "string", // 搜索关键词，必填
+    "page": "number", // 页码，可选，默认1
+    "limit": "number", // 每页数量，可选，默认20
+    "category": "string", // 分类筛选，可选
+    "type": "string", // 类型筛选，可选
+    "date_range": "string" // 时间范围，可选：week/month/year
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "documents": [
+        {
+          "id": "number",
+          "title": "string",
+          "content": "string", // 摘要内容，高亮显示关键词
+          "category": "string",
+          "type": "string",
+          "status": "string",
+          "author_name": "string",
+          "created_at": "string",
+          "updated_at": "string",
+          "relevance_score": "number" // 相关性评分
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      },
+      "suggestions": ["string"], // 搜索建议
+      "filters": { // 可用筛选条件
+        "categories": ["string"],
+        "types": ["string"]
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档查看权限
+
+### 14.9 导出文档
+- **接口地址**: `/admin/documents/{id}/export`
+- **请求方法**: `GET`
+- **接口描述**: 导出文档
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 文档ID（路径参数）
+    "format": "string" // 导出格式，必填：pdf/docx/html
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "download_url": "string", // 下载链接
+      "expires_at": "string" // 链接过期时间
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档导出权限
+
+### 14.10 获取文档分类列表
+- **接口地址**: `/admin/documents/categories`
+- **请求方法**: `GET`
+- **接口描述**: 获取文档分类列表
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "categories": [
+        {
+          "id": "number",
+          "name": "string",
+          "description": "string",
+          "parent_id": "number",
+          "parent_name": "string",
+          "document_count": "number",
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档查看权限
+
+### 14.11 创建文档分类
+- **接口地址**: `/admin/documents/categories`
+- **请求方法**: `POST`
+- **接口描述**: 创建文档分类
+- **请求参数**:
+  ```json
+  {
+    "name": "string", // 分类名称，必填
+    "description": "string", // 分类描述，可选
+    "parent_id": "number" // 父分类ID，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "category": {
+        "id": "number",
+        "name": "string",
+        "description": "string",
+        "parent_id": "number",
+        "parent_name": "string",
+        "document_count": 0,
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 409: 分类名称已存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或分类管理权限
+
+### 14.12 更新文档分类
+- **接口地址**: `/admin/documents/categories/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新文档分类
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 分类ID（路径参数）
+    "name": "string", // 分类名称，可选
+    "description": "string", // 分类描述，可选
+    "parent_id": "number" // 父分类ID，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "category": {
+        "id": "number",
+        "name": "string",
+        "description": "string",
+        "parent_id": "number",
+        "parent_name": "string",
+        "document_count": "number",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 分类不存在
+  - 409: 分类名称已存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或分类管理权限
+
+### 14.13 删除文档分类
+- **接口地址**: `/admin/documents/categories/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除文档分类
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 分类ID（路径参数）
+    "move_documents_to": "number" // 将该分类下的文档移动到此分类ID，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "分类删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 分类不存在
+  - 409: 分类下有文档且未指定移动目标
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或分类管理权限
+
+### 14.14 批量操作文档
+- **接口地址**: `/admin/documents/batch`
+- **请求方法**: `POST`
+- **接口描述**: 批量操作文档
+- **请求参数**:
+  ```json
+  {
+    "action": "string", // 操作类型，必填：delete/publish/unpublish/change_category
+    "document_ids": ["number"], // 文档ID列表，必填
+    "category_id": "number" // 目标分类ID，仅当action为change_category时需要
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "success_count": "number", // 成功数量
+      "failure_count": "number", // 失败数量
+      "failed_items": [ // 失败项目
+        {
+          "id": "number",
+          "error": "string"
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或相应文档操作权限
+
+### 14.15 上传文档附件
+- **接口地址**: `/admin/documents/attachments`
+- **请求方法**: `POST`
+- **接口描述**: 上传文档附件
+- **请求参数**:
+  ```json
+  {
+    "file": "file", // 文件，必填
+    "document_id": "number" // 文档ID，可选，不填则返回临时URL
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "attachment": {
+        "id": "number",
+        "name": "string",
+        "url": "string",
+        "size": "number",
+        "type": "string",
+        "document_id": "number",
+        "created_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 413: 文件过大
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档编辑权限
+
+### 14.16 删除文档附件
+- **接口地址**: `/admin/documents/attachments/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除文档附件
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 附件ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "附件删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 附件不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档编辑权限
+
+### 14.17 获取文档评论列表
+- **接口地址**: `/admin/documents/{id}/comments`
+- **请求方法**: `GET`
+- **接口描述**: 获取文档评论列表
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 文档ID（路径参数）
+    "page": "number", // 页码，可选，默认1
+    "limit": "number" // 每页数量，可选，默认20
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "comments": [
+        {
+          "id": "number",
+          "document_id": "number",
+          "content": "string",
+          "author_id": "number",
+          "author_name": "string",
+          "author_avatar": "string",
+          "parent_id": "number", // 父评论ID，0表示顶级评论
+          "created_at": "string",
+          "updated_at": "string",
+          "like_count": "number",
+          "replies": [ // 回复列表
+            {
+              "id": "number",
+              "content": "string",
+              "author_id": "number",
+              "author_name": "string",
+              "author_avatar": "string",
+              "created_at": "string",
+              "like_count": "number"
+            }
+          ]
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "total_pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档查看权限
+
+### 14.18 删除文档评论
+- **接口地址**: `/admin/documents/comments/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除文档评论
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 评论ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "评论删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 评论不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或评论管理权限
+
+### 14.19 生成文档目录
+- **接口地址**: `/admin/documents/{id}/toc`
+- **请求方法**: `GET`
+- **接口描述**: 生成文档目录
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 文档ID（路径参数）
+    "max_level": "number" // 最大目录层级，可选，默认3
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "toc": [
+        {
+          "level": "number",
+          "title": "string",
+          "anchor": "string", // 锚点ID
+          "children": [ // 子目录
+            {
+              "level": "number",
+              "title": "string",
+              "anchor": "string"
+            }
+          ]
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档查看权限
+
+### 14.20 复制文档
+- **接口地址**: `/admin/documents/{id}/copy`
+- **请求方法**: `POST`
+- **接口描述**: 复制文档
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 文档ID（路径参数）
+    "title": "string" // 新文档标题，可选，不填则自动生成
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "document": {
+        "id": "number",
+        "title": "string",
+        "content": "string",
+        "category": "string",
+        "type": "string",
+        "status": "string", // 默认为draft
+        "author_id": "number",
+        "author_name": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "original_id": "number" // 原文档ID
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 文档不存在
+  - 500: 服务器内部错误
+- **说明**: 需要管理员权限或文档创建权限
+
+---
+
+## 附录：接口使用示例和最佳实践
+
+### 1. 开发环境配置
+
+#### 1.1 获取API访问凭证
+
+所有API请求都需要有效的访问令牌。首先通过管理员登录接口获取访问令牌：
+
+```javascript
+// 登录示例
+const loginResponse = await fetch('/api/admin/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    username: 'admin',
+    password: 'your_password'
+  })
+});
+
+const { data } = await loginResponse.json();
+const { token, refreshToken } = data;
+
+// 保存令牌
+localStorage.setItem('admin_token', token);
+localStorage.setItem('admin_refresh_token', refreshToken);
+```
+
+#### 1.2 配置基础URL和认证信息
+
+```javascript
+// API配置
+const API_BASE_URL = 'https://your-domain.com/api/admin';
+
+// 创建API请求实例
+const apiRequest = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('admin_token');
+  
+  const defaultOptions = {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
+  };
+  
+  const config = {
+    ...defaultOptions,
+    ...options,
+    headers: {
+      ...defaultOptions.headers,
+      ...options.headers
+    }
+  };
+  
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  
+  // 处理401未授权错误，尝试刷新令牌
+  if (response.status === 401) {
+    const refreshSuccess = await refreshToken();
+    if (refreshSuccess) {
+      // 使用新令牌重试请求
+      const newToken = localStorage.getItem('admin_token');
+      config.headers.Authorization = `Bearer ${newToken}`;
+      return fetch(`${API_BASE_URL}${endpoint}`, config);
+    }
+  }
+  
+  return response;
+};
+```
+
+#### 1.3 设置请求拦截器和响应拦截器
+
+```javascript
+// 请求拦截器
+const requestInterceptor = (config) => {
+  // 添加请求ID用于追踪
+  config.headers['X-Request-ID'] = generateUUID();
+  
+  // 添加时间戳防止缓存
+  if (config.method === 'GET') {
+    const url = new URL(config.url, API_BASE_URL);
+    url.searchParams.append('_t', Date.now());
+    config.url = url.pathname + url.search;
+  }
+  
+  return config;
+};
+
+// 响应拦截器
+const responseInterceptor = async (response) => {
+  // 记录API调用日志
+  console.log(`API Call: ${response.url} - Status: ${response.status}`);
+  
+  // 检查响应格式
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    throw new Error('Invalid response format');
+  }
+  
+  const data = await response.json();
+  
+  // 检查业务状态码
+  if (!data.success) {
+    // 处理业务错误
+    handleBusinessError(data.code, data.message);
+    throw new Error(data.message || '请求失败');
+  }
+  
+  return data;
+};
+```
+
+#### 1.4 配置错误处理机制
+
+```javascript
+// 全局错误处理
+const errorHandler = (error) => {
+  console.error('API Error:', error);
+  
+  // 根据错误类型进行不同处理
+  if (error.response) {
+    // 服务器响应错误
+    const { status, data } = error.response;
+    
+    switch (status) {
+      case 400:
+        showToast('请求参数错误: ' + (data.message || '请检查请求参数'));
+        break;
+      case 401:
+        showToast('登录已过期，请重新登录');
+        // 跳转到登录页
+        window.location.href = '/login';
+        break;
+      case 403:
+        showToast('权限不足，无法执行此操作');
+        break;
+      case 404:
+        showToast('请求的资源不存在');
+        break;
+      case 500:
+        showToast('服务器内部错误，请稍后再试');
+        break;
+      default:
+        showToast(`请求失败: ${status}`);
+    }
+  } else if (error.request) {
+    // 网络错误
+    showToast('网络连接失败，请检查网络设置');
+  } else {
+    // 其他错误
+    showToast('发生未知错误: ' + error.message);
+  }
+  
+  // 上报错误到监控系统
+  reportError(error);
+};
+```
+
+### 2. 常见问题解决
+
+#### 2.1 认证失败处理
+
+```javascript
+// 刷新令牌函数
+const refreshToken = async () => {
+  const refreshToken = localStorage.getItem('admin_refresh_token');
+  
+  if (!refreshToken) {
+    return false;
+  }
+  
+  try {
+    const response = await fetch('/api/admin/auth/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ refreshToken })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      localStorage.setItem('admin_token', data.data.token);
+      return true;
+    } else {
+      // 刷新失败，清除令牌并跳转登录页
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_refresh_token');
+      window.location.href = '/login';
+      return false;
+    }
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    return false;
+  }
+};
+```
+
+#### 2.2 权限检查与处理
+
+```javascript
+// 权限检查函数
+const checkPermission = (requiredPermission) => {
+  const userPermissions = JSON.parse(localStorage.getItem('user_permissions') || '[]');
+  return userPermissions.includes(requiredPermission);
+};
+
+// 权限装饰器
+const withPermission = (requiredPermission) => {
+  return (target, propertyKey, descriptor) => {
+    const originalMethod = descriptor.value;
+    
+    descriptor.value = function(...args) {
+      if (!checkPermission(requiredPermission)) {
+        showToast('权限不足，无法执行此操作');
+        return Promise.reject(new Error('Permission denied'));
+      }
+      
+      return originalMethod.apply(this, args);
+    };
+    
+    return descriptor;
+  };
+};
+
+// 使用示例
+class UserService {
+  @withPermission('user:delete')
+  async deleteUser(userId) {
+    return apiRequest(`/users/${userId}`, { method: 'DELETE' });
+  }
+}
+```
+
+#### 2.3 参数验证与处理
+
+```javascript
+// 参数验证函数
+const validateParams = (schema, data) => {
+  const errors = [];
+  
+  for (const field in schema) {
+    const rules = schema[field];
+    const value = data[field];
+    
+    // 必填验证
+    if (rules.required && (value === undefined || value === null || value === '')) {
+      errors.push(`${field} 是必填字段`);
+      continue;
+    }
+    
+    // 类型验证
+    if (value !== undefined && rules.type && typeof value !== rules.type) {
+      errors.push(`${field} 必须是 ${rules.type} 类型`);
+    }
+    
+    // 长度验证
+    if (value !== undefined && rules.minLength && value.length < rules.minLength) {
+      errors.push(`${field} 长度不能少于 ${rules.minLength} 个字符`);
+    }
+    
+    if (value !== undefined && rules.maxLength && value.length > rules.maxLength) {
+      errors.push(`${field} 长度不能超过 ${rules.maxLength} 个字符`);
+    }
+    
+    // 自定义验证
+    if (value !== undefined && rules.validator && !rules.validator(value)) {
+      errors.push(`${field} 格式不正确`);
+    }
+  }
+  
+  return errors;
+};
+
+// 使用示例
+const createUserSchema = {
+  username: {
+    required: true,
+    type: 'string',
+    minLength: 3,
+    maxLength: 20,
+    validator: (value) => /^[a-zA-Z0-9_]+$/.test(value)
+  },
+  email: {
+    required: true,
+    type: 'string',
+    validator: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  },
+  age: {
+    required: false,
+    type: 'number',
+    validator: (value) => value >= 18 && value <= 100
+  }
+};
+
+const createUser = async (userData) => {
+  const errors = validateParams(createUserSchema, userData);
+  
+  if (errors.length > 0) {
+    showToast('参数验证失败: ' + errors.join(', '));
+    return Promise.reject(new Error('Validation failed'));
+  }
+  
+  return apiRequest('/users', {
+    method: 'POST',
+    body: JSON.stringify(userData)
+  });
+};
+```
+
+#### 2.4 网络问题处理
+
+```javascript
+// 重试机制
+const retryRequest = async (requestFn, maxRetries = 3, delay = 1000) => {
+  let lastError;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await requestFn();
+    } catch (error) {
+      lastError = error;
+      
+      // 如果是客户端错误（4xx），不重试
+      if (error.response && error.response.status >= 400 && error.response.status < 500) {
+        throw error;
+      }
+      
+      // 如果是最后一次尝试，直接抛出错误
+      if (i === maxRetries - 1) {
+        throw error;
+      }
+      
+      // 等待后重试
+      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+    }
+  }
+  
+  throw lastError;
+};
+
+// 网络状态检测
+const checkNetworkStatus = () => {
+  if (!navigator.onLine) {
+    showToast('网络连接已断开，请检查网络设置');
+    return false;
+  }
+  return true;
+};
+
+// 使用示例
+const fetchUserData = async (userId) => {
+  if (!checkNetworkStatus()) {
+    return Promise.reject(new Error('Network offline'));
+  }
+  
+  return retryRequest(() => apiRequest(`/users/${userId}`));
+};
+```
+
+### 3. 性能优化建议
+
+#### 3.1 合理使用分页查询
+
+```javascript
+// 分页查询封装
+const fetchPaginatedData = async (endpoint, params = {}) => {
+  const { page = 1, limit = 20, ...otherParams } = params;
+  
+  const queryParams = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    ...otherParams
+  });
+  
+  const response = await apiRequest(`${endpoint}?${queryParams}`);
+  
+  return {
+    data: response.data.items || response.data.list || response.data,
+    pagination: response.data.pagination || {
+      page,
+      limit,
+      total: response.data.total || 0,
+      totalPages: Math.ceil((response.data.total || 0) / limit)
+    }
+  };
+};
+
+// 无限滚动加载
+const useInfiniteScroll = (endpoint, params = {}) => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+  
+  const loadMore = async () => {
+    if (loading || !hasMore) return;
+    
+    setLoading(true);
+    
+    try {
+      const result = await fetchPaginatedData(endpoint, {
+        ...params,
+        page
+      });
+      
+      setData(prev => [...prev, ...result.data]);
+      setHasMore(result.pagination.page < result.pagination.totalPages);
+      setPage(prev => prev + 1);
+    } catch (error) {
+      console.error('Failed to load more data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return { data, loading, hasMore, loadMore };
+};
+```
+
+#### 3.2 避免不必要的数据请求
+
+```javascript
+// 数据缓存
+const dataCache = new Map();
+
+const cachedRequest = async (endpoint, options = {}) => {
+  const cacheKey = `${endpoint}_${JSON.stringify(options)}`;
+  
+  // 检查缓存
+  if (dataCache.has(cacheKey)) {
+    const { data, timestamp } = dataCache.get(cacheKey);
+    
+    // 缓存有效期5分钟
+    if (Date.now() - timestamp < 5 * 60 * 1000) {
+      return Promise.resolve({ data });
+    }
+  }
+  
+  // 发起请求
+  const response = await apiRequest(endpoint, options);
+  
+  // 存入缓存
+  dataCache.set(cacheKey, {
+    data: response.data,
+    timestamp: Date.now()
+  });
+  
+  return response;
+};
+
+// 请求防抖
+const debounceRequest = (() => {
+  const pendingRequests = new Map();
+  
+  return (endpoint, options = {}, delay = 300) => {
+    const requestKey = `${endpoint}_${JSON.stringify(options)}`;
+    
+    // 如果已有相同请求在进行中，取消之前的请求
+    if (pendingRequests.has(requestKey)) {
+      clearTimeout(pendingRequests.get(requestKey).timeoutId);
+    }
+    
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(async () => {
+        try {
+          const response = await apiRequest(endpoint, options);
+          pendingRequests.delete(requestKey);
+          resolve(response);
+        } catch (error) {
+          pendingRequests.delete(requestKey);
+          reject(error);
+        }
+      }, delay);
+      
+      pendingRequests.set(requestKey, { timeoutId, resolve, reject });
+    });
+  };
+})();
+```
+
+#### 3.3 批量操作优化
+
+```javascript
+// 批量请求
+const batchRequest = async (requests) => {
+  const results = await Promise.allSettled(
+    requests.map(({ endpoint, options }) => apiRequest(endpoint, options))
+  );
+  
+  const successful = results
+    .filter(result => result.status === 'fulfilled')
+    .map(result => result.value);
+  
+  const failed = results
+    .filter(result => result.status === 'rejected')
+    .map(result => result.reason);
+  
+  return { successful, failed };
+};
+
+// 批量删除示例
+const batchDeleteUsers = async (userIds) => {
+  const requests = userIds.map(id => ({
+    endpoint: `/users/${id}`,
+    options: { method: 'DELETE' }
+  }));
+  
+  const { successful, failed } = await batchRequest(requests);
+  
+  if (failed.length > 0) {
+    console.error('部分用户删除失败:', failed);
+    showToast(`成功删除 ${successful.length} 个用户，${failed.length} 个用户删除失败`);
+  } else {
+    showToast(`成功删除 ${successful.length} 个用户`);
+  }
+  
+  return { successful, failed };
+};
+
+// 分批处理大量数据
+const processBatch = async (items, batchSize, processor) => {
+  const results = [];
+  
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+    
+    // 显示进度
+    const progress = Math.min(i + batchSize, items.length);
+    console.log(`处理进度: ${progress}/${items.length}`);
+  }
+  
+  return results;
+};
+```
+
+#### 3.4 前端性能优化
+
+```javascript
+// 虚拟滚动（适用于大量数据列表）
+const VirtualList = ({ items, itemHeight, containerHeight }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  
+  const visibleStart = Math.floor(scrollTop / itemHeight);
+  const visibleEnd = Math.min(
+    visibleStart + Math.ceil(containerHeight / itemHeight) + 1,
+    items.length - 1
+  );
+  
+  const visibleItems = items.slice(visibleStart, visibleEnd + 1);
+  const offsetY = visibleStart * itemHeight;
+  
+  return (
+    <div
+      style={{ height: containerHeight, overflow: 'auto' }}
+      onScroll={(e) => setScrollTop(e.target.scrollTop)}
+    >
+      <div style={{ height: items.length * itemHeight, position: 'relative' }}>
+        <div style={{ transform: `translateY(${offsetY}px)` }}>
+          {visibleItems.map((item, index) => (
+            <div key={visibleStart + index} style={{ height: itemHeight }}>
+              {item.content}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 图片懒加载
+const LazyImage = ({ src, alt, placeholder, ...props }) => {
+  const [imageSrc, setImageSrc] = useState(placeholder);
+  const [imageRef, inView] = useInView({
+    triggerOnce: true,
+    threshold: 0.1
+  });
+  
+  useEffect(() => {
+    if (inView && src !== imageSrc) {
+      const img = new Image();
+      img.onload = () => setImageSrc(src);
+      img.src = src;
+    }
+  }, [inView, src, imageSrc]);
+  
+  return <img ref={imageRef} src={imageSrc} alt={alt} {...props} />;
+};
+
+// 数据预加载
+const preloadData = async (endpoints) => {
+  const promises = endpoints.map(endpoint => 
+    cachedRequest(endpoint).catch(error => {
+      console.warn(`预加载数据失败: ${endpoint}`, error);
+      return null;
+    })
+  );
+  
+  return Promise.all(promises);
+};
+
+// 使用示例
+const preloadCommonData = () => {
+  return preloadData([
+    '/users/roles',
+    '/system/config',
+    '/documents/categories'
+  ]);
+};
+```
+
+### 4. 安全最佳实践
+
+#### 4.1 XSS防护
+
+```javascript
+// HTML内容转义
+const escapeHtml = (text) => {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  
+  return text.replace(/[&<>"']/g, m => map[m]);
+};
+
+// 安全渲染HTML内容
+const SafeHtmlRenderer = ({ content }) => {
+  const sanitizedContent = DOMPurify.sanitize(content);
+  return <div dangerouslySetInnerHTML={{ __html: sanitizedContent }} />;
+};
+```
+
+#### 4.2 CSRF防护
+
+```javascript
+// 添加CSRF令牌
+const addCSRFToken = (options = {}) => {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  
+  if (csrfToken) {
+    options.headers = {
+      ...options.headers,
+      'X-CSRF-TOKEN': csrfToken
+    };
+  }
+  
+  return options;
+};
+
+// 使用示例
+const secureRequest = async (endpoint, options = {}) => {
+  const secureOptions = addCSRFToken(options);
+  return apiRequest(endpoint, secureOptions);
+};
+```
+
+#### 4.3 敏感信息处理
+
+```javascript
+// 敏感字段脱敏
+const maskSensitiveData = (data, sensitiveFields = ['password', 'token', 'secret']) => {
+  const maskedData = { ...data };
+  
+  sensitiveFields.forEach(field => {
+    if (maskedData[field]) {
+      maskedData[field] = '***';
+    }
+  });
+  
+  return maskedData;
+};
+
+// 日志记录时过滤敏感信息
+const logSafeData = (data) => {
+  const safeData = maskSensitiveData(data);
+  console.log('API Response:', safeData);
+};
+```
+
+---
+
+*文档版本: v1.0*  
+*最后更新: 2023-12-31*

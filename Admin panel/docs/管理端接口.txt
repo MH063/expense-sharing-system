@@ -1,0 +1,115 @@
+## 1. 管理员认证相关API (adminAuthApi)
+- POST /admin/auth/login - 管理员登录
+## 2. 角色管理相关API (roleApi)
+- GET /admin/roles - 获取角色列表
+- GET /admin/roles/{id} - 获取角色详情
+- POST /admin/roles - 创建角色
+- PUT /admin/roles/{id} - 更新角色
+- DELETE /admin/roles/{id} - 删除角色
+- GET /admin/permissions - 获取权限列表
+## 3. 用户管理相关API (userApi)
+- GET /admin/users - 获取用户列表
+- GET /admin/users/{id} - 获取用户详情
+- POST /admin/users - 创建用户
+- PUT /admin/users/{id} - 更新用户
+- PUT /admin/users/{id}/status - 更新用户状态
+- POST /admin/users/{id}/reset-password - 重置用户密码
+- DELETE /admin/users/{id} - 删除用户
+- POST /admin/users/{userId}/roles - 分配角色
+- GET /admin/users/{userId}/roles - 获取用户角色
+- GET /admin/users/available - 获取可分配用户列表
+## 4. 账单管理相关API (billApi)
+- GET /admin/bills - 获取账单列表
+- GET /admin/bills/{id} - 获取账单详情
+- PUT /admin/bills/{id} - 更新账单
+- DELETE /admin/bills/{id} - 删除账单
+## 5. 费用审核相关API (expenseApi)
+- GET /admin/expenses - 获取待审核费用列表
+- GET /admin/expenses/{id} - 获取费用详情
+- POST /admin/expenses/{id}/review - 审核费用
+- GET /abnormal-expenses - 获取异常支出列表
+- PUT /abnormal-expenses/{id}/status - 更新异常支出状态
+- GET /abnormal-expenses/stats - 获取异常支出统计
+- GET /api/abnormal-expenses/export - 导出异常支出报告(Excel/PDF)
+## 6. 数据统计相关API (statisticsApi)
+- GET /stats/system - 获取系统概览数据
+- GET /stats/user - 获取用户统计数据
+- GET /stats/room - 获取寝室统计数据
+- GET /stats/forecast - 获取预测数据
+## 7. 系统设置相关API (systemApi)
+- GET /admin/system/config - 获取系统配置
+- PUT /admin/system/config - 更新系统配置
+- GET /admin/feature-flags - 获取功能开关
+- PUT /admin/feature-flags/{id} - 更新功能开关
+- GET /admin/maintenance-windows - 获取维护窗口
+- POST /admin/maintenance-windows - 创建维护窗口
+- GET /admin/announcements - 获取公告列表
+- POST /admin/announcements - 创建公告
+## 8. 操作日志相关API (auditLogApi)
+- GET /admin/operation-logs - 获取操作日志
+- GET /admin/data-change-audits - 获取数据变更审计日志
+## 9. 批量任务与报表相关API (batchJobApi)
+- GET /admin/batch-jobs - 获取批量任务列表
+- POST /admin/batch-jobs - 创建批量任务
+- GET /admin/batch-jobs/{id} - 获取任务详情
+- GET /admin/reports - 获取报表定义列表
+- POST /admin/reports - 创建报表定义
+- GET /admin/reports/{id}/snapshots - 获取报表快照
+- POST /admin/reports/{id}/generate - 生成报表
+- GET /admin/exports - 获取导出任务列表
+- POST /admin/exports - 创建导出任务
+## 10. 内容审核与工单相关API (moderationApi)
+- GET /admin/moderation-queue - 获取审核队列
+- POST /admin/moderation/{id}/process - 处理审核
+- GET /admin/tickets - 获取工单列表
+- GET /admin/tickets/{id} - 获取工单详情
+- PUT /admin/tickets/{id}/status - 更新工单状态
+- POST /admin/tickets/{id}/comments - 添加工单备注
+## 11. 集成与回调相关API (webhookApi)
+- GET /admin/webhooks - 获取Webhook列表
+- POST /admin/webhooks - 创建Webhook
+- GET /admin/webhooks/{id}/events - 获取Webhook事件
+## 12. 争议管理相关API (disputeApi)
+- GET /admin/disputes - 获取争议列表
+- GET /admin/disputes/{id} - 获取争议详情
+- POST /admin/disputes - 创建争议
+- PUT /admin/disputes/{id} - 更新争议
+- DELETE /admin/disputes/{id} - 删除争议
+- POST /admin/disputes/{id}/assign - 分配处理人
+- POST /admin/disputes/{id}/handle - 处理争议
+- POST /admin/disputes/{id}/resolve - 解决争议
+- GET /admin/disputes/handlers - 获取可分配的处理人列表
+- GET /admin/disputes/stats - 获取争议统计数据
+## 13. 寝室管理相关API (dormApi)
+- GET /admin/dorms - 获取寝室列表
+- GET /admin/dorms/{id} - 获取寝室详情
+- POST /admin/dorms - 创建寝室
+- PUT /admin/dorms/{id} - 更新寝室
+- DELETE /admin/dorms/{id} - 删除寝室
+- GET /admin/dorms/{id}/members - 获取寝室成员列表
+- POST /admin/dorms/{id}/members - 添加寝室成员
+- DELETE /admin/dorms/{id}/members/{memberId} - 移除寝室成员
+- PUT /admin/dorms/{id}/leader - 设置寝室长
+## 14. 文档管理相关API (docs)
+- GET /api/docs/view - 查看文档
+- POST /api/docs/edit - 编辑文档
+- GET /api/docs/history - 获取文档历史
+- GET /api/docs/{id} - 获取文档详情
+- PUT /api/docs/{id} - 更新文档
+- GET /api/docs/{id}/history - 获取文档历史记录
+- DELETE /api/docs/{id} - 删除文档
+- GET /api/docs/stats - 获取文档统计
+- GET /api/docs/types - 获取文档类型
+- GET /api/docs/recent - 获取最近文档
+- GET /api/docs/popular - 获取热门文档
+- GET /api/docs/updates - 获取最近更新
+- GET /api/docs/export/summary - 导出文档概览
+- GET /api/docs/export/pdf - 导出PDF文档
+- GET /api/docs/export/excel - 导出Excel文档
+- GET /api/docs/search - 搜索文档
+- GET /api/docs/{id}/download - 下载文档
+- GET /api/docs/export - 导出文档
+- POST /api/docs/save-all - 保存整个文档
+- POST /api/docs/swagger - 生成Swagger文档
+- POST /api/docs/test - 测试API
+- GET /api/docs/structure - 获取文档结构

@@ -23,7 +23,7 @@ function loadEnvironmentConfig() {
     try {
       if (fs.existsSync(envPath)) {
         console.log(`加载环境变量文件: ${envPath}`);
-        require('dotenv').config({ path: envPath, override: false });
+        require('dotenv').config({ path: envPath, override: true });
       }
     } catch (error) {
       console.warn(`警告: 加载环境变量文件失败: ${envPath}`, error.message);

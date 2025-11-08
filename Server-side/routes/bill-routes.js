@@ -6,6 +6,7 @@ const {
   billValidationRules, 
   handleValidationErrors 
 } = require('../middleware/validation-middleware');
+const { billCache } = require('../middleware/cache-middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -40,6 +41,7 @@ const upload = multer({
 router.post(
   '/',
   authenticateToken,
+  billCache.clearBills,
   billValidationRules.create,
   handleValidationErrors,
   billController.createBill
@@ -47,42 +49,45 @@ router.post(
 
 // 上传账单收据
 // 进度跟踪与错误捕获在控制器中统一处理
-router.post('/receipt', authenticateToken, upload.single('receipt'), billController.uploadReceipt);
+router.post('/receipt', authenticateToken, billCache.clearBills, upload.single('receipt'), billController.uploadReceipt);
 
 // 获取账单列表
-router.get('/', authenticateToken, billController.getBills);
+router.get('/', authenticateToken, billCache.getBills, billController.getBills);
 
 // 获取账单详情
-router.get('/:id', authenticateToken, billController.getBillById);
+router.get('/:id', authenticateToken, billCache.getBills, billController.getBillById);
 
 // 更新账单
 router.put(
   '/:id',
   authenticateToken,
+  billCache.clearBills,
   billValidationRules.update,
   handleValidationErrors,
   billController.updateBill
 );
 
 // 删除账单
-router.delete('/:id', authenticateToken, billController.deleteBill);
+router.delete('/:id', authenticateToken, billCache.clearBills, billController.deleteBill);
 
 // 审核账单（寝室管理员）
 router.post(
   '/:id/review',
   authenticateToken,
+  billCache.clearBills,
   billValidationRules.review,
   handleValidationErrors,
   billController.reviewBill
 );
 
 // 确认支付账单分摊
-router.post('/:id/payment', authenticateToken, billController.confirmBillPayment);
+router.post('/:id/payment', authenticateToken, billCache.clearBills, billController.confirmBillPayment);
 
 // 重新计算账单分摊
 router.put(
   '/:id/split',
   authenticateToken,
+  billCache.clearBills,
   handleValidationErrors,
   billController.recalculateBillSplit
 );
@@ -91,29 +96,30 @@ router.put(
 router.post(
   '/:bill_id/settlements',
   authenticateToken,
+  billCache.clearBills,
   handleValidationErrors,
   billController.recordSettlement
 );
 
 // 获取账单结算记录
-router.get('/:bill_id/settlements', authenticateToken, billController.getBillSettlements);
+router.get('/:bill_id/settlements', authenticateToken, billCache.getBills, billController.getBillSettlements);
 
 // 获取用户的账单统计
-router.get('/stats/user', authenticateToken, billController.getUserBillStats);
+router.get('/stats/user', authenticateToken, billCache.getBills, billController.getUserBillStats);
 
 // 获取寝室的账单统计
-router.get('/stats/room', authenticateToken, billController.getRoomBillStats);
+router.get('/stats/room', authenticateToken, billCache.getBills, billController.getRoomBillStats);
 
 // 获取时间范围内的账单统计
-router.get('/stats/date-range', authenticateToken, billController.getBillStatsByDateRange);
+router.get('/stats/date-range', authenticateToken, billCache.getBills, billController.getBillStatsByDateRange);
 
 // 账单评论
-router.post('/:id/comments', authenticateToken, billController.addBillComment);
-router.get('/:id/comments', authenticateToken, billController.getBillComments);
+router.post('/:id/comments', authenticateToken, billCache.clearBills, billController.addBillComment);
+router.get('/:id/comments', authenticateToken, billCache.getBills, billController.getBillComments);
 
 // 账单分享（需要创建者或房间管理员）
-router.post('/:id/share', authenticateToken, billController.createBillShare);
+router.post('/:id/share', authenticateToken, billCache.clearBills, billController.createBillShare);
 // 通过分享码获取账单（允许未认证访问，若需限制可加鉴权）
-router.get('/share/:code', billController.getBillByShareCode);
+router.get('/share/:code', billCache.getBills, billController.getBillByShareCode);
 
 module.exports = router;

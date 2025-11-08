@@ -5,6 +5,7 @@
 
 const BaseService = require('./base-service');
 const { v4: uuidv4 } = require('uuid');
+const cacheService = require('../cache-service');
 
 class BillService extends BaseService {
   constructor() {
@@ -38,52 +39,62 @@ class BillService extends BaseService {
    * @returns {Promise<Array>} 账单列表
    */
   async getRoomBills(roomId, options = {}) {
-    let sql = `
-      SELECT b.*, u.username as creator_name, u.name as creator_display_name
-      FROM bills b
-      LEFT JOIN users u ON b.creator_id = u.id
-      WHERE b.room_id = $1
-    `;
-    const params = [roomId];
-    let paramIndex = 2;
+    // 创建缓存键，包含房间ID和查询选项的哈希
+    const optionsHash = require('crypto')
+      .createHash('md5')
+      .update(JSON.stringify(options))
+      .digest('hex');
+    const cacheKey = `room:bills:${roomId}:${optionsHash}`;
+    
+    // 使用getOrSet方法实现缓存穿透保护
+    return await cacheService.getOrSet(cacheKey, async () => {
+      let sql = `
+        SELECT b.*, u.username as creator_name, u.name as creator_display_name
+        FROM bills b
+        LEFT JOIN users u ON b.creator_id = u.id
+        WHERE b.room_id = $1
+      `;
+      const params = [roomId];
+      let paramIndex = 2;
 
-    // 添加状态过滤
-    if (options.status) {
-      sql += ` AND b.status = $${paramIndex}`;
-      params.push(options.status);
-      paramIndex++;
-    }
-
-    // 添加日期范围过滤
-    if (options.startDate) {
-      sql += ` AND b.created_at >= $${paramIndex}`;
-      params.push(options.startDate);
-      paramIndex++;
-    }
-
-    if (options.endDate) {
-      sql += ` AND b.created_at <= $${paramIndex}`;
-      params.push(options.endDate);
-      paramIndex++;
-    }
-
-    // 排序
-    sql += ` ORDER BY b.created_at DESC`;
-
-    // 分页
-    if (options.limit) {
-      sql += ` LIMIT $${paramIndex}`;
-      params.push(options.limit);
-      paramIndex++;
-
-      if (options.offset) {
-        sql += ` OFFSET $${paramIndex}`;
-        params.push(options.offset);
+      // 添加状态过滤
+      if (options.status) {
+        sql += ` AND b.status = $${paramIndex}`;
+        params.push(options.status);
+        paramIndex++;
       }
-    }
 
-    const result = await this.query(sql, params);
-    return result.rows;
+      // 添加日期范围过滤
+      if (options.startDate) {
+        sql += ` AND b.created_at >= $${paramIndex}`;
+        params.push(options.startDate);
+        paramIndex++;
+      }
+
+      if (options.endDate) {
+        sql += ` AND b.created_at <= $${paramIndex}`;
+        params.push(options.endDate);
+        paramIndex++;
+      }
+
+      // 排序
+      sql += ` ORDER BY b.created_at DESC`;
+
+      // 分页
+      if (options.limit) {
+        sql += ` LIMIT $${paramIndex}`;
+        params.push(options.limit);
+        paramIndex++;
+
+        if (options.offset) {
+          sql += ` OFFSET $${paramIndex}`;
+          params.push(options.offset);
+        }
+      }
+
+      const result = await this.query(sql, params);
+      return result.rows;
+    }, 1800); // 缓存30分钟
   }
 
   /**
@@ -92,51 +103,57 @@ class BillService extends BaseService {
    * @returns {Promise<Object|null>} 账单详情
    */
   async getBillWithPayments(billId) {
-    // 获取账单基本信息
-    const billSql = `
-      SELECT b.*, u.username as creator_name, u.name as creator_display_name
-      FROM bills b
-      LEFT JOIN users u ON b.creator_id = u.id
-      WHERE b.id = $1
-    `;
-    const billResult = await this.query(billSql, [billId]);
+    // 使用缓存键模式：bill:detail:{billId}
+    const cacheKey = `bill:detail:${billId}`;
     
-    if (billResult.rows.length === 0) {
-      return null;
-    }
-    
-    const bill = billResult.rows[0];
-    
-    // 获取账单的支付记录
-    const paymentsSql = `
-      SELECT p.*, u.username, u.name as display_name
-      FROM payments p
-      LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.bill_id = $1
-      ORDER BY p.created_at DESC
-    `;
-    const paymentsResult = await this.query(paymentsSql, [billId]);
-    
-    bill.payments = paymentsResult.rows;
-    
-    // 计算已支付金额
-    const totalPaid = paymentsResult.rows
-      .filter(p => p.status === 'completed')
-      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-    
-    bill.total_paid = totalPaid;
-    bill.remaining_amount = parseFloat(bill.total_amount) - totalPaid;
-    
-    // 根据支付情况更新账单状态
-    if (totalPaid >= parseFloat(bill.total_amount)) {
-      bill.payment_status = 'PAID';
-    } else if (totalPaid > 0) {
-      bill.payment_status = 'PARTIAL';
-    } else {
-      bill.payment_status = 'PENDING';
-    }
-    
-    return bill;
+    // 使用getOrSet方法实现缓存穿透保护
+    return await cacheService.getOrSet(cacheKey, async () => {
+      // 获取账单基本信息
+      const billSql = `
+        SELECT b.*, u.username as creator_name, u.name as creator_display_name
+        FROM bills b
+        LEFT JOIN users u ON b.creator_id = u.id
+        WHERE b.id = $1
+      `;
+      const billResult = await this.query(billSql, [billId]);
+      
+      if (billResult.rows.length === 0) {
+        return null;
+      }
+      
+      const bill = billResult.rows[0];
+      
+      // 获取账单的支付记录
+      const paymentsSql = `
+        SELECT p.*, u.username, u.name as display_name
+        FROM payments p
+        LEFT JOIN users u ON p.user_id = u.id
+        WHERE p.bill_id = $1
+        ORDER BY p.created_at DESC
+      `;
+      const paymentsResult = await this.query(paymentsSql, [billId]);
+      
+      bill.payments = paymentsResult.rows;
+      
+      // 计算已支付金额
+      const totalPaid = paymentsResult.rows
+        .filter(p => p.status === 'completed')
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
+      bill.total_paid = totalPaid;
+      bill.remaining_amount = parseFloat(bill.total_amount) - totalPaid;
+      
+      // 根据支付情况更新账单状态
+      if (totalPaid >= parseFloat(bill.total_amount)) {
+        bill.payment_status = 'PAID';
+      } else if (totalPaid > 0) {
+        bill.payment_status = 'PARTIAL';
+      } else {
+        bill.payment_status = 'PENDING';
+      }
+      
+      return bill;
+    }, 1800); // 缓存30分钟
   }
 
   /**
@@ -153,7 +170,14 @@ class BillService extends BaseService {
       RETURNING *
     `;
     const result = await this.query(sql, [status, billId]);
-    return result.rows.length > 0 ? result.rows[0] : null;
+    
+    if (result.rows.length > 0) {
+      // 清除相关缓存
+      await this.clearBillCache(billId);
+      return result.rows[0];
+    }
+    
+    return null;
   }
 
   /**
@@ -191,7 +215,14 @@ class BillService extends BaseService {
     `;
 
     const result = await this.query(sql, values);
-    return result.rows.length > 0 ? result.rows[0] : null;
+    
+    if (result.rows.length > 0) {
+      // 清除相关缓存
+      await this.clearBillCache(billId, result.rows[0].room_id);
+      return result.rows[0];
+    }
+    
+    return null;
   }
 
   /**
@@ -200,6 +231,11 @@ class BillService extends BaseService {
    * @returns {Promise<boolean>} 是否删除成功
    */
   async deleteBill(billId) {
+    // 先获取账单信息以便清除缓存
+    const billSql = `SELECT room_id FROM bills WHERE id = $1`;
+    const billResult = await this.query(billSql, [billId]);
+    const roomId = billResult.rows.length > 0 ? billResult.rows[0].room_id : null;
+    
     // 先删除相关的支付记录
     const deletePaymentsSql = `DELETE FROM payments WHERE bill_id = $1`;
     await this.query(deletePaymentsSql, [billId]);
@@ -207,7 +243,33 @@ class BillService extends BaseService {
     // 删除账单
     const sql = `DELETE FROM bills WHERE id = $1`;
     const result = await this.query(sql, [billId]);
-    return result.rowCount > 0;
+    
+    if (result.rowCount > 0) {
+      // 清除相关缓存
+      await this.clearBillCache(billId, roomId);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * 清除账单相关的缓存
+   * @param {string} billId - 账单ID
+   * @param {string} roomId - 房间ID（可选）
+   * @returns {Promise<void>}
+   */
+  async clearBillCache(billId, roomId) {
+    // 清除账单详情缓存
+    await cacheService.del(`bill:detail:${billId}`);
+    
+    // 如果提供了房间ID，清除该房间的所有账单列表缓存
+    if (roomId) {
+      await cacheService.delPattern(`room:bills:${roomId}:*`);
+    } else {
+      // 如果没有提供房间ID，清除所有账单列表缓存
+      await cacheService.delPattern('room:bills:*');
+    }
   }
 
   /**

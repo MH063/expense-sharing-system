@@ -5,6 +5,7 @@
 
 const BaseService = require('./base-service');
 const { v4: uuidv4 } = require('uuid');
+const cacheService = require('../cache-service');
 
 class UserService extends BaseService {
   constructor() {
@@ -17,9 +18,22 @@ class UserService extends BaseService {
    * @returns {Promise<Object|null>} 查找结果
    */
   async findByUsername(username) {
-    const sql = `SELECT * FROM users WHERE username = $1`;
-    const result = await this.query(sql, [username]);
-    return result.rows.length > 0 ? result.rows[0] : null;
+    // 使用缓存键模式：user:username:{username}
+    const cacheKey = `user:username:${username}`;
+    
+    // 使用getOrSet方法实现缓存穿透保护
+    return await cacheService.getOrSet(cacheKey, async () => {
+      const sql = `SELECT * FROM users WHERE username = $1`;
+      const result = await this.query(sql, [username]);
+      const user = result.rows.length > 0 ? result.rows[0] : null;
+      
+      // 如果找到用户，删除密码哈希字段（安全考虑）
+      if (user) {
+        delete user.password_hash;
+      }
+      
+      return user;
+    }, 3600); // 缓存1小时
   }
 
   /**
@@ -28,9 +42,22 @@ class UserService extends BaseService {
    * @returns {Promise<Object|null>} 查找结果
    */
   async findByEmail(email) {
-    const sql = `SELECT * FROM users WHERE email = $1`;
-    const result = await this.query(sql, [email]);
-    return result.rows.length > 0 ? result.rows[0] : null;
+    // 使用缓存键模式：user:email:{email}
+    const cacheKey = `user:email:${email}`;
+    
+    // 使用getOrSet方法实现缓存穿透保护
+    return await cacheService.getOrSet(cacheKey, async () => {
+      const sql = `SELECT * FROM users WHERE email = $1`;
+      const result = await this.query(sql, [email]);
+      const user = result.rows.length > 0 ? result.rows[0] : null;
+      
+      // 如果找到用户，删除密码哈希字段（安全考虑）
+      if (user) {
+        delete user.password_hash;
+      }
+      
+      return user;
+    }, 3600); // 缓存1小时
   }
 
   /**
@@ -56,6 +83,10 @@ class UserService extends BaseService {
     const result = await this.query(sql, values);
     const user = result.rows[0];
     delete user.password_hash;
+    
+    // 清除可能存在的用户名和邮箱缓存（防止缓存脏数据）
+    await this.clearUserCache(null, username, email);
+    
     return user;
   }
 
@@ -144,6 +175,10 @@ class UserService extends BaseService {
     // 返回用户信息，但不包含密码
     const user = result.rows[0];
     delete user.password;
+    
+    // 清除相关缓存
+    await this.clearUserCache(userId, user.username, user.email);
+    
     return user;
   }
 
@@ -153,15 +188,21 @@ class UserService extends BaseService {
    * @returns {Promise<Array>} 用户所属的房间列表
    */
   async getUserRooms(userId) {
-    const sql = `
-      SELECT r.*, rm.relation_type, rm.join_date
-      FROM rooms r
-      JOIN room_members rm ON r.id = rm.room_id
-      WHERE rm.user_id = $1 AND rm.is_active = $2 AND r.is_active = $2
-      ORDER BY rm.join_date DESC
-    `;
-    const result = await this.query(sql, [userId, true]);
-    return result.rows;
+    // 使用缓存键模式：user:rooms:{userId}
+    const cacheKey = `user:rooms:${userId}`;
+    
+    // 使用getOrSet方法实现缓存穿透保护
+    return await cacheService.getOrSet(cacheKey, async () => {
+      const sql = `
+        SELECT r.*, rm.relation_type, rm.join_date
+        FROM rooms r
+        JOIN room_members rm ON r.id = rm.room_id
+        WHERE rm.user_id = $1 AND rm.is_active = $2 AND r.is_active = $2
+        ORDER BY rm.join_date DESC
+      `;
+      const result = await this.query(sql, [userId, true]);
+      return result.rows;
+    }, 1800); // 缓存30分钟
   }
 
   /**
@@ -170,15 +211,57 @@ class UserService extends BaseService {
    * @returns {Promise<Array>} 房间中的用户列表
    */
   async getRoomUsers(roomId) {
-    const sql = `
-      SELECT u.id, u.username, u.email, u.name, u.avatar, u.phone, rm.relation_type, rm.join_date
-      FROM users u
-      JOIN room_members rm ON u.id = rm.user_id
-      WHERE rm.room_id = $1 AND rm.is_active = $2 AND u.is_active = $2
-      ORDER BY rm.join_date ASC
-    `;
-    const result = await this.query(sql, [roomId, true]);
-    return result.rows;
+    // 使用缓存键模式：room:users:{roomId}
+    const cacheKey = `room:users:${roomId}`;
+    
+    // 使用getOrSet方法实现缓存穿透保护
+    return await cacheService.getOrSet(cacheKey, async () => {
+      const sql = `
+        SELECT u.id, u.username, u.email, u.name, u.avatar, u.phone, rm.relation_type, rm.join_date
+        FROM users u
+        JOIN room_members rm ON u.id = rm.user_id
+        WHERE rm.room_id = $1 AND rm.is_active = $2 AND u.is_active = $2
+        ORDER BY rm.join_date ASC
+      `;
+      const result = await this.query(sql, [roomId, true]);
+      return result.rows;
+    }, 1800); // 缓存30分钟
+  }
+
+  /**
+   * 清除用户相关的缓存
+   * @param {string} userId - 用户ID
+   * @param {string} username - 用户名
+   * @param {string} email - 邮箱
+   * @returns {Promise<void>}
+   */
+  async clearUserCache(userId, username, email) {
+    // 清除用户基本信息缓存
+    if (username) {
+      await cacheService.del(`user:username:${username}`);
+    }
+    
+    if (email) {
+      await cacheService.del(`user:email:${email}`);
+    }
+    
+    // 清除用户房间列表缓存
+    if (userId) {
+      await cacheService.del(`user:rooms:${userId}`);
+    }
+  }
+
+  /**
+   * 清除房间相关的缓存
+   * @param {string} roomId - 房间ID
+   * @returns {Promise<void>}
+   */
+  async clearRoomCache(roomId) {
+    // 清除房间用户列表缓存
+    await cacheService.del(`room:users:${roomId}`);
+    
+    // 清除所有用户房间列表缓存（因为房间变化会影响所有成员）
+    await cacheService.delPattern('user:rooms:*');
   }
 }
 

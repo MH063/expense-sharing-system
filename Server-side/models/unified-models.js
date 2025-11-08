@@ -4,40 +4,71 @@ const sequelize = require('../config/database');
 // 定义User模型
 const User = sequelize.define('User', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   username: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(50),
     allowNull: false,
     unique: true
   },
   email: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(100),
     allowNull: false,
     unique: true,
     validate: {
       isEmail: true
     }
   },
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false
+  password_hash: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    field: 'password_hash'
   },
-  password: {
-    type: DataTypes.STRING,
-    allowNull: false
+  user_type: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'user', // 'user', 'admin'
+    field: 'user_type'
   },
-  avatar: {
-    type: DataTypes.STRING
+  avatar_url: {
+    type: DataTypes.STRING(255),
+    field: 'avatar_url'
   },
   phone: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING(20)
   },
-  is_active: {
+  full_name: {
+    type: DataTypes.STRING(100),
+    field: 'full_name'
+  },
+  status: {
+    type: DataTypes.STRING(20),
+    defaultValue: 'active'
+  },
+  email_verified: {
     type: DataTypes.BOOLEAN,
-    defaultValue: true
+    defaultValue: false,
+    field: 'email_verified'
+  },
+  last_login_at: {
+    type: DataTypes.DATE,
+    field: 'last_login_at'
+  },
+  login_count: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'login_count'
+  },
+  failed_login_attempts: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'failed_login_attempts'
+  },
+  locked_until: {
+    type: DataTypes.DATE,
+    field: 'locked_until'
   }
 }, {
   tableName: 'users',
@@ -50,9 +81,9 @@ const User = sequelize.define('User', {
 // 定义Room模型
 const Room = sequelize.define('Room', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   name: {
     type: DataTypes.STRING,
@@ -66,7 +97,7 @@ const Room = sequelize.define('Room', {
     unique: true
   },
   creator_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   is_active: {
@@ -84,16 +115,16 @@ const Room = sequelize.define('Room', {
 // 定义RoomMember模型
 const RoomMember = sequelize.define('RoomMember', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   user_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   room_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   relation_type: {
@@ -120,12 +151,12 @@ const RoomMember = sequelize.define('RoomMember', {
 // 定义Bill模型
 const Bill = sequelize.define('Bill', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   room_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   title: {
@@ -144,7 +175,7 @@ const Bill = sequelize.define('Bill', {
     defaultValue: 'PENDING'
   },
   creator_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   due_date: {
@@ -161,16 +192,16 @@ const Bill = sequelize.define('Bill', {
 // 定义Payment模型
 const Payment = sequelize.define('Payment', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   bill_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   user_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   amount: {
@@ -216,16 +247,16 @@ const Payment = sequelize.define('Payment', {
 // 定义OfflinePayment模型
 const OfflinePayment = sequelize.define('OfflinePayment', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   bill_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   user_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   amount: {
@@ -268,16 +299,16 @@ const OfflinePayment = sequelize.define('OfflinePayment', {
 // 定义PaymentReminder模型
 const PaymentReminder = sequelize.define('PaymentReminder', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   bill_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   user_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   reminder_time: {
@@ -306,9 +337,9 @@ const PaymentReminder = sequelize.define('PaymentReminder', {
 // 定义ExpenseType模型
 const ExpenseType = sequelize.define('ExpenseType', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   name: {
     type: DataTypes.STRING,
@@ -342,9 +373,9 @@ const ExpenseType = sequelize.define('ExpenseType', {
 // 定义Expense模型
 const Expense = sequelize.define('Expense', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   description: {
     type: DataTypes.STRING,
@@ -359,15 +390,15 @@ const Expense = sequelize.define('Expense', {
     allowNull: false
   },
   category_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   room_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   paid_by: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   receipt_image: {
@@ -391,16 +422,16 @@ const Expense = sequelize.define('Expense', {
 // 定义ExpenseSplit模型
 const ExpenseSplit = sequelize.define('ExpenseSplit', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   expense_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   user_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   amount: {
@@ -426,12 +457,12 @@ const ExpenseSplit = sequelize.define('ExpenseSplit', {
 // 定义InviteCode模型
 const InviteCode = sequelize.define('InviteCode', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   room_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   code: {
@@ -440,7 +471,7 @@ const InviteCode = sequelize.define('InviteCode', {
     unique: true
   },
   created_by: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   expires_at: {
@@ -469,12 +500,12 @@ const InviteCode = sequelize.define('InviteCode', {
 // 定义QRCode模型
 const QRCode = sequelize.define('QRCode', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   room_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   code: {
@@ -507,16 +538,16 @@ const QRCode = sequelize.define('QRCode', {
 // 定义SpecialPaymentRule模型
 const SpecialPaymentRule = sequelize.define('SpecialPaymentRule', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   room_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   user_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   rule_type: {
@@ -545,16 +576,16 @@ const SpecialPaymentRule = sequelize.define('SpecialPaymentRule', {
 // 定义PaymentTransfer模型
 const PaymentTransfer = sequelize.define('PaymentTransfer', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: Sequelize.UUIDV4,
-    primaryKey: true
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
   from_payment_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   to_payment_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   amount: {
@@ -576,6 +607,336 @@ const PaymentTransfer = sequelize.define('PaymentTransfer', {
   updatedAt: 'updated_at'
 });
 
+// 定义UserToken模型
+const UserToken = sequelize.define('UserToken', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  access_token: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  },
+  refresh_token: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  },
+  expires_at: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  device_name: {
+    type: DataTypes.STRING(100)
+  },
+  device_type: {
+    type: DataTypes.STRING(20)
+  },
+  ip_address: {
+    type: DataTypes.INET
+  },
+  user_agent: {
+    type: DataTypes.TEXT
+  }
+}, {
+  tableName: 'user_tokens',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false
+});
+
+// 定义UserSession模型
+const UserSession = sequelize.define('UserSession', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  session_token: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    unique: true
+  },
+  device_name: {
+    type: DataTypes.STRING(100)
+  },
+  device_type: {
+    type: DataTypes.STRING(20)
+  },
+  ip_address: {
+    type: DataTypes.INET
+  },
+  user_agent: {
+    type: DataTypes.TEXT
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
+  last_activity_at: {
+    type: DataTypes.DATE,
+    defaultValue: Sequelize.NOW
+  },
+  expires_at: {
+    type: DataTypes.DATE,
+    allowNull: false
+  }
+}, {
+  tableName: 'user_sessions',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false
+});
+
+// 定义Role模型
+const Role = sequelize.define('Role', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  role_name: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    unique: true
+  },
+  role_level: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    unique: true
+  },
+  description: {
+    type: DataTypes.TEXT
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
+}, {
+  tableName: 'roles',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+});
+
+// 定义Permission模型
+const Permission = sequelize.define('Permission', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  permission_name: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    unique: true
+  },
+  resource: {
+    type: DataTypes.STRING(50),
+    allowNull: false
+  },
+  action: {
+    type: DataTypes.STRING(50),
+    allowNull: false
+  },
+  description: {
+    type: DataTypes.TEXT
+  }
+}, {
+  tableName: 'permissions',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false
+});
+
+// 定义RolePermission模型
+const RolePermission = sequelize.define('RolePermission', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  role_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  permission_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  }
+}, {
+  tableName: 'role_permissions',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false
+});
+
+// 定义UserRole模型
+const UserRole = sequelize.define('UserRole', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  role_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  assigned_by: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  assigned_at: {
+    type: DataTypes.DATE,
+    defaultValue: Sequelize.NOW
+  }
+}, {
+  tableName: 'user_roles',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false
+});
+
+// 定义AuditLog模型
+const AuditLog = sequelize.define('AuditLog', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  action: {
+    type: DataTypes.STRING(100),
+    allowNull: false
+  },
+  resource_type: {
+    type: DataTypes.STRING(50),
+    allowNull: false
+  },
+  resource_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  old_values: {
+    type: DataTypes.JSONB
+  },
+  new_values: {
+    type: DataTypes.JSONB
+  },
+  ip_address: {
+    type: DataTypes.INET
+  },
+  user_agent: {
+    type: DataTypes.TEXT
+  },
+  session_id: {
+    type: DataTypes.STRING(255)
+  }
+}, {
+  tableName: 'audit_logs',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false
+});
+
+// 定义Notification模型
+const Notification = sequelize.define('Notification', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  title: {
+    type: DataTypes.STRING(255),
+    allowNull: false
+  },
+  message: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  },
+  type: {
+    type: DataTypes.ENUM('info', 'warning', 'error', 'success'),
+    defaultValue: 'info'
+  },
+  is_read: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  data: {
+    type: DataTypes.JSONB
+  },
+  expires_at: {
+    type: DataTypes.DATE
+  }
+}, {
+  tableName: 'notifications',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+});
+
+// 定义NotificationChannel模型
+const NotificationChannel = sequelize.define('NotificationChannel', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  channel_type: {
+    type: DataTypes.ENUM('email', 'sms', 'push', 'webhook'),
+    allowNull: false
+  },
+  channel_address: {
+    type: DataTypes.STRING(255),
+    allowNull: false
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
+  is_verified: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  }
+}, {
+  tableName: 'notification_channels',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+});
+
 // 定义模型关联关系
 // User关联
 User.hasMany(Room, { foreignKey: 'creator_id', as: 'createdRooms' });
@@ -588,6 +949,12 @@ User.hasMany(Expense, { foreignKey: 'paid_by', as: 'paidExpenses' });
 User.hasMany(ExpenseSplit, { foreignKey: 'user_id', as: 'expenseSplits' });
 User.hasMany(InviteCode, { foreignKey: 'created_by', as: 'createdInviteCodes' });
 User.hasMany(SpecialPaymentRule, { foreignKey: 'user_id', as: 'specialPaymentRules' });
+User.hasMany(UserToken, { foreignKey: 'user_id', as: 'userTokens' });
+User.hasMany(UserSession, { foreignKey: 'user_id', as: 'userSessions' });
+User.hasMany(UserRole, { foreignKey: 'user_id', as: 'userRoles' });
+User.hasMany(AuditLog, { foreignKey: 'user_id', as: 'auditLogs' });
+User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
+User.hasMany(NotificationChannel, { foreignKey: 'user_id', as: 'notificationChannels' });
 
 // Room关联
 Room.belongsTo(User, { foreignKey: 'creator_id', as: 'creator' });
@@ -651,6 +1018,36 @@ SpecialPaymentRule.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 PaymentTransfer.belongsTo(Payment, { foreignKey: 'from_payment_id', as: 'fromPayment' });
 PaymentTransfer.belongsTo(Payment, { foreignKey: 'to_payment_id', as: 'toPayment' });
 
+// Role关联
+Role.hasMany(RolePermission, { foreignKey: 'role_id', as: 'rolePermissions' });
+Role.hasMany(UserRole, { foreignKey: 'role_id', as: 'userRoles' });
+
+// Permission关联
+Permission.hasMany(RolePermission, { foreignKey: 'permission_id', as: 'rolePermissions' });
+
+// RolePermission关联
+RolePermission.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
+RolePermission.belongsTo(Permission, { foreignKey: 'permission_id', as: 'permission' });
+
+// UserRole关联
+UserRole.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+UserRole.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
+
+// UserToken关联
+UserToken.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// UserSession关联
+UserSession.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// AuditLog关联
+AuditLog.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// Notification关联
+Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// NotificationChannel关联
+NotificationChannel.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
 // 导出所有模型
 const db = {
   sequelize,
@@ -668,7 +1065,16 @@ const db = {
   InviteCode,
   QRCode,
   SpecialPaymentRule,
-  PaymentTransfer
+  PaymentTransfer,
+  UserToken,
+  UserSession,
+  Role,
+  Permission,
+  RolePermission,
+  UserRole,
+  AuditLog,
+  Notification,
+  NotificationChannel
 };
 
 module.exports = db;

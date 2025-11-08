@@ -1,5 +1,6 @@
 const winston = require('winston');
 const { pool } = require('../config/db');
+const { PrecisionCalculator } = require('../services/precision-calculator');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -170,17 +171,22 @@ class StatsController {
       const dailyTrendResult = await client.query(dailyTrendQuery, params);
       const dailyTrend = dailyTrendResult.rows;
       
+      // 使用PrecisionCalculator进行高精度计算
+      const totalPaid = PrecisionCalculator.round(parseFloat(paymentStats.total_paid), 2);
+      const avgPayment = PrecisionCalculator.round(parseFloat(paymentStats.avg_payment), 2);
+      const totalOwed = PrecisionCalculator.round(parseFloat(splitStats.total_owed), 2);
+      
       res.status(200).json({
         success: true,
         data: {
           payment_stats: {
             count: parseInt(paymentStats.payment_count),
-            total_paid: parseFloat(paymentStats.total_paid),
-            avg_payment: parseFloat(paymentStats.avg_payment)
+            total_paid: totalPaid,
+            avg_payment: avgPayment
           },
           split_stats: {
             count: parseInt(splitStats.split_count),
-            total_owed: parseFloat(splitStats.total_owed)
+            total_owed: totalOwed
           },
           bill_stats: {
             count: parseInt(billStats.bill_count),
@@ -189,11 +195,11 @@ class StatsController {
           expense_types: expenseTypes.map(type => ({
             type_name: type.type_name,
             count: parseInt(type.count),
-            total_amount: parseFloat(type.total_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(type.total_amount), 2)
           })),
           daily_trend: dailyTrend.map(trend => ({
             date: trend.date,
-            total_amount: parseFloat(trend.total_amount),
+            total_amount: PrecisionCalculator.round(parseFloat(trend.total_amount), 2),
             count: parseInt(trend.count)
           }))
         }
@@ -364,37 +370,44 @@ class StatsController {
       const dailyTrendResult = await client.query(dailyTrendQuery, params);
       const dailyTrend = dailyTrendResult.rows;
       
+      // 使用PrecisionCalculator进行高精度计算
+      const totalExpense = PrecisionCalculator.round(parseFloat(expenseStats.total_expense), 2);
+      const avgExpense = PrecisionCalculator.round(parseFloat(expenseStats.avg_expense), 2);
+      const totalBillAmount = PrecisionCalculator.round(parseFloat(billStats.total_bill_amount), 2);
+      const paidAmount = PrecisionCalculator.round(parseFloat(billStats.paid_amount), 2);
+      const pendingAmount = PrecisionCalculator.round(parseFloat(billStats.pending_amount), 2);
+      
       res.status(200).json({
         success: true,
         data: {
           expense_stats: {
             count: parseInt(expenseStats.expense_count),
-            total_expense: parseFloat(expenseStats.total_expense),
-            avg_expense: parseFloat(expenseStats.avg_expense),
+            total_expense: totalExpense,
+            avg_expense: avgExpense,
             unique_payers: parseInt(expenseStats.unique_payers)
           },
           bill_stats: {
             count: parseInt(billStats.bill_count),
-            total_amount: parseFloat(billStats.total_bill_amount),
-            paid_amount: parseFloat(billStats.paid_amount),
-            pending_amount: parseFloat(billStats.pending_amount)
+            total_amount: totalBillAmount,
+            paid_amount: paidAmount,
+            pending_amount: pendingAmount
           },
           member_contributions: memberContributions.map(member => ({
             id: member.id,
             username: member.username,
             avatar: member.avatar,
             expense_count: parseInt(member.expense_count),
-            total_paid: parseFloat(member.total_paid),
-            total_owed: parseFloat(member.total_owed)
+            total_paid: PrecisionCalculator.round(parseFloat(member.total_paid), 2),
+            total_owed: PrecisionCalculator.round(parseFloat(member.total_owed), 2)
           })),
           expense_types: expenseTypes.map(type => ({
             type_name: type.type_name,
             count: parseInt(type.count),
-            total_amount: parseFloat(type.total_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(type.total_amount), 2)
           })),
           daily_trend: dailyTrend.map(trend => ({
             date: trend.date,
-            total_amount: parseFloat(trend.total_amount),
+            total_amount: PrecisionCalculator.round(parseFloat(trend.total_amount), 2),
             count: parseInt(trend.count)
           }))
         }
@@ -514,6 +527,10 @@ class StatsController {
       const activeRoomsResult = await client.query(activeRoomsQuery);
       const activeRooms = activeRoomsResult.rows;
       
+      // 使用PrecisionCalculator进行高精度计算
+      const totalExpenseAmount = PrecisionCalculator.round(parseFloat(expenseStats.total_amount), 2);
+      const totalBillAmount = PrecisionCalculator.round(parseFloat(billStats.total_amount), 2);
+      
       res.status(200).json({
         success: true,
         data: {
@@ -527,12 +544,12 @@ class StatsController {
           },
           expense_stats: {
             total_expenses: parseInt(expenseStats.total_expenses),
-            total_amount: parseFloat(expenseStats.total_amount),
+            total_amount: totalExpenseAmount,
             new_expenses: parseInt(expenseStats.new_expenses)
           },
           bill_stats: {
             total_bills: parseInt(billStats.total_bills),
-            total_amount: parseFloat(billStats.total_amount),
+            total_amount: totalBillAmount,
             completed_bills: parseInt(billStats.completed_bills),
             pending_bills: parseInt(billStats.pending_bills)
           },
@@ -542,14 +559,14 @@ class StatsController {
           })),
           expense_trend: expenseTrend.map(trend => ({
             month: trend.month,
-            total_amount: parseFloat(trend.total_amount),
+            total_amount: PrecisionCalculator.round(parseFloat(trend.total_amount), 2),
             count: parseInt(trend.count)
           })),
           active_rooms: activeRooms.map(room => ({
             id: room.id,
             name: room.name,
             expense_count: parseInt(room.expense_count),
-            total_amount: parseFloat(room.total_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(room.total_amount), 2)
           }))
         }
       });
@@ -636,12 +653,12 @@ class StatsController {
           const prev = parseFloat(historicalData[i-1].total_amount);
           const curr = parseFloat(historicalData[i].total_amount);
           if (prev > 0) {
-            growthRates.push((curr - prev) / prev);
+            growthRates.push(PrecisionCalculator.divide(PrecisionCalculator.subtract(curr, prev), prev));
           }
         }
         
         const avgGrowthRate = growthRates.length > 0 
-          ? growthRates.reduce((sum, rate) => sum + rate, 0) / growthRates.length 
+          ? PrecisionCalculator.divide(growthRates.reduce((sum, rate) => PrecisionCalculator.add(sum, rate), 0), growthRates.length)
           : 0;
         
         // 生成未来4周的预测
@@ -649,13 +666,13 @@ class StatsController {
         const lastWeekDate = new Date(historicalData[historicalData.length - 1].week);
         
         for (let i = 1; i <= 4; i++) {
-          const predictedAmount = lastWeekAmount * (1 + avgGrowthRate) * i;
+          const predictedAmount = PrecisionCalculator.multiply(lastWeekAmount, PrecisionCalculator.multiply(PrecisionCalculator.add(1, avgGrowthRate), i));
           const predictedDate = new Date(lastWeekDate);
           predictedDate.setDate(predictedDate.getDate() + (i * 7));
           
           forecast.push({
             week: predictedDate,
-            predicted_amount: Math.max(0, predictedAmount)
+            predicted_amount: Math.max(0, parseFloat(predictedAmount))
           });
         }
       }
@@ -669,12 +686,12 @@ class StatsController {
           const prev = parseFloat(billHistoricalData[i-1].total_amount);
           const curr = parseFloat(billHistoricalData[i].total_amount);
           if (prev > 0) {
-            billGrowthRates.push((curr - prev) / prev);
+            billGrowthRates.push(PrecisionCalculator.divide(PrecisionCalculator.subtract(curr, prev), prev));
           }
         }
         
         const avgBillGrowthRate = billGrowthRates.length > 0 
-          ? billGrowthRates.reduce((sum, rate) => sum + rate, 0) / billGrowthRates.length 
+          ? PrecisionCalculator.divide(billGrowthRates.reduce((sum, rate) => PrecisionCalculator.add(sum, rate), 0), billGrowthRates.length)
           : 0;
         
         // 生成未来4周的账单预测
@@ -682,13 +699,13 @@ class StatsController {
         const lastBillDate = new Date(billHistoricalData[billHistoricalData.length - 1].week);
         
         for (let i = 1; i <= 4; i++) {
-          const predictedAmount = lastBillAmount * (1 + avgBillGrowthRate) * i;
+          const predictedAmount = PrecisionCalculator.multiply(lastBillAmount, PrecisionCalculator.multiply(PrecisionCalculator.add(1, avgBillGrowthRate), i));
           const predictedDate = new Date(lastBillDate);
           predictedDate.setDate(predictedDate.getDate() + (i * 7));
           
           billForecast.push({
             week: predictedDate,
-            predicted_amount: Math.max(0, predictedAmount)
+            predicted_amount: Math.max(0, parseFloat(predictedAmount))
           });
         }
       }
@@ -746,32 +763,32 @@ class StatsController {
         data: {
           historical_data: historicalData.map(data => ({
             week: data.week,
-            total_amount: parseFloat(data.total_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(data.total_amount), 2)
           })),
           bill_historical_data: billHistoricalData.map(data => ({
             week: data.week,
             bill_count: parseInt(data.bill_count),
-            total_amount: parseFloat(data.total_amount),
-            paid_amount: parseFloat(data.paid_amount),
-            pending_amount: parseFloat(data.pending_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(data.total_amount), 2),
+            paid_amount: PrecisionCalculator.round(parseFloat(data.paid_amount), 2),
+            pending_amount: PrecisionCalculator.round(parseFloat(data.pending_amount), 2)
           })),
           forecast: forecast,
           bill_forecast: billForecast,
           type_distribution: typeDistribution.map(type => ({
             type_name: type.type_name,
             count: parseInt(type.count),
-            total_amount: parseFloat(type.total_amount),
-            avg_amount: parseFloat(type.avg_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(type.total_amount), 2),
+            avg_amount: PrecisionCalculator.round(parseFloat(type.avg_amount), 2)
           })),
           bill_status_distribution: billStatusDistribution.map(status => ({
             status: status.status,
             count: parseInt(status.count),
-            total_amount: parseFloat(status.total_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(status.total_amount), 2)
           })),
           upcoming_bills: upcomingBills.map(bill => ({
             id: bill.id,
             title: bill.title,
-            amount: parseFloat(bill.amount),
+            amount: PrecisionCalculator.round(parseFloat(bill.amount), 2),
             due_date: bill.due_date,
             status: bill.status,
             created_by: bill.created_by

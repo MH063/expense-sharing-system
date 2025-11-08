@@ -21,7 +21,7 @@ export const roleApi = {
   // 获取角色列表
   getRoleList: () => {
     return request({
-      url: '/admin/roles',  // 移除了 /api 前缀
+      url: '/roles',  // 匹配后端路径
       method: 'get'
     })
   },
@@ -29,7 +29,7 @@ export const roleApi = {
   // 获取角色详情
   getRoleDetail: (id) => {
     return request({
-      url: `/admin/roles/${id}`,  // 移除了 /api 前缀
+      url: `/roles/${id}`,  // 匹配后端路径
       method: 'get'
     })
   },
@@ -37,7 +37,7 @@ export const roleApi = {
   // 创建角色
   createRole: (data) => {
     return request({
-      url: '/admin/roles',  // 移除了 /api 前缀
+      url: '/roles',  // 匹配后端路径
       method: 'post',
       data
     })
@@ -46,7 +46,7 @@ export const roleApi = {
   // 更新角色
   updateRole: (id, data) => {
     return request({
-      url: `/admin/roles/${id}`,  // 移除了 /api 前缀
+      url: `/roles/${id}`,  // 匹配后端路径
       method: 'put',
       data
     })
@@ -55,7 +55,7 @@ export const roleApi = {
   // 删除角色
   deleteRole: (id) => {
     return request({
-      url: `/admin/roles/${id}`,  // 移除了 /api 前缀
+      url: `/roles/${id}`,  // 匹配后端路径
       method: 'delete'
     })
   },
@@ -63,8 +63,32 @@ export const roleApi = {
   // 获取权限列表
   getPermissionList: () => {
     return request({
-      url: '/admin/permissions',  // 移除了 /api 前缀
+      url: '/roles/permissions/all',  // 匹配后端路径
       method: 'get'
+    })
+  },
+
+  // 获取角色权限
+  getRolePermissions: (roleId) => {
+    return request({
+      url: `/roles/${roleId}/permissions`,  // 匹配后端路径
+      method: 'get'
+    })
+  },
+
+  // 分配权限给角色
+  assignPermissionToRole: (roleId, permissionId) => {
+    return request({
+      url: `/roles/${roleId}/permissions/${permissionId}`,  // 匹配后端路径
+      method: 'post'
+    })
+  },
+
+  // 移除角色权限
+  removePermissionFromRole: (roleId, permissionId) => {
+    return request({
+      url: `/roles/${roleId}/permissions/${permissionId}`,  // 匹配后端路径
+      method: 'delete'
     })
   }
 }
@@ -76,7 +100,7 @@ export const userApi = {
   // 获取用户列表
   getUserList: (params) => {
     return request({
-      url: '/admin/users',  // 移除了 /api 前缀
+      url: '/users',  // 匹配后端路径
       method: 'get',
       params
     })
@@ -85,7 +109,7 @@ export const userApi = {
   // 获取用户详情
   getUserDetail: (id) => {
     return request({
-      url: `/admin/users/${id}`,  // 移除了 /api 前缀
+      url: `/users/${id}`,  // 匹配后端路径
       method: 'get'
     })
   },
@@ -93,7 +117,7 @@ export const userApi = {
   // 创建用户
   createUser: (data) => {
     return request({
-      url: '/admin/users',  // 移除了 /api 前缀
+      url: '/users',  // 匹配后端路径
       method: 'post',
       data
     })
@@ -102,7 +126,7 @@ export const userApi = {
   // 更新用户
   updateUser: (id, data) => {
     return request({
-      url: `/admin/users/${id}`,  // 移除了 /api 前缀
+      url: `/users/${id}`,  // 匹配后端路径
       method: 'put',
       data
     })
@@ -111,7 +135,7 @@ export const userApi = {
   // 更新用户状态
   updateUserStatus: (id, status) => {
     return request({
-      url: `/admin/users/${id}/status`,  // 移除了 /api 前缀
+      url: `/users/${id}/status`,  // 匹配后端路径
       method: 'put',
       data: { status }
     })
@@ -120,7 +144,7 @@ export const userApi = {
   // 重置用户密码
   resetUserPassword: (id) => {
     return request({
-      url: `/admin/users/${id}/reset-password`,  // 移除了 /api 前缀
+      url: `/users/${id}/reset-password`,  // 匹配后端路径
       method: 'post'
     })
   },
@@ -128,7 +152,7 @@ export const userApi = {
   // 删除用户
   deleteUser: (id) => {
     return request({
-      url: `/admin/users/${id}`,  // 移除了 /api 前缀
+      url: `/users/${id}`,  // 匹配后端路径
       method: 'delete'
     })
   },
@@ -136,7 +160,7 @@ export const userApi = {
   // 分配角色
   assignRole: (userId, data) => {
     return request({
-      url: `/admin/users/${userId}/roles`,  // 移除了 /api 前缀
+      url: `/users/${userId}/roles`,  // 匹配后端路径
       method: 'post',
       data
     })
@@ -145,8 +169,58 @@ export const userApi = {
   // 获取用户角色
   getUserRoles: (userId) => {
     return request({
-      url: `/admin/users/${userId}/roles`,  // 移除了 /api 前缀
+      url: `/users/${userId}/roles`,  // 匹配后端路径
       method: 'get'
+    })
+  },
+
+  // 移除用户角色
+  removeUserRole: (userId, roleId) => {
+    return request({
+      url: `/users/${userId}/roles/${roleId}`,  // 匹配后端路径
+      method: 'delete'
+    })
+  },
+
+  // 更新用户角色
+  updateUserRole: (userId, data) => {
+    return request({
+      url: `/users/${userId}/roles`,  // 匹配后端路径
+      method: 'put',
+      data
+    })
+  },
+
+  // 获取用户会话列表
+  getUserSessions: (userId) => {
+    return request({
+      url: `/users/${userId}/sessions`,  // 匹配后端路径
+      method: 'get'
+    })
+  },
+
+  // 终止用户会话
+  terminateUserSession: (userId, sessionId) => {
+    return request({
+      url: `/users/${userId}/sessions/${sessionId}`,  // 匹配后端路径
+      method: 'delete'
+    })
+  },
+
+  // 获取用户通知渠道
+  getUserNotificationChannels: (userId) => {
+    return request({
+      url: `/users/${userId}/notification-channels`,  // 匹配后端路径
+      method: 'get'
+    })
+  },
+
+  // 更新用户通知渠道
+  updateUserNotificationChannel: (userId, channelId, data) => {
+    return request({
+      url: `/users/${userId}/notification-channels/${channelId}`,  // 匹配后端路径
+      method: 'put',
+      data
     })
   }
 }

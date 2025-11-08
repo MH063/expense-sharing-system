@@ -155,6 +155,8 @@ const reviewRoutes = require('./routes/review-routes');
 const systemConfigRoutes = require('./routes/system-config-routes');
 const fileRoutes = require('./routes/file-routes');
 const websocketManagementRoutes = require('./routes/websocket-management-routes');
+const roleRoutes = require('./routes/role-routes');
+const leaveRecordRoutes = require('./routes/leave-record-routes');
 
 // 导入错误处理中间件
 const { errorHandler, notFoundHandler } = require('./middleware/error-handler');
@@ -241,6 +243,7 @@ app.use('/api/ws', websocketManagementRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/roles', roleRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/expense-types', expenseTypeRoutes);
@@ -257,6 +260,7 @@ app.use('/api/notification-settings', notificationSettingsRoutes);
 app.use('/api/mfa', mfaRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
 app.use('/api/abnormal-expenses', abnormalExpenseRoutes);
+app.use('/api/leave-records', leaveRecordRoutes);
 app.use('/api/cache-test', cacheTestRoutes);
 
 // 前端应用路由（使用绝对路径，兼容空格路径；目录不存在则跳过挂载并记录日志）

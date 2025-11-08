@@ -1,5 +1,7 @@
 const { pool } = require('../config/db');
 const winston = require('winston');
+const PresenceDaySplitService = require('../services/presence-day-split-service');
+const { PrecisionCalculator } = require('../services/precision-calculator');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -22,6 +24,15 @@ class ExpenseController {
 
   // 创建费用记录
   async createExpense(req, res) {
+    const startTime = Date.now();
+    const requestId = `create-expense-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    logger.info(`[${requestId}] 开始创建费用记录`, {
+      requestId,
+      userId: req.user.sub,
+      body: { ...req.body, password: undefined } // 不记录敏感信息
+    });
+
     try {
       const { 
         title, 
@@ -35,15 +46,109 @@ class ExpenseController {
         expense_date,
         receipt_image_url,
         tags,
-        status
+        status,
+        // 新增读数计算方式相关字段
+        calculation_method = 'amount', // 'amount' 或 'reading'
+        meter_type,
+        current_reading,
+        previous_reading,
+        unit_price,
+        // 新增分摊人员选择相关字段
+        selected_members
       } = req.body;
       const creatorId = req.user.sub; // 从认证中间件获取用户ID
 
       // 验证必填字段
-      if (!title || !amount || !expense_type_id || !room_id || !payer_id || !split_type) {
+      if (!title || !expense_type_id || !room_id || !payer_id || !split_type) {
+        logger.warn(`[${requestId}] 创建费用记录失败: 缺少必填字段`, {
+          requestId,
+          missingFields: {
+            title: !title,
+            expense_type_id: !expense_type_id,
+            room_id: !room_id,
+            payer_id: !payer_id,
+            split_type: !split_type
+          }
+        });
+        
         return res.status(400).json({
           success: false,
           message: '缺少必填字段'
+        });
+      }
+
+      // 验证selected_members参数
+      if (selected_members && !Array.isArray(selected_members)) {
+        logger.warn(`[${requestId}] 创建费用记录失败: selected_members参数必须是数组`, {
+          requestId,
+          selected_members
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: 'selected_members参数必须是数组'
+        });
+      }
+
+      // 如果是读数计算方式，验证必填字段
+      let calculatedAmount = amount;
+      if (calculation_method === 'reading') {
+        if (!meter_type || current_reading === undefined || previous_reading === undefined || !unit_price) {
+          logger.warn(`[${requestId}] 创建费用记录失败: 读数计算方式缺少必填字段`, {
+            requestId,
+            missingFields: {
+              meter_type: !meter_type,
+              current_reading: current_reading === undefined,
+              previous_reading: previous_reading === undefined,
+              unit_price: !unit_price
+            }
+          });
+          
+          return res.status(400).json({
+            success: false,
+            message: '读数计算方式需要提供表计类型、本次读数、上次读数和单价'
+          });
+        }
+        
+        // 验证读数是否合理
+        if (parseFloat(current_reading) < parseFloat(previous_reading)) {
+          logger.warn(`[${requestId}] 创建费用记录失败: 本次读数小于上次读数`, {
+            requestId,
+            current_reading,
+            previous_reading
+          });
+          
+          return res.status(400).json({
+            success: false,
+            message: '本次读数不能小于上次读数'
+          });
+        }
+        
+        // 计算用量和总费用
+        const usage = PrecisionCalculator.subtract(parseFloat(current_reading), parseFloat(previous_reading));
+        calculatedAmount = PrecisionCalculator.multiply(usage, parseFloat(unit_price));
+        
+        // 如果前端提供了金额，检查是否与计算结果一致
+        if (amount && Math.abs(PrecisionCalculator.subtract(calculatedAmount, parseFloat(amount))) > 0.01) {
+          logger.warn(`[${requestId}] 创建费用记录失败: 计算金额与提供金额不一致`, {
+            requestId,
+            calculatedAmount,
+            providedAmount: amount
+          });
+          
+          return res.status(400).json({
+            success: false,
+            message: `计算金额(${calculatedAmount})与提供金额(${amount})不一致`
+          });
+        }
+      } else if (!amount) {
+        logger.warn(`[${requestId}] 创建费用记录失败: 金额计算方式需要提供金额`, {
+          requestId
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: '金额计算方式需要提供金额'
         });
       }
 
@@ -54,6 +159,12 @@ class ExpenseController {
       );
 
       if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 创建费用记录失败: 用户不是该寝室的成员`, {
+          requestId,
+          userId: creatorId,
+          roomId: room_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您不是该寝室的成员'
@@ -67,6 +178,11 @@ class ExpenseController {
       );
 
       if (expenseTypeResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 创建费用记录失败: 费用类型不存在`, {
+          requestId,
+          expense_type_id
+        });
+        
         return res.status(404).json({
           success: false,
           message: '费用类型不存在'
@@ -89,14 +205,16 @@ class ExpenseController {
         const expenseResult = await client.query(
           `INSERT INTO expenses 
            (title, description, amount, expense_type_id, room_id, payer_id, split_algorithm, 
-            expense_date, split_parameters, status, created_by, created_at, updated_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()) 
+            expense_date, split_parameters, status, created_by, created_at, updated_at,
+            calculation_method, meter_type, current_reading, previous_reading, unit_price) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW(), $12, $13, $14, $15, $16) 
            RETURNING id, title, description, amount, expense_type_id, room_id, payer_id, 
-                    split_algorithm, expense_date, split_parameters, status, created_by, created_at`,
+                    split_algorithm, expense_date, split_parameters, status, created_by, created_at,
+                    calculation_method, meter_type, current_reading, previous_reading, unit_price`,
           [
             title, 
             description || '', 
-            amount, 
+            calculatedAmount, 
             expense_type_id, 
             room_id, 
             payer_id, 
@@ -104,62 +222,177 @@ class ExpenseController {
             expense_date || new Date().toISOString().split('T')[0], 
             JSON.stringify({}), 
             'pending', 
-            creatorId
+            creatorId,
+            calculation_method,
+            meter_type,
+            current_reading,
+            previous_reading,
+            unit_price
           ]
         );
 
         const expense = expenseResult.rows[0];
+        logger.info(`[${requestId}] 费用记录创建成功`, {
+          requestId,
+          expenseId: expense.id,
+          title: expense.title,
+          amount: expense.amount
+        });
 
         // 根据分摊类型创建分摊记录
         let splitRecords = [];
         
         if (split_type === 'equal') {
           // 平均分摊
-          const membersResult = await client.query(
-            `SELECT user_id FROM user_room_relations 
-             WHERE room_id = $1 AND is_active = TRUE`,
-            [room_id]
+          let membersQuery = `SELECT user_id FROM user_room_relations WHERE room_id = $1 AND is_active = TRUE`;
+          let membersParams = [room_id];
+          
+          // 如果指定了selected_members，只分摊给选中的成员
+          if (selected_members && selected_members.length > 0) {
+            membersQuery += ` AND user_id = ANY($2)`;
+            membersParams.push(selected_members);
+            logger.info(`[${requestId}] 使用指定成员进行平均分摊`, {
+              requestId,
+              selected_members
+            });
+          }
+          
+          const membersResult = await client.query(membersQuery, membersParams);
+          const members = membersResult.rows;
+          
+          if (members.length === 0) {
+            logger.warn(`[${requestId}] 创建费用记录失败: 没有找到有效的分摊成员`, {
+              requestId,
+              room_id,
+              selected_members
+            });
+            
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+              success: false,
+              message: '没有找到有效的分摊成员'
+            });
+          }
+          
+          // 使用尾差处理机制确保分摊总额等于实际金额
+          const sharesArray = members.map(() => 1); // 每人一份
+          const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(amount), sharesArray);
+          
+          for (let i = 0; i < members.length; i++) {
+            const splitRecord = await client.query(
+              `INSERT INTO expense_splits 
+               (expense_id, user_id, amount, split_type, split_ratio, created_at) 
+               VALUES ($1, $2, $3, $4, 1.0, NOW()) 
+               RETURNING id, expense_id, user_id, amount, split_type`,
+              [expense.id, members[i].user_id, splitAmounts[i], 'equal']
+            );
+            splitRecords.push(splitRecord.rows[0]);
+          }
+          
+          logger.info(`[${requestId}] 平均分摊记录创建成功`, {
+            requestId,
+            expenseId: expense.id,
+            memberCount: members.length
+          });
+        } else if (split_type === 'custom' && split_details && split_details.length > 0) {
+          // 自定义分摊 - 使用尾差处理机制确保分摊总额等于实际金额
+          
+          // 验证分摊金额总和
+          const totalAmount = split_details.reduce((sum, detail) => 
+            PrecisionCalculator.add(sum, parseFloat(detail.amount)), 0
           );
           
-          const members = membersResult.rows;
-          const splitAmount = parseFloat(amount) / members.length;
+          // 如果分摊金额总和与实际金额不一致，按比例调整
+          if (Math.abs(PrecisionCalculator.subtract(totalAmount, parseFloat(amount))) > 0.01) {
+            // 按比例调整每个分摊金额
+            const ratio = PrecisionCalculator.divide(parseFloat(amount), totalAmount);
+            split_details = split_details.map(detail => ({
+              ...detail,
+              amount: PrecisionCalculator.multiply(parseFloat(detail.amount), ratio)
+            }));
+            
+            logger.info(`[${requestId}] 自定义分摊金额按比例调整`, {
+              requestId,
+              originalTotal: totalAmount,
+              targetAmount: parseFloat(amount),
+              ratio
+            });
+          }
           
-          for (const member of members) {
+          // 使用尾差处理机制确保分摊总额等于实际金额
+          const sharesArray = split_details.map(detail => parseFloat(detail.amount));
+          const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(amount), sharesArray);
+          
+          for (let i = 0; i < split_details.length; i++) {
             const splitRecord = await client.query(
               `INSERT INTO expense_splits 
                (expense_id, user_id, amount, split_type, split_ratio, created_at) 
                VALUES ($1, $2, $3, $4, 1.0, NOW()) 
                RETURNING id, expense_id, user_id, amount, split_type`,
-              [expense.id, member.user_id, splitAmount, 'equal']
+              [expense.id, split_details[i].user_id, splitAmounts[i], 'custom']
             );
             splitRecords.push(splitRecord.rows[0]);
           }
-        } else if (split_type === 'custom' && split_details && split_details.length > 0) {
-          // 自定义分摊
-          for (const detail of split_details) {
-            const splitRecord = await client.query(
-              `INSERT INTO expense_splits 
-               (expense_id, user_id, amount, split_type, split_ratio, created_at) 
-               VALUES ($1, $2, $3, $4, 1.0, NOW()) 
-               RETURNING id, expense_id, user_id, amount, split_type`,
-              [expense.id, detail.user_id, detail.amount, 'custom']
-            );
-            splitRecords.push(splitRecord.rows[0]);
-          }
+          
+          logger.info(`[${requestId}] 自定义分摊记录创建成功`, {
+            requestId,
+            expenseId: expense.id,
+            memberCount: split_details.length
+          });
         } else if (split_type === 'percentage' && split_details && split_details.length > 0) {
-          // 百分比分摊
-          for (const detail of split_details) {
-            const splitAmount = parseFloat(amount) * parseFloat(detail.percentage) / 100;
+          // 百分比分摊 - 使用尾差处理机制确保分摊总额等于实际金额
+          
+          // 验证百分比总和
+          let totalPercentage = split_details.reduce((sum, detail) => 
+            PrecisionCalculator.add(sum, parseFloat(detail.percentage)), 0
+          );
+          
+          // 如果百分比总和不为100%，按比例调整
+          if (Math.abs(PrecisionCalculator.subtract(totalPercentage, 100)) > 0.01) {
+            // 按比例调整每个百分比
+            split_details = split_details.map(detail => ({
+              ...detail,
+              percentage: PrecisionCalculator.divide(
+                PrecisionCalculator.multiply(parseFloat(detail.percentage), 100), 
+                totalPercentage
+              )
+            }));
+            
+            logger.info(`[${requestId}] 百分比分摊按比例调整`, {
+              requestId,
+              originalTotal: totalPercentage,
+              targetPercentage: 100
+            });
+          }
+          
+          // 使用尾差处理机制计算分摊金额
+          const sharesArray = split_details.map(detail => parseFloat(detail.percentage));
+          const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(amount), sharesArray);
+          
+          for (let i = 0; i < split_details.length; i++) {
             const splitRecord = await client.query(
               `INSERT INTO expense_splits 
                (expense_id, user_id, amount, split_type, split_ratio, created_at) 
                VALUES ($1, $2, $3, $4, 1.0, NOW()) 
                RETURNING id, expense_id, user_id, amount, split_type`,
-              [expense.id, detail.user_id, splitAmount, 'by_area']
+              [expense.id, split_details[i].user_id, splitAmounts[i], 'by_area']
             );
             splitRecords.push(splitRecord.rows[0]);
           }
+          
+          logger.info(`[${requestId}] 百分比分摊记录创建成功`, {
+            requestId,
+            expenseId: expense.id,
+            memberCount: split_details.length
+          });
         } else {
+          logger.error(`[${requestId}] 创建费用记录失败: 无效的分摊类型或缺少分摊详情`, {
+            requestId,
+            split_type,
+            has_split_details: !!split_details,
+            split_details_length: split_details ? split_details.length : 0
+          });
+          
           throw new Error('无效的分摊类型或缺少分摊详情');
         }
 
@@ -168,7 +401,8 @@ class ExpenseController {
         // 获取完整的费用信息
         const fullExpenseResult = await pool.query(
           `SELECT e.id, e.title, e.description, e.amount, e.expense_type_id, e.room_id, e.payer_id, 
-                  e.split_algorithm, e.expense_date, e.split_parameters, e.status, e.created_by, e.created_at,
+                  e.split_type, e.expense_date, e.receipt_image_url, e.tags, e.status, e.created_at, e.updated_at,
+                  e.calculation_method, e.meter_type, e.current_reading, e.previous_reading, e.unit_price,
                   et.name as expense_type_name, et.icon as expense_type_icon,
                   u.username as payer_username, u.name as payer_name
            FROM expenses e
@@ -179,9 +413,17 @@ class ExpenseController {
         );
 
         const fullExpense = fullExpenseResult.rows[0];
-        fullExpense.splits = splitRecords;
+        const duration = Date.now() - startTime;
 
-        logger.info(`费用记录创建成功: ${title} (ID: ${expense.id})`);
+        logger.info(`[${requestId}] 费用记录创建成功`, {
+          requestId,
+          expenseId: fullExpense.id,
+          title: fullExpense.title,
+          amount: fullExpense.amount,
+          splitType: split_type,
+          splitRecordCount: splitRecords.length,
+          duration
+        });
 
         res.status(201).json({
           success: true,
@@ -191,13 +433,24 @@ class ExpenseController {
 
       } catch (error) {
         await client.query('ROLLBACK');
+        logger.error(`[${requestId}] 创建费用记录事务失败`, {
+          requestId,
+          error: error.message,
+          stack: error.stack
+        });
         throw error;
       } finally {
         client.release();
       }
 
     } catch (error) {
-      logger.error('费用记录创建失败:', error);
+      const duration = Date.now() - startTime;
+      logger.error(`[${requestId}] 费用记录创建失败`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
       res.status(500).json({
         success: false,
         message: '服务器内部错误'
@@ -289,6 +542,7 @@ class ExpenseController {
       const expensesQuery = `
         SELECT e.id, e.title, e.description, e.amount, e.expense_type_id, e.room_id, e.payer_id, 
                e.split_type, e.expense_date, e.receipt_image_url, e.tags, e.status, e.created_at,
+               e.calculation_method, e.meter_type, e.current_reading, e.previous_reading, e.unit_price,
                et.name as expense_type_name, et.icon as expense_type_icon,
                u.username as payer_username, u.name as payer_name,
                r.name as room_name
@@ -346,6 +600,7 @@ class ExpenseController {
       const expenseResult = await pool.query(
         `SELECT e.id, e.title, e.description, e.amount, e.expense_type_id, e.room_id, e.payer_id, 
                 e.split_type, e.expense_date, e.receipt_image_url, e.tags, e.status, e.creator_id, e.created_at, e.updated_at,
+                e.calculation_method, e.meter_type, e.current_reading, e.previous_reading, e.unit_price,
                 et.name as expense_type_name, et.icon as expense_type_icon,
                 u.username as payer_username, u.name as payer_name,
                 r.name as room_name
@@ -411,6 +666,16 @@ class ExpenseController {
 
   // 更新费用记录
   async updateExpense(req, res) {
+    const startTime = Date.now();
+    const requestId = `update-expense-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    logger.info(`[${requestId}] 开始更新费用记录`, {
+      requestId,
+      userId: req.user.sub,
+      expenseId: req.params.id,
+      body: { ...req.body, password: undefined } // 不记录敏感信息
+    });
+
     try {
       const { id } = req.params;
       const { 
@@ -424,7 +689,15 @@ class ExpenseController {
         expense_date,
         receipt_image_url,
         tags,
-        status
+        status,
+        // 新增读数计算方式相关字段
+        calculation_method,
+        meter_type,
+        current_reading,
+        previous_reading,
+        unit_price,
+        // 新增分摊人员选择相关字段
+        selected_members
       } = req.body;
       const userId = req.user.sub; // 从认证中间件获取用户ID
 
@@ -432,6 +705,11 @@ class ExpenseController {
       const expenseResult = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
 
       if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 更新费用记录失败: 费用记录不存在`, {
+          requestId,
+          expenseId: id
+        });
+        
         return res.status(404).json({
           success: false,
           message: '费用记录不存在'
@@ -442,6 +720,14 @@ class ExpenseController {
 
       // 验证用户是否有权限更新费用（创建者或支付者）
       if (expense.creator_id !== userId && expense.payer_id !== userId) {
+        logger.warn(`[${requestId}] 更新费用记录失败: 用户没有权限更新该费用记录`, {
+          requestId,
+          userId,
+          expenseId: id,
+          creatorId: expense.creator_id,
+          payerId: expense.payer_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '只有费用创建者或支付者可以更新费用记录'
@@ -455,10 +741,82 @@ class ExpenseController {
       );
 
       if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 更新费用记录失败: 用户不是该寝室的成员`, {
+          requestId,
+          userId,
+          roomId: expense.room_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您不是该寝室的成员'
         });
+      }
+
+      // 验证selected_members参数
+      if (selected_members && !Array.isArray(selected_members)) {
+        logger.warn(`[${requestId}] 更新费用记录失败: selected_members参数必须是数组`, {
+          requestId,
+          selected_members
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: 'selected_members参数必须是数组'
+        });
+      }
+
+      // 如果是读数计算方式，验证必填字段
+      let calculatedAmount = amount;
+      if (calculation_method === 'reading') {
+        if (!meter_type || current_reading === undefined || previous_reading === undefined || !unit_price) {
+          logger.warn(`[${requestId}] 更新费用记录失败: 读数计算方式缺少必填字段`, {
+            requestId,
+            missingFields: {
+              meter_type: !meter_type,
+              current_reading: current_reading === undefined,
+              previous_reading: previous_reading === undefined,
+              unit_price: !unit_price
+            }
+          });
+          
+          return res.status(400).json({
+            success: false,
+            message: '读数计算方式需要提供表计类型、本次读数、上次读数和单价'
+          });
+        }
+        
+        // 验证读数是否合理
+        if (parseFloat(current_reading) < parseFloat(previous_reading)) {
+          logger.warn(`[${requestId}] 更新费用记录失败: 本次读数小于上次读数`, {
+            requestId,
+            current_reading,
+            previous_reading
+          });
+          
+          return res.status(400).json({
+            success: false,
+            message: '本次读数不能小于上次读数'
+          });
+        }
+        
+        // 计算用量和总费用
+        const usage = PrecisionCalculator.subtract(parseFloat(current_reading), parseFloat(previous_reading));
+        calculatedAmount = PrecisionCalculator.multiply(usage, parseFloat(unit_price));
+        
+        // 如果前端提供了金额，检查是否与计算结果一致
+        if (amount && Math.abs(PrecisionCalculator.subtract(calculatedAmount, parseFloat(amount))) > 0.01) {
+          logger.warn(`[${requestId}] 更新费用记录失败: 计算金额与提供金额不一致`, {
+            requestId,
+            calculatedAmount,
+            providedAmount: amount
+          });
+          
+          return res.status(400).json({
+            success: false,
+            message: `计算金额(${calculatedAmount})与提供金额(${amount})不一致`
+          });
+        }
       }
 
       // 开始事务
@@ -484,7 +842,7 @@ class ExpenseController {
 
         if (amount !== undefined) {
           updateFields.push(`amount = $${paramIndex++}`);
-          updateValues.push(amount);
+          updateValues.push(calculatedAmount !== undefined ? calculatedAmount : amount);
         }
 
         if (expense_type_id !== undefined) {
@@ -493,9 +851,9 @@ class ExpenseController {
         }
 
         if (payer_id !== undefined) {
-        updateFields.push(`payer_id = $${paramIndex++}`);
-        updateValues.push(payer_id);
-      }
+          updateFields.push(`payer_id = $${paramIndex++}`);
+          updateValues.push(payer_id);
+        }
 
         if (split_type !== undefined) {
           updateFields.push(`split_type = $${paramIndex++}`);
@@ -522,6 +880,32 @@ class ExpenseController {
           updateValues.push(status);
         }
 
+        // 添加读数计算方式相关字段
+        if (calculation_method !== undefined) {
+          updateFields.push(`calculation_method = $${paramIndex++}`);
+          updateValues.push(calculation_method);
+        }
+
+        if (meter_type !== undefined) {
+          updateFields.push(`meter_type = $${paramIndex++}`);
+          updateValues.push(meter_type);
+        }
+
+        if (current_reading !== undefined) {
+          updateFields.push(`current_reading = $${paramIndex++}`);
+          updateValues.push(current_reading);
+        }
+
+        if (previous_reading !== undefined) {
+          updateFields.push(`previous_reading = $${paramIndex++}`);
+          updateValues.push(previous_reading);
+        }
+
+        if (unit_price !== undefined) {
+          updateFields.push(`unit_price = $${paramIndex++}`);
+          updateValues.push(unit_price);
+        }
+
         updateFields.push(`updated_at = NOW()`);
         updateValues.push(id);
 
@@ -536,11 +920,22 @@ class ExpenseController {
 
         const result = await client.query(updateQuery, updateValues);
         const updatedExpense = result.rows[0];
+        
+        logger.info(`[${requestId}] 费用记录更新成功`, {
+          requestId,
+          expenseId: updatedExpense.id,
+          title: updatedExpense.title
+        });
 
         // 如果分摊类型或金额发生变化，需要更新分摊记录
         if (split_type !== undefined || amount !== undefined) {
           // 删除原有分摊记录
           await client.query('DELETE FROM expense_splits WHERE expense_id = $1', [id]);
+          
+          logger.info(`[${requestId}] 原有分摊记录已删除`, {
+            requestId,
+            expenseId: id
+          });
 
           // 重新创建分摊记录
           let splitRecords = [];
@@ -548,52 +943,156 @@ class ExpenseController {
           const finalSplitType = split_type !== undefined ? split_type : expense.split_type;
           
           if (finalSplitType === 'equal') {
-            // 平均分摊
-            const membersResult = await client.query(
-              `SELECT user_id FROM user_room_relations 
-               WHERE room_id = $1 AND is_active = TRUE`,
-              [expense.room_id]
+            // 平均分摊 - 使用尾差处理机制确保分摊总额等于实际金额
+            let membersQuery = `SELECT user_id FROM user_room_relations WHERE room_id = $1 AND is_active = TRUE`;
+            let membersParams = [expense.room_id];
+            
+            // 如果指定了selected_members，只分摊给选中的成员
+            if (selected_members && selected_members.length > 0) {
+              membersQuery += ` AND user_id = ANY($2)`;
+              membersParams.push(selected_members);
+              logger.info(`[${requestId}] 使用指定成员进行平均分摊`, {
+                requestId,
+                selected_members
+              });
+            }
+            
+            const membersResult = await client.query(membersQuery, membersParams);
+            const members = membersResult.rows;
+            
+            if (members.length === 0) {
+              logger.warn(`[${requestId}] 更新费用记录失败: 没有找到有效的分摊成员`, {
+                requestId,
+                roomId: expense.room_id,
+                selected_members
+              });
+              
+              await client.query('ROLLBACK');
+              return res.status(400).json({
+                success: false,
+                message: '没有找到有效的分摊成员'
+              });
+            }
+            
+            // 使用尾差处理机制确保分摊总额等于实际金额
+            const sharesArray = members.map(() => 1); // 每人一份
+            const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(finalAmount), sharesArray);
+            
+            for (let i = 0; i < members.length; i++) {
+              const splitRecord = await client.query(
+                `INSERT INTO expense_splits 
+                 (expense_id, user_id, amount, split_type, created_at, updated_at) 
+                 VALUES ($1, $2, $3, $4, NOW(), NOW()) 
+                 RETURNING id, expense_id, user_id, amount, split_type`,
+                [id, members[i].user_id, splitAmounts[i], finalSplitType]
+              );
+              splitRecords.push(splitRecord.rows[0]);
+            }
+            
+            logger.info(`[${requestId}] 平均分摊记录创建成功`, {
+              requestId,
+              expenseId: id,
+              memberCount: members.length
+            });
+          } else if (finalSplitType === 'custom' && split_details && split_details.length > 0) {
+            // 自定义分摊 - 使用尾差处理机制确保分摊总额等于实际金额
+            
+            // 验证分摊金额总和
+            const totalAmount = split_details.reduce((sum, detail) => 
+              PrecisionCalculator.add(sum, parseFloat(detail.amount)), 0
             );
             
-            const members = membersResult.rows;
-            const splitAmount = parseFloat(finalAmount) / members.length;
+            // 如果分摊金额总和与实际金额不一致，按比例调整
+            if (Math.abs(PrecisionCalculator.subtract(totalAmount, parseFloat(finalAmount))) > 0.01) {
+              // 按比例调整每个分摊金额
+              const ratio = PrecisionCalculator.divide(parseFloat(finalAmount), totalAmount);
+              split_details = split_details.map(detail => ({
+                ...detail,
+                amount: PrecisionCalculator.multiply(parseFloat(detail.amount), ratio)
+              }));
+              
+              logger.info(`[${requestId}] 自定义分摊金额按比例调整`, {
+                requestId,
+                originalTotal: totalAmount,
+                targetAmount: parseFloat(finalAmount),
+                ratio
+              });
+            }
             
-            for (const member of members) {
+            // 使用尾差处理机制确保分摊总额等于实际金额
+            const sharesArray = split_details.map(detail => parseFloat(detail.amount));
+            const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(finalAmount), sharesArray);
+            
+            for (let i = 0; i < split_details.length; i++) {
               const splitRecord = await client.query(
                 `INSERT INTO expense_splits 
                  (expense_id, user_id, amount, split_type, created_at, updated_at) 
                  VALUES ($1, $2, $3, $4, NOW(), NOW()) 
                  RETURNING id, expense_id, user_id, amount, split_type`,
-                [id, member.user_id, splitAmount, finalSplitType]
+                [id, split_details[i].user_id, splitAmounts[i], finalSplitType]
               );
               splitRecords.push(splitRecord.rows[0]);
             }
-          } else if (finalSplitType === 'custom' && split_details && split_details.length > 0) {
-            // 自定义分摊
-            for (const detail of split_details) {
-              const splitRecord = await client.query(
-                `INSERT INTO expense_splits 
-                 (expense_id, user_id, amount, split_type, created_at, updated_at) 
-                 VALUES ($1, $2, $3, $4, NOW(), NOW()) 
-                 RETURNING id, expense_id, user_id, amount, split_type`,
-                [id, detail.user_id, detail.amount, finalSplitType]
-              );
-              splitRecords.push(splitRecord.rows[0]);
-            }
+            
+            logger.info(`[${requestId}] 自定义分摊记录创建成功`, {
+              requestId,
+              expenseId: id,
+              memberCount: split_details.length
+            });
           } else if (finalSplitType === 'percentage' && split_details && split_details.length > 0) {
-            // 百分比分摊
-            for (const detail of split_details) {
-              const splitAmount = parseFloat(finalAmount) * parseFloat(detail.percentage) / 100;
+            // 百分比分摊 - 使用尾差处理机制确保分摊总额等于实际金额
+            
+            // 验证百分比总和
+            let totalPercentage = split_details.reduce((sum, detail) => 
+              PrecisionCalculator.add(sum, parseFloat(detail.percentage)), 0
+            );
+            
+            // 如果百分比总和不为100%，按比例调整
+            if (Math.abs(PrecisionCalculator.subtract(totalPercentage, 100)) > 0.01) {
+              // 按比例调整每个百分比
+              split_details = split_details.map(detail => ({
+                ...detail,
+                percentage: PrecisionCalculator.divide(
+                  PrecisionCalculator.multiply(parseFloat(detail.percentage), 100), 
+                  totalPercentage
+                )
+              }));
+              
+              logger.info(`[${requestId}] 百分比分摊按比例调整`, {
+                requestId,
+                originalTotal: totalPercentage,
+                targetPercentage: 100
+              });
+            }
+            
+            // 使用尾差处理机制计算分摊金额
+            const sharesArray = split_details.map(detail => parseFloat(detail.percentage));
+            const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(finalAmount), sharesArray);
+            
+            for (let i = 0; i < split_details.length; i++) {
               const splitRecord = await client.query(
                 `INSERT INTO expense_splits 
                  (expense_id, user_id, amount, split_type, created_at, updated_at) 
                  VALUES ($1, $2, $3, $4, NOW(), NOW()) 
                  RETURNING id, expense_id, user_id, amount, split_type`,
-                [id, detail.user_id, splitAmount, finalSplitType]
+                [id, split_details[i].user_id, splitAmounts[i], finalSplitType]
               );
               splitRecords.push(splitRecord.rows[0]);
             }
+            
+            logger.info(`[${requestId}] 百分比分摊记录创建成功`, {
+              requestId,
+              expenseId: id,
+              memberCount: split_details.length
+            });
           } else {
+            logger.error(`[${requestId}] 更新费用记录失败: 无效的分摊类型或缺少分摊详情`, {
+              requestId,
+              split_type: finalSplitType,
+              has_split_details: !!split_details,
+              split_details_length: split_details ? split_details.length : 0
+            });
+            
             throw new Error('无效的分摊类型或缺少分摊详情');
           }
         }
@@ -604,6 +1103,7 @@ class ExpenseController {
         const fullExpenseResult = await pool.query(
           `SELECT e.id, e.title, e.description, e.amount, e.expense_type_id, e.room_id, e.payer_id, 
                   e.split_type, e.expense_date, e.receipt_image_url, e.tags, e.status, e.created_at, e.updated_at,
+                  e.calculation_method, e.meter_type, e.current_reading, e.previous_reading, e.unit_price,
                   et.name as expense_type_name, et.icon as expense_type_icon,
                   u.username as payer_username, u.name as payer_name
            FROM expenses e
@@ -614,8 +1114,17 @@ class ExpenseController {
         );
 
         const fullExpense = fullExpenseResult.rows[0];
+        const duration = Date.now() - startTime;
 
-        logger.info(`费用记录更新成功: ${fullExpense.title} (ID: ${fullExpense.id})`);
+        logger.info(`[${requestId}] 费用记录更新成功`, {
+          requestId,
+          expenseId: fullExpense.id,
+          title: fullExpense.title,
+          amount: fullExpense.amount,
+          splitType: fullExpense.split_type,
+          splitRecordCount: splitRecords ? splitRecords.length : 0,
+          duration
+        });
 
         res.status(200).json({
           success: true,
@@ -625,13 +1134,24 @@ class ExpenseController {
 
       } catch (error) {
         await client.query('ROLLBACK');
+        logger.error(`[${requestId}] 更新费用记录事务失败`, {
+          requestId,
+          error: error.message,
+          stack: error.stack
+        });
         throw error;
       } finally {
         client.release();
       }
 
     } catch (error) {
-      logger.error('费用记录更新失败:', error);
+      const duration = Date.now() - startTime;
+      logger.error(`[${requestId}] 费用记录更新失败`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
       res.status(500).json({
         success: false,
         message: '服务器内部错误'
@@ -641,6 +1161,15 @@ class ExpenseController {
 
   // 删除费用记录
   async deleteExpense(req, res) {
+    const startTime = Date.now();
+    const requestId = `delete-expense-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    logger.info(`[${requestId}] 开始删除费用记录`, {
+      requestId,
+      userId: req.user.sub,
+      expenseId: req.params.id
+    });
+
     try {
       const { id } = req.params;
       const userId = req.user.sub; // 从认证中间件获取用户ID
@@ -649,6 +1178,12 @@ class ExpenseController {
       const expenseResult = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
 
       if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 删除费用记录失败: 费用记录不存在`, {
+          requestId,
+          expenseId: id,
+          userId
+        });
+        
         return res.status(404).json({
           success: false,
           message: '费用记录不存在'
@@ -659,6 +1194,13 @@ class ExpenseController {
 
       // 验证用户是否有权限删除费用（只有创建者可以删除）
       if (expense.creator_id !== userId) {
+        logger.warn(`[${requestId}] 删除费用记录失败: 权限不足`, {
+          requestId,
+          expenseId: id,
+          userId,
+          creatorId: expense.creator_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '只有费用创建者可以删除费用记录'
@@ -672,14 +1214,31 @@ class ExpenseController {
         await client.query('BEGIN');
 
         // 删除分摊记录
-        await client.query('DELETE FROM expense_splits WHERE expense_id = $1', [id]);
+        const deleteSplitsResult = await client.query(
+          'DELETE FROM expense_splits WHERE expense_id = $1 RETURNING id',
+          [id]
+        );
+        
+        logger.info(`[${requestId}] 费用分摊记录已删除`, {
+          requestId,
+          expenseId: id,
+          deletedSplitCount: deleteSplitsResult.rows.length
+        });
 
         // 删除费用记录
         await client.query('DELETE FROM expenses WHERE id = $1', [id]);
 
         await client.query('COMMIT');
-
-        logger.info(`费用记录删除成功: ${expense.title} (ID: ${expense.id})`);
+        
+        const duration = Date.now() - startTime;
+        
+        logger.info(`[${requestId}] 费用记录删除成功`, {
+          requestId,
+          expenseId: id,
+          title: expense.title,
+          deletedSplitCount: deleteSplitsResult.rows.length,
+          duration
+        });
 
         res.status(200).json({
           success: true,
@@ -688,13 +1247,30 @@ class ExpenseController {
 
       } catch (error) {
         await client.query('ROLLBACK');
+        
+        logger.error(`[${requestId}] 删除费用记录事务失败`, {
+          requestId,
+          expenseId: id,
+          error: error.message,
+          stack: error.stack
+        });
+        
         throw error;
       } finally {
         client.release();
       }
 
     } catch (error) {
-      logger.error('费用记录删除失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 费用记录删除失败`, {
+        requestId,
+        expenseId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '服务器内部错误'
@@ -704,6 +1280,16 @@ class ExpenseController {
 
   // 确认支付分摊金额
   async confirmSplitPayment(req, res) {
+    const startTime = Date.now();
+    const requestId = `confirm-payment-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    logger.info(`[${requestId}] 开始确认支付分摊金额`, {
+      requestId,
+      userId: req.user.sub,
+      splitId: req.params.id,
+      paidDate: req.body.paid_date
+    });
+
     try {
       const { id } = req.params;
       const { paid_date } = req.body;
@@ -719,6 +1305,12 @@ class ExpenseController {
       );
 
       if (splitResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 确认支付失败: 分摊记录不存在`, {
+          requestId,
+          splitId: id,
+          userId
+        });
+        
         return res.status(404).json({
           success: false,
           message: '分摊记录不存在'
@@ -729,6 +1321,13 @@ class ExpenseController {
 
       // 验证用户是否有权限确认支付（只有分摊人本人可以确认）
       if (split.user_id !== userId) {
+        logger.warn(`[${requestId}] 确认支付失败: 权限不足`, {
+          requestId,
+          splitId: id,
+          userId,
+          splitUserId: split.user_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '只有分摊人本人可以确认支付'
@@ -742,9 +1341,31 @@ class ExpenseController {
       );
 
       if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 确认支付失败: 用户不是寝室成员`, {
+          requestId,
+          splitId: id,
+          userId,
+          roomId: split.room_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您不是该寝室的成员'
+        });
+      }
+
+      // 检查是否已经支付
+      if (split.is_paid) {
+        logger.warn(`[${requestId}] 确认支付失败: 分摊已支付`, {
+          requestId,
+          splitId: id,
+          userId,
+          paidDate: split.paid_date
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: '该分摊已确认支付'
         });
       }
 
@@ -758,8 +1379,17 @@ class ExpenseController {
       );
 
       const updatedSplit = updateResult.rows[0];
-
-      logger.info(`分摊支付确认成功: 分摊ID ${updatedSplit.id}, 用户ID ${userId}`);
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 分摊支付确认成功`, {
+        requestId,
+        splitId: updatedSplit.id,
+        expenseId: updatedSplit.expense_id,
+        userId,
+        amount: updatedSplit.amount,
+        paidDate: updatedSplit.paid_date,
+        duration
+      });
 
       res.status(200).json({
         success: true,
@@ -768,7 +1398,17 @@ class ExpenseController {
       });
 
     } catch (error) {
-      logger.error('分摊支付确认失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 分摊支付确认失败`, {
+        requestId,
+        splitId: req.params.id,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '服务器内部错误'
@@ -778,15 +1418,51 @@ class ExpenseController {
 
   // 智能分摊计算
   async calculateSmartSplit(req, res) {
+    const startTime = Date.now();
+    const requestId = `smart-split-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    logger.info(`[${requestId}] 开始智能分摊计算`, {
+      requestId,
+      userId: req.user.sub,
+      requestData: {
+        room_id: req.body.room_id,
+        amount: req.body.amount,
+        split_type: req.body.split_type,
+        split_details_count: req.body.split_details ? req.body.split_details.length : 0
+      }
+    });
+
     try {
       const { room_id, amount, split_type, split_details } = req.body;
       const userId = req.user.sub; // 从认证中间件获取用户ID
 
       // 验证必填字段
       if (!room_id || !amount || !split_type) {
+        logger.warn(`[${requestId}] 智能分摊计算失败: 缺少必填字段`, {
+          requestId,
+          userId,
+          room_id,
+          amount,
+          split_type
+        });
+        
         return res.status(400).json({
           success: false,
           message: '缺少必填字段'
+        });
+      }
+
+      // 验证金额是否为有效数字
+      if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        logger.warn(`[${requestId}] 智能分摊计算失败: 无效的金额`, {
+          requestId,
+          userId,
+          amount
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: '金额必须是大于0的数字'
         });
       }
 
@@ -797,6 +1473,12 @@ class ExpenseController {
       );
 
       if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 智能分摊计算失败: 用户不是寝室成员`, {
+          requestId,
+          userId,
+          room_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您不是该寝室的成员'
@@ -815,28 +1497,53 @@ class ExpenseController {
 
       const members = membersResult.rows;
       const totalAmount = parseFloat(amount);
+      
+      logger.info(`[${requestId}] 获取寝室成员成功`, {
+        requestId,
+        roomId: room_id,
+        memberCount: members.length
+      });
 
       // 根据分摊类型计算分摊结果
       let splitResult = [];
 
       if (split_type === 'equal') {
         // 平均分摊
-        const splitAmount = totalAmount / members.length;
+        const splitAmount = PrecisionCalculator.divide(totalAmount, members.length);
         
         for (const member of members) {
           splitResult.push({
             user_id: member.id,
             username: member.username,
             name: member.name,
-            amount: splitAmount.toFixed(2)
+            amount: PrecisionCalculator.formatCurrency(splitAmount)
           });
         }
+        
+        logger.info(`[${requestId}] 平均分摊计算完成`, {
+          requestId,
+          totalAmount,
+          memberCount: members.length,
+          splitAmount
+        });
       } else if (split_type === 'custom' && split_details && split_details.length > 0) {
         // 自定义分摊
         const splitDetailsMap = new Map();
         
         // 将分摊详情转换为Map
         for (const detail of split_details) {
+          if (!detail.user_id || isNaN(parseFloat(detail.amount))) {
+            logger.warn(`[${requestId}] 智能分摊计算失败: 无效的自定义分摊详情`, {
+              requestId,
+              detail
+            });
+            
+            return res.status(400).json({
+              success: false,
+              message: '分摊详情包含无效数据'
+            });
+          }
+          
           splitDetailsMap.set(detail.user_id, parseFloat(detail.amount));
         }
         
@@ -848,32 +1555,130 @@ class ExpenseController {
             user_id: member.id,
             username: member.username,
             name: member.name,
-            amount: amount.toFixed(2)
+            amount: PrecisionCalculator.formatCurrency(amount)
           });
         }
+        
+        logger.info(`[${requestId}] 自定义分摊计算完成`, {
+          requestId,
+          totalAmount,
+          memberCount: members.length,
+          splitDetailsCount: split_details.length
+        });
       } else if (split_type === 'percentage' && split_details && split_details.length > 0) {
         // 百分比分摊
         const splitDetailsMap = new Map();
+        let totalPercentage = 0;
         
-        // 将分摊详情转换为Map
+        // 将分摊详情转换为Map并验证百分比总和
         for (const detail of split_details) {
-          splitDetailsMap.set(detail.user_id, parseFloat(detail.percentage));
+          if (!detail.user_id || isNaN(parseFloat(detail.percentage))) {
+            logger.warn(`[${requestId}] 智能分摊计算失败: 无效的百分比分摊详情`, {
+              requestId,
+              detail
+            });
+            
+            return res.status(400).json({
+              success: false,
+              message: '分摊详情包含无效数据'
+            });
+          }
+          
+          const percentage = parseFloat(detail.percentage);
+          splitDetailsMap.set(detail.user_id, percentage);
+          totalPercentage += percentage;
+        }
+        
+        // 检查百分比总和是否接近100%
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+          logger.warn(`[${requestId}] 百分比分摊总和不为100%`, {
+            requestId,
+            totalPercentage
+          });
         }
         
         // 为每个成员计算分摊金额
         for (const member of members) {
           const percentage = splitDetailsMap.get(member.id) || 0;
-          const amount = totalAmount * percentage / 100;
+          const amount = PrecisionCalculator.divide(PrecisionCalculator.multiply(totalAmount, percentage), 100);
           
           splitResult.push({
             user_id: member.id,
             username: member.username,
             name: member.name,
-            amount: amount.toFixed(2),
+            amount: PrecisionCalculator.formatCurrency(amount),
             percentage: percentage
           });
         }
+        
+        logger.info(`[${requestId}] 百分比分摊计算完成`, {
+          requestId,
+          totalAmount,
+          memberCount: members.length,
+          splitDetailsCount: split_details.length,
+          totalPercentage
+        });
+      } else if (split_type === 'presence_days') {
+        // 按在寝天数分摊
+        const { startDate, endDate } = req.body;
+        
+        if (!startDate || !endDate) {
+          logger.warn(`[${requestId}] 智能分摊计算失败: 按在寝天数分摊缺少日期参数`, {
+            requestId,
+            startDate,
+            endDate
+          });
+          
+          return res.status(400).json({
+            success: false,
+            message: '按在寝天数分摊需要提供开始日期和结束日期'
+          });
+        }
+        
+        try {
+          const presenceDaysSplit = await PresenceDaySplitService.calculateSplit(
+            room_id,
+            totalAmount,
+            startDate,
+            endDate
+          );
+          
+          splitResult = presenceDaysSplit.map(split => ({
+            user_id: split.user_id,
+            username: split.username,
+            name: split.name,
+            amount: PrecisionCalculator.formatCurrency(split.amount),
+            presence_days: split.presence_days,
+            total_days: split.total_days
+          }));
+          
+          logger.info(`[${requestId}] 按在寝天数分摊计算完成`, {
+            requestId,
+            totalAmount,
+            startDate,
+            endDate,
+            splitCount: splitResult.length
+          });
+        } catch (error) {
+          logger.error(`[${requestId}] 按在寝天数分摊计算失败`, {
+            requestId,
+            error: error.message,
+            stack: error.stack
+          });
+          
+          return res.status(500).json({
+            success: false,
+            message: '按在寝天数分摊计算失败: ' + error.message
+          });
+        }
       } else {
+        logger.warn(`[${requestId}] 智能分摊计算失败: 无效的分摊类型`, {
+          requestId,
+          split_type,
+          has_split_details: !!split_details,
+          split_details_count: split_details ? split_details.length : 0
+        });
+        
         return res.status(400).json({
           success: false,
           message: '无效的分摊类型或缺少分摊详情'
@@ -881,10 +1686,20 @@ class ExpenseController {
       }
 
       // 计算总和验证
-      const calculatedTotal = splitResult.reduce((sum, item) => sum + parseFloat(item.amount), 0);
-      const difference = Math.abs(totalAmount - calculatedTotal).toFixed(2);
-
-      logger.info(`智能分摊计算成功: 寝室ID ${room_id}, 总金额 ${totalAmount}, 分摊类型 ${split_type}`);
+      const calculatedTotal = splitResult.reduce((sum, item) => PrecisionCalculator.add(sum, parseFloat(item.amount)), 0);
+      const difference = PrecisionCalculator.subtract(totalAmount, calculatedTotal);
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 智能分摊计算成功`, {
+        requestId,
+        roomId: room_id,
+        totalAmount,
+        splitType: split_type,
+        splitCount: splitResult.length,
+        calculatedTotal,
+        difference,
+        duration
+      });
 
       res.status(200).json({
         success: true,
@@ -894,13 +1709,22 @@ class ExpenseController {
           total_amount: totalAmount,
           split_type,
           split_details: splitResult,
-          calculated_total: calculatedTotal.toFixed(2),
-          difference
+          calculated_total: PrecisionCalculator.formatCurrency(calculatedTotal),
+          difference: PrecisionCalculator.formatCurrency(difference)
         }
       });
 
     } catch (error) {
-      logger.error('智能分摊计算失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 智能分摊计算失败`, {
+        requestId,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '服务器内部错误'
@@ -910,14 +1734,31 @@ class ExpenseController {
 
   // 获取费用收款码
   async getExpenseQrCode(req, res) {
+    const startTime = Date.now();
+    const requestId = `qr-code-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const client = await pool.connect();
+    
     try {
       const { expenseId } = req.params;
       const userId = req.user.sub;
       const { qr_type } = req.query; // wechat 或 alipay
 
+      logger.info(`[${requestId}] 开始获取费用收款码`, {
+        requestId,
+        userId,
+        expenseId,
+        qr_type
+      });
+
       // 验证收款码类型
       if (!qr_type || !['wechat', 'alipay'].includes(qr_type)) {
+        logger.warn(`[${requestId}] 获取费用收款码失败: 无效的收款码类型`, {
+          requestId,
+          userId,
+          expenseId,
+          qr_type
+        });
+        
         return res.status(400).json({
           success: false,
           message: '收款码类型必须是wechat或alipay'
@@ -935,6 +1776,12 @@ class ExpenseController {
       );
 
       if (expenseCheck.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用收款码失败: 费用不存在`, {
+          requestId,
+          userId,
+          expenseId
+        });
+        
         return res.status(404).json({
           success: false,
           message: '费用不存在'
@@ -951,6 +1798,13 @@ class ExpenseController {
       );
 
       if (permissionCheck.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用收款码失败: 用户没有权限查看此费用`, {
+          requestId,
+          userId,
+          expenseId,
+          roomId: expense.room_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您没有权限查看此费用'
@@ -970,6 +1824,13 @@ class ExpenseController {
       const userSplit = splitDetails.rows.find(split => split.user_id == userId);
       
       if (!userSplit) {
+        logger.warn(`[${requestId}] 获取费用收款码失败: 用户不在此费用的分摊中`, {
+          requestId,
+          userId,
+          expenseId,
+          splitCount: splitDetails.rows.length
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您不在此费用的分摊中'
@@ -978,6 +1839,13 @@ class ExpenseController {
 
       // 检查用户是否已支付
       if (userSplit.is_paid) {
+        logger.warn(`[${requestId}] 获取费用收款码失败: 用户已支付此费用`, {
+          requestId,
+          userId,
+          expenseId,
+          isPaid: userSplit.is_paid
+        });
+        
         return res.status(400).json({
           success: false,
           message: '您已支付此费用'
@@ -994,6 +1862,14 @@ class ExpenseController {
       );
 
       if (payeeQrCode.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用收款码失败: 收款人未设置默认收款码`, {
+          requestId,
+          userId,
+          expenseId,
+          payeeId: expense.payer_id,
+          qr_type
+        });
+        
         return res.status(404).json({
           success: false,
           message: `收款人未设置默认的${qr_type === 'wechat' ? '微信' : '支付宝'}收款码`
@@ -1017,6 +1893,17 @@ class ExpenseController {
         expense_date: expense.expense_date
       };
 
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用收款码成功`, {
+        requestId,
+        userId,
+        expenseId,
+        qr_type,
+        userAmount: userSplit.amount,
+        duration
+      });
+
       res.status(200).json({
         success: true,
         data: {
@@ -1024,7 +1911,17 @@ class ExpenseController {
         }
       });
     } catch (error) {
-      logger.error('获取费用收款码失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用收款码失败`, {
+        requestId,
+        userId: req.user.sub,
+        expenseId: req.params.expenseId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '获取费用收款码失败',
@@ -1037,14 +1934,35 @@ class ExpenseController {
 
   // 确认费用支付
   async confirmExpensePayment(req, res) {
+    const startTime = Date.now();
+    const requestId = `confirm-payment-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const client = await pool.connect();
+    
     try {
       const { expenseId } = req.params;
       const userId = req.user.sub;
       const { payment_method, transaction_id, payment_time } = req.body;
 
+      logger.info(`[${requestId}] 开始确认费用支付`, {
+        requestId,
+        userId,
+        expenseId,
+        payment_method,
+        transaction_id,
+        payment_time
+      });
+
       // 验证必填字段
       if (!payment_method || !transaction_id || !payment_time) {
+        logger.warn(`[${requestId}] 确认费用支付失败: 缺少必填字段`, {
+          requestId,
+          userId,
+          expenseId,
+          payment_method,
+          transaction_id,
+          payment_time
+        });
+        
         return res.status(400).json({
           success: false,
           message: '请提供完整的支付信息'
@@ -1053,6 +1971,13 @@ class ExpenseController {
 
       // 验证支付方式
       if (!['wechat', 'alipay', 'cash', 'bank_transfer'].includes(payment_method)) {
+        logger.warn(`[${requestId}] 确认费用支付失败: 无效的支付方式`, {
+          requestId,
+          userId,
+          expenseId,
+          payment_method
+        });
+        
         return res.status(400).json({
           success: false,
           message: '无效的支付方式'
@@ -1069,6 +1994,12 @@ class ExpenseController {
       );
 
       if (expenseCheck.rows.length === 0) {
+        logger.warn(`[${requestId}] 确认费用支付失败: 费用不存在`, {
+          requestId,
+          userId,
+          expenseId
+        });
+        
         return res.status(404).json({
           success: false,
           message: '费用不存在'
@@ -1085,6 +2016,13 @@ class ExpenseController {
       );
 
       if (permissionCheck.rows.length === 0) {
+        logger.warn(`[${requestId}] 确认费用支付失败: 用户没有权限支付此费用`, {
+          requestId,
+          userId,
+          expenseId,
+          roomId: expense.room_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您没有权限支付此费用'
@@ -1099,6 +2037,12 @@ class ExpenseController {
       );
 
       if (splitCheck.rows.length === 0) {
+        logger.warn(`[${requestId}] 确认费用支付失败: 用户不在此费用的分摊中`, {
+          requestId,
+          userId,
+          expenseId
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您不在此费用的分摊中'
@@ -1116,6 +2060,13 @@ class ExpenseController {
       );
 
       if (existingPayment.rows.length > 0) {
+        logger.warn(`[${requestId}] 确认费用支付失败: 用户已支付此费用`, {
+          requestId,
+          userId,
+          expenseId,
+          paymentCount: existingPayment.rows.length
+        });
+        
         return res.status(400).json({
           success: false,
           message: '您已支付此费用'
@@ -1140,6 +2091,14 @@ class ExpenseController {
         );
         billId = billResult.rows[0].id;
         
+        logger.info(`[${requestId}] 创建新账单记录`, {
+          requestId,
+          userId,
+          expenseId,
+          billId,
+          amount: userSplit.amount
+        });
+        
         // 创建账单费用关联
         await client.query(
           `INSERT INTO bill_expenses (bill_id, expense_id) VALUES ($1, $2)`,
@@ -1147,6 +2106,13 @@ class ExpenseController {
         );
       } else {
         billId = existingBill.rows[0].id;
+        
+        logger.info(`[${requestId}] 使用现有账单记录`, {
+          requestId,
+          userId,
+          expenseId,
+          billId
+        });
       }
 
       // 创建支付记录
@@ -1157,6 +2123,16 @@ class ExpenseController {
          RETURNING *`,
         [billId, userId, userId, userSplit.amount, payment_method, transaction_id, payment_time]
       );
+
+      logger.info(`[${requestId}] 创建支付记录成功`, {
+        requestId,
+        userId,
+        expenseId,
+        billId,
+        paymentId: paymentResult.rows[0].id,
+        amount: userSplit.amount,
+        payment_method
+      });
 
       // 检查是否所有用户都已支付
       const allUsersCount = await client.query(
@@ -1179,11 +2155,30 @@ class ExpenseController {
            WHERE id = $1`,
           [expenseId]
         );
+        
+        logger.info(`[${requestId}] 费用状态更新为已支付`, {
+          requestId,
+          userId,
+          expenseId,
+          allUsersCount: allUsersCount.rows[0].count,
+          paidUsersCount: paidUsersCount.rows[0].count
+        });
       }
 
       await client.query('COMMIT');
 
-      logger.info(`用户 ${userId} 支付了费用 ${expenseId}，金额: ${userSplit.amount}`);
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 确认费用支付成功`, {
+        requestId,
+        userId,
+        expenseId,
+        billId,
+        paymentId: paymentResult.rows[0].id,
+        amount: userSplit.amount,
+        payment_method,
+        duration
+      });
 
       res.status(200).json({
         success: true,
@@ -1194,7 +2189,17 @@ class ExpenseController {
       });
     } catch (error) {
       await client.query('ROLLBACK');
-      logger.error('确认费用支付失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 确认费用支付失败`, {
+        requestId,
+        userId: req.user.sub,
+        expenseId: req.params.expenseId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '确认费用支付失败',
@@ -1207,10 +2212,19 @@ class ExpenseController {
 
   // 获取费用支付状态
   async getExpensePaymentStatus(req, res) {
+    const startTime = Date.now();
+    const requestId = `payment-status-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const client = await pool.connect();
+    
     try {
       const { expenseId } = req.params;
       const userId = req.user.sub;
+
+      logger.info(`[${requestId}] 开始获取费用支付状态`, {
+        requestId,
+        userId,
+        expenseId
+      });
 
       // 检查费用是否存在
       const expenseCheck = await client.query(
@@ -1222,6 +2236,12 @@ class ExpenseController {
       );
 
       if (expenseCheck.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用支付状态失败: 费用不存在`, {
+          requestId,
+          userId,
+          expenseId
+        });
+        
         return res.status(404).json({
           success: false,
           message: '费用不存在'
@@ -1238,6 +2258,13 @@ class ExpenseController {
       );
 
       if (permissionCheck.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用支付状态失败: 用户没有权限查看此费用`, {
+          requestId,
+          userId,
+          expenseId,
+          roomId: expense.room_id
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您没有权限查看此费用'
@@ -1277,8 +2304,20 @@ class ExpenseController {
         total_count: splitDetails.rows.length,
         paid_amount: splitDetails.rows
           .filter(split => split.is_paid)
-          .reduce((sum, split) => sum + parseFloat(split.amount), 0)
+          .reduce((sum, split) => PrecisionCalculator.add(sum, parseFloat(split.amount)), 0)
       };
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用支付状态成功`, {
+        requestId,
+        userId,
+        expenseId,
+        paidCount: paymentStatus.paid_count,
+        totalCount: paymentStatus.total_count,
+        paidAmount: paymentStatus.paid_amount,
+        duration
+      });
 
       res.status(200).json({
         success: true,
@@ -1287,7 +2326,17 @@ class ExpenseController {
         }
       });
     } catch (error) {
-      logger.error('获取费用支付状态失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用支付状态失败`, {
+        requestId,
+        userId: req.user.sub,
+        expenseId: req.params.expenseId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '获取费用支付状态失败',
@@ -1300,11 +2349,22 @@ class ExpenseController {
 
   // 获取用户费用支付记录
   async getUserExpensePayments(req, res) {
+    const startTime = Date.now();
+    const requestId = `user-payments-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const client = await pool.connect();
+    
     try {
       const userId = req.user.sub;
       const { page = 1, limit = 10, status } = req.query;
       const offset = (page - 1) * limit;
+      
+      logger.info(`[${requestId}] 开始获取用户费用支付记录`, {
+        requestId,
+        userId,
+        page,
+        limit,
+        status
+      });
 
       // 构建查询条件
       let whereClause = 'WHERE ep.user_id = $1';
@@ -1340,6 +2400,19 @@ class ExpenseController {
 
       const countResult = await client.query(countQuery, queryParams.slice(0, -2));
       const total = parseInt(countResult.rows[0].total);
+      
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取用户费用支付记录成功`, {
+        requestId,
+        userId,
+        page,
+        limit,
+        status,
+        total,
+        returned: paymentsResult.rows.length,
+        duration
+      });
 
       res.status(200).json({
         success: true,
@@ -1354,7 +2427,19 @@ class ExpenseController {
         }
       });
     } catch (error) {
-      logger.error('获取用户费用支付记录失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取用户费用支付记录失败`, {
+        requestId,
+        userId: req.user.sub,
+        page: req.query.page,
+        limit: req.query.limit,
+        status: req.query.status,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '获取用户费用支付记录失败',
@@ -1367,11 +2452,22 @@ class ExpenseController {
 
   // 获取费用统计
   async getExpenseStats(req, res) {
+    const startTime = Date.now();
+    const requestId = `expense-stats-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const client = await pool.connect();
+    
     try {
       const { roomId } = req.params;
       const { startDate, endDate } = req.query;
       const userId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始获取费用统计`, {
+        requestId,
+        userId,
+        roomId,
+        startDate,
+        endDate
+      });
 
       // 验证用户是否是寝室成员
       const membershipResult = await client.query(
@@ -1380,6 +2476,12 @@ class ExpenseController {
       );
 
       if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用统计失败: 用户不是该寝室的成员`, {
+          requestId,
+          userId,
+          roomId
+        });
+        
         return res.status(403).json({
           success: false,
           message: '您不是该寝室的成员'
@@ -1493,24 +2595,134 @@ class ExpenseController {
         },
         summary: {
           total_expenses: parseInt(totalStatsResult.rows[0].total_expenses),
-          total_amount: parseFloat(totalStatsResult.rows[0].total_amount),
-          average_amount: parseFloat(totalStatsResult.rows[0].average_amount)
+          total_amount: PrecisionCalculator.round(parseFloat(totalStatsResult.rows[0].total_amount), 2),
+          average_amount: PrecisionCalculator.round(parseFloat(totalStatsResult.rows[0].average_amount), 2)
         },
         by_type: typeStatsResult.rows,
         by_payer: payerStatsResult.rows,
         by_month: monthlyStatsResult.rows,
         recent_expenses: recentExpensesResult.rows
       };
+      
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用统计成功`, {
+        requestId,
+        userId,
+        roomId,
+        startDate,
+        endDate,
+        totalExpenses: statsData.summary.total_expenses,
+        totalAmount: statsData.summary.total_amount,
+        typeCount: typeStatsResult.rows.length,
+        payerCount: payerStatsResult.rows.length,
+        monthCount: monthlyStatsResult.rows.length,
+        recentCount: recentExpensesResult.rows.length,
+        duration
+      });
 
       res.status(200).json({
         success: true,
         data: statsData
       });
     } catch (error) {
-      logger.error('获取费用统计失败:', error);
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用统计失败`, {
+        requestId,
+        userId: req.user.sub,
+        roomId: req.params.roomId,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
       res.status(500).json({
         success: false,
         message: '获取费用统计失败',
+        error: error.message
+      });
+    } finally {
+      client.release();
+    }
+  }
+
+  // 获取寝室成员列表
+  async getRoomMembers(req, res) {
+    const startTime = Date.now();
+    const requestId = `room-members-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await pool.connect();
+    
+    try {
+      const { room_id } = req.params;
+      const userId = req.user.sub; // 从认证中间件获取用户ID
+      
+      logger.info(`[${requestId}] 开始获取寝室成员列表`, {
+        requestId,
+        userId,
+        room_id
+      });
+
+      // 验证用户是否属于该寝室
+      const roomMemberResult = await client.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, room_id]
+      );
+
+      if (roomMemberResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取寝室成员列表失败: 用户不属于该寝室`, {
+          requestId,
+          userId,
+          room_id
+        });
+        
+        return res.status(403).json({
+          success: false,
+          message: '您不属于该寝室，无法查看寝室成员'
+        });
+      }
+
+      // 获取寝室所有活跃成员
+      const membersResult = await client.query(
+        `SELECT u.id, u.username, u.name, u.avatar_url, urr.created_at as joined_at
+         FROM users u
+         JOIN user_room_relations urr ON u.id = urr.user_id
+         WHERE urr.room_id = $1 AND urr.is_active = TRUE
+         ORDER BY urr.created_at`,
+        [room_id]
+      );
+      
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取寝室成员列表成功`, {
+        requestId,
+        userId,
+        room_id,
+        memberCount: membersResult.rows.length,
+        duration
+      });
+
+      res.status(200).json({
+        success: true,
+        data: membersResult.rows
+      });
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取寝室成员列表失败`, {
+        requestId,
+        userId: req.user.sub,
+        room_id: req.params.room_id,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: '获取寝室成员列表失败',
         error: error.message
       });
     } finally {

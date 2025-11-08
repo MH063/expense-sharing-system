@@ -73,4 +73,7 @@ router.get('/payments/user', authenticateToken, expenseController.getUserExpense
 // 获取费用统计 - 需要认证
 router.get('/stats/room/:roomId', authenticateToken, expenseController.getExpenseStats);
 
+// 获取寝室成员列表 - 需要认证
+router.get('/room/:room_id/members', authenticateToken, expenseController.getRoomMembers);
+
 module.exports = router;

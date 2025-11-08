@@ -146,10 +146,28 @@ const roomCache = {
   clearSpecificRoom: (roomId) => clearCache(`rooms:*${roomId}*`)
 };
 
+/**
+ * 角色相关的缓存中间件
+ */
+const roleCache = {
+  // 获取角色信息缓存
+  getRoles: getCache('roles', 1800), // 30分钟
+  
+  // 获取单个角色信息缓存
+  getRole: getCache('role', 1800), // 30分钟
+  
+  // 清除角色相关缓存
+  clearRoles: clearCache('roles:*'),
+  
+  // 清除特定角色的缓存
+  clearRole: clearCache('role:*')
+};
+
 module.exports = {
   getCache,
   clearCache,
   userCache,
   billCache,
-  roomCache
+  roomCache,
+  roleCache
 };

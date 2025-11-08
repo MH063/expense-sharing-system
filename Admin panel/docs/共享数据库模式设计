@@ -1,0 +1,388 @@
+# 共享数据库模式设计 - 完整版
+
+## 概述
+
+基于您的需求，我设计了一个**共享数据库模式**，将前端和管理端的表整合在同一个数据库中，去除重复部分，同时保持功能的完整性。通过统一用户认证系统、权限管理系统、日志审计系统等核心模块，实现前后端数据的无缝共享和一致性管理。
+
+## 设计原则
+
+1. **统一用户认证**：前端用户和管理员共享同一套认证系统，但通过角色区分权限
+2. **权限分层管理**：基于RBAC模型，实现细粒度的权限控制
+3. **数据一致性**：通过外键约束和事务保证数据一致性
+4. **审计完整性**：记录所有关键操作，便于追踪和审计
+5. **扩展性**：预留扩展字段，支持未来功能扩展
+
+## 共享数据库模式设计方案
+
+### 1. 用户认证系统（共享）
+
+```sql
+-- 统一用户表（合并前端和管理端用户）
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    user_type VARCHAR(20) NOT NULL DEFAULT 'user', -- 'user', 'admin'
+    avatar_url VARCHAR(255),
+    phone VARCHAR(20),
+    full_name VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'active',
+    email_verified BOOLEAN DEFAULT false,
+    last_login_at TIMESTAMP,
+    login_count INTEGER DEFAULT 0,
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 统一用户令牌表
+CREATE TABLE user_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    device_name VARCHAR(100),
+    device_type VARCHAR(20),
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 统一用户会话表
+CREATE TABLE user_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    session_token VARCHAR(255) UNIQUE NOT NULL,
+    device_name VARCHAR(100),
+    device_type VARCHAR(20),
+    ip_address INET,
+    user_agent TEXT,
+    is_active BOOLEAN DEFAULT true,
+    last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+```
+
+### 2. 权限管理系统（共享）
+
+```sql
+-- 统一角色表
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    role_level INTEGER NOT NULL, -- 角色等级，1为最高级，5为最低级
+    is_system BOOLEAN DEFAULT false,
+    version INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_role_level CHECK (role_level BETWEEN 1 AND 5)
+);
+
+-- 统一权限表
+CREATE TABLE permissions (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    module VARCHAR(50) NOT NULL,
+    version INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 角色权限关联表
+CREATE TABLE role_permissions (
+    id SERIAL PRIMARY KEY,
+    role_id INTEGER REFERENCES roles(id),
+    permission_id INTEGER REFERENCES permissions(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(role_id, permission_id)
+);
+
+-- 用户角色关联表
+CREATE TABLE user_roles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    role_id INTEGER REFERENCES roles(id),
+    assigned_by INTEGER REFERENCES users(id),
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP,
+    UNIQUE(user_id, role_id)
+);
+
+-- 初始化角色数据
+INSERT INTO roles (name, description, role_level, is_system) VALUES
+('系统管理员', '负责整个系统的维护和管理，仅具备系统维护相关权限，严格禁止接触任何真实业务数据和用户个人信息', 1, true),
+('管理员', '负责权限分配和角色分配', 2, false),
+('寝室长', '负责本寝室的管理和协调', 3, false),
+('缴费人', '负责实际支付费用', 4, false),
+('普通用户', '参与寝室费用记录和分摊', 5, false);
+
+-- 初始化权限数据
+INSERT INTO permissions (code, name, description, module) VALUES
+-- 系统管理员权限
+('system:config', '系统配置管理', '配置系统参数', 'system'),
+('system:monitor', '系统运行状态监控', '监控系统运行状态和性能指标', 'system'),
+('system:update', '系统更新与升级', '执行系统更新和升级操作', 'system'),
+('system:logs', '系统日志查看与管理', '查看和管理系统操作日志和异常日志', 'system'),
+('system:performance', '系统性能监控', '监控系统性能指标和资源使用情况', 'system'),
+('system:backup', '数据备份和恢复', '执行数据备份和恢复操作', 'system'),
+('system:stats', '查看系统统计信息', '查看脱敏处理的系统统计数据', 'system'),
+
+-- 管理员权限
+('admin:user:manage', '用户账户管理', '创建、编辑、删除用户账户', 'admin'),
+('admin:role:assign', '分配用户角色', '为用户分配角色', 'admin'),
+('admin:permission:manage', '管理用户权限', '管理用户权限', 'admin'),
+('admin:role:approve', '审批角色申请', '审批用户角色申请', 'admin'),
+('admin:permission:view', '查看用户权限状态', '查看用户权限状态', 'admin'),
+
+-- 寝室长权限
+('room:create', '创建寝室', '创建新寝室', 'room'),
+('room:manage', '管理寝室', '管理本寝室信息和设置', 'room'),
+('room:member:invite', '邀请寝室成员', '邀请新成员加入寝室', 'room'),
+('room:member:approve', '批准加入申请', '批准成员加入寝室的申请', 'room'),
+('room:member:manage', '管理寝室成员', '管理本寝室成员', 'room'),
+('room:split:rules', '设置费用分摊规则', '设置寝室费用分摊规则', 'room'),
+('room:bill:manage', '管理寝室账单', '管理本寝室账单和统计', 'room'),
+('room:expense:view', '查看费用记录', '查看本寝室费用记录（仅查看）', 'room'),
+('room:expense:add', '添加费用记录', '添加本寝室费用记录', 'room'),
+
+-- 缴费人权限
+('payment:record', '记录支付信息', '记录支付信息', 'payment'),
+('payment:view', '查看支付记录', '查看支付记录', 'payment'),
+('payment:confirm', '确认费用支付状态', '确认费用支付状态', 'payment'),
+('payment:method:manage', '管理个人支付方式', '管理个人支付方式', 'payment'),
+('expense:full', '费用记录完整权限', '添加、编辑、删除本寝室费用记录', 'expense'),
+('bill:create', '创建账单', '创建、编辑、删除本寝室账单', 'bill'),
+('payment:operate', '支付操作', '确认支付操作，上传支付凭证', 'payment'),
+
+-- 普通用户权限
+('expense:record', '记录个人消费', '记录个人消费', 'expense'),
+('expense:split:view', '查看费用分摊情况', '查看本人费用分摊情况', 'expense'),
+('profile:manage', '管理个人信息', '管理个人信息', 'user'),
+('room:stats:view', '查看寝室统计信息', '查看寝室统计信息', 'room'),
+('bill:view', '查看个人账单', '查看本人参与的账单和个人应付金额', 'bill'),
+('notification:view', '查看通知', '查看寝室通知和费用提醒', 'notification');
+
+-- 为系统管理员分配系统权限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 1, id FROM permissions WHERE code LIKE 'system:%';
+
+-- 为管理员分配管理权限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 2, id FROM permissions WHERE code LIKE 'admin:%';
+
+-- 为寝室长分配寝室管理权限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 3, id FROM permissions WHERE code LIKE 'room:%' OR code = 'expense:view' OR code = 'expense:add';
+
+-- 为缴费人分配支付相关权限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 4, id FROM permissions WHERE code LIKE 'payment:%' OR code = 'expense:full' OR code = 'bill:create';
+
+-- 为普通用户分配基础权限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 5, id FROM permissions WHERE code IN ('expense:record', 'expense:split:view', 'profile:manage', 'room:stats:view', 'bill:view', 'notification:view');
+```
+
+### 3. 日志和审计系统（共享）
+
+```sql
+-- 统一操作日志表
+CREATE TABLE operation_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    operation_type VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id INTEGER,
+    request_method VARCHAR(10),
+    request_path VARCHAR(500),
+    request_params JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    status_code INTEGER,
+    response_time INTEGER,
+    operation_result VARCHAR(20),
+    details JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 统一数据变更审计表
+CREATE TABLE data_change_audits (
+    id SERIAL PRIMARY KEY,
+    table_name VARCHAR(100) NOT NULL,
+    record_id INTEGER NOT NULL,
+    operation_type VARCHAR(20) NOT NULL,
+    old_values JSONB,
+    new_values JSONB,
+    changed_by INTEGER REFERENCES users(id),
+    ip_address INET,
+    user_agent TEXT,
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 4. 通知系统（共享）
+
+```sql
+-- 统一通知表
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    related_entity_type VARCHAR(50),
+    related_entity_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 系统通知表（管理端功能）
+CREATE TABLE system_notifications (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    notification_type VARCHAR(50) NOT NULL,
+    target_type VARCHAR(20) NOT NULL,
+    target_ids JSONB,
+    is_read BOOLEAN DEFAULT false,
+    read_at TIMESTAMP,
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP
+);
+```
+
+### 5. 保留前端特有表（不变）
+
+```sql
+-- 以下表保持原样，仅添加缺失的外键约束
+-- bills, expenses, rooms, room_members, payments 等所有前端业务表
+-- 只需确保外键引用统一的users表
+```
+
+### 6. 保留管理端特有表（不变）
+
+```sql
+-- 以下表保持原样，仅修改外键引用
+-- system_configs, feature_flags, batch_jobs, report_definitions 等所有管理端表
+-- 将admin_id外键改为引用users表
+```
+
+### 7. 安全相关表（共享）
+
+```sql
+-- 统一安全设置表
+CREATE TABLE user_security_settings (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    two_factor_enabled BOOLEAN DEFAULT false,
+    two_factor_secret VARCHAR(255),
+    backup_codes JSONB,
+    password_change_required BOOLEAN DEFAULT false,
+    password_last_changed_at TIMESTAMP,
+    session_timeout_minutes INTEGER DEFAULT 60,
+    ip_whitelist JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- 统一安全日志表
+CREATE TABLE security_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    event_type VARCHAR(50) NOT NULL,
+    event_details JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    success BOOLEAN,
+    failure_reason VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 统一设备管理表
+CREATE TABLE user_devices (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    device_id VARCHAR(100) NOT NULL,
+    device_name VARCHAR(100),
+    device_type VARCHAR(20),
+    platform VARCHAR(20),
+    push_token VARCHAR(255),
+    is_trusted BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, device_id)
+);
+```
+
+## 主要改进点
+
+### 1. **统一用户体系**
+- 合并 `admins` 和 `users` 表
+- 通过 `user_type` 字段区分用户类型
+- 统一认证和会话管理
+
+### 2. **统一角色权限系统**
+- 合并 `admin_roles` 和用户角色概念
+- 采用等级制角色系统（1-5级，1为最高级）
+- 明确定义五种角色：系统管理员、管理员、寝室长、缴费人、普通用户
+- 系统管理员严格禁止接触任何真实业务数据和用户个人信息
+- 统一的权限分配机制，基于RBAC模型
+
+### 3. **权限层级规则**
+- 系统管理员 > 管理员 > 寝室长/缴费人 > 普通用户
+- 高级角色自动继承低级角色的所有权限
+- 同级角色（寝室长和缴费人）权限不重叠，各自拥有特定领域的管理权限
+- 当用户同时拥有多个角色时，以最高权限角色为准
+
+### 4. **统一日志审计**
+- 合并操作日志和数据变更审计
+- 统一的日志记录格式
+- 支持跨用户类型的审计追踪
+
+### 5. **保持业务隔离**
+- 前端业务表保持不变
+- 管理端业务表保持不变
+- 仅修改外键引用关系
+
+### 6. **共享基础设施**
+- 统一通知系统
+- 统一安全机制
+- 统一设备管理
+
+## 外键更新示例
+
+```sql
+-- 更新管理端表的外键引用
+ALTER TABLE system_configs 
+DROP CONSTRAINT IF EXISTS system_configs_created_by_fkey,
+ADD CONSTRAINT system_configs_created_by_fkey 
+FOREIGN KEY (created_by) REFERENCES users(id);
+
+-- 更新前端表的外键引用（如需要）
+ALTER TABLE bills 
+DROP CONSTRAINT IF EXISTS bills_creator_id_fkey,
+ADD CONSTRAINT bills_creator_id_fkey 
+FOREIGN KEY (creator_id) REFERENCES users(id);
+```
+
+## 优势
+
+1. **数据一致性** - 统一的用户数据，避免重复
+2. **维护简便** - 单一用户管理体系
+3. **扩展性强** - 支持新的用户类型
+4. **功能完整** - 保留所有原有功能
+5. **权限清晰** - 统一的权限控制机制，基于等级制的角色系统
+6. **安全性高** - 系统管理员严格隔离，禁止接触任何真实业务数据和用户个人信息
+7. **权限继承** - 高级角色自动继承低级角色权限，简化权限管理
+8. **职责分明** - 同级角色权限不重叠，各自负责特定领域，避免权限冲突
+
+这个设计方案确保了前端和管理端可以共享相同的数据库实例，同时保持各自的功能完整性，避免了数据冗余和维护复杂性。角色设计完全符合需求文档中的定义，实现了严格的权限控制和数据隔离。

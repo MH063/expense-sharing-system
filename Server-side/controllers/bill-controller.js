@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
 const { logger } = require('../config/logger');
 const { authenticateToken, requireRole } = require('../middleware/auth-middleware');
+const { PrecisionCalculator } = require('../services/precision-calculator');
 const fs = require('fs');
 const path = require('path');
 
@@ -136,8 +137,8 @@ class BillController {
         }
         
         // 验证分摊金额总和是否等于账单总金额
-        const splitTotal = split_details.reduce((sum, detail) => sum + parseFloat(detail.amount), 0);
-        if (Math.abs(splitTotal - parseFloat(total_amount)) > 0.01) {
+        const splitTotal = split_details.reduce((sum, detail) => PrecisionCalculator.add(sum, parseFloat(detail.amount)), 0);
+        if (Math.abs(PrecisionCalculator.subtract(splitTotal, parseFloat(total_amount))) > 0.01) {
           return res.status(400).json({
             success: false,
             message: '分摊金额总和与账单总金额不匹配'
@@ -162,8 +163,8 @@ class BillController {
         }
         
         // 验证百分比总和是否等于100%
-        const percentageTotal = split_details.reduce((sum, detail) => sum + parseFloat(detail.amount), 0);
-        if (Math.abs(percentageTotal - 100) > 0.01) {
+        const percentageTotal = split_details.reduce((sum, detail) => PrecisionCalculator.add(sum, parseFloat(detail.amount)), 0);
+        if (Math.abs(PrecisionCalculator.subtract(percentageTotal, 100)) > 0.01) {
           return res.status(400).json({
             success: false,
             message: '百分比总和必须等于100%'
@@ -223,60 +224,109 @@ class BillController {
       
       // 创建账单分摊记录
       if (split_type === 'EQUAL') {
-        // 平均分摊
-        const amount = total_amount / memberCount;
+        // 平均分摊 - 使用preciseSplitAmount确保分摊总额与总金额一致
+        const sharesArray = members.map(() => 1); // 每人一份
+        const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(total_amount), sharesArray);
         
-        for (const member of members) {
+        for (let i = 0; i < members.length; i++) {
           await client.query(
             `INSERT INTO bill_splits (bill_id, user_id, amount, status)
              VALUES ($1, $2, $3, 'PENDING')`,
-            [bill.id, member.user_id, amount]
+            [bill.id, members[i].user_id, splitAmounts[i]]
           );
         }
       } else if (split_type === 'CUSTOM') {
         // 自定义分摊
         if (split_details.length > 0) {
-          // 使用提供的分摊详情
-          for (const detail of split_details) {
-            await client.query(
-              `INSERT INTO bill_splits (bill_id, user_id, amount, status)
-               VALUES ($1, $2, $3, 'PENDING')`,
-              [bill.id, detail.user_id, detail.amount]
+          // 使用提供的分摊详情 - 使用preciseSplitAmount确保分摊总额与总金额一致
+          const amounts = split_details.map(detail => parseFloat(detail.amount));
+          const totalSplitAmount = amounts.reduce((sum, amount) => PrecisionCalculator.add(sum, amount), 0);
+          
+          // 如果分摊总额与总金额不一致，按比例调整
+          if (!PrecisionCalculator.equals(totalSplitAmount, parseFloat(total_amount))) {
+            const sharesArray = amounts.map(amount => 
+              PrecisionCalculator.divide(amount, totalSplitAmount)
             );
+            const adjustedAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(total_amount), sharesArray);
+            
+            for (let i = 0; i < split_details.length; i++) {
+              await client.query(
+                `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+                 VALUES ($1, $2, $3, 'PENDING')`,
+                [bill.id, split_details[i].user_id, adjustedAmounts[i]]
+              );
+            }
+          } else {
+            // 分摊总额与总金额一致，直接使用
+            for (const detail of split_details) {
+              await client.query(
+                `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+                 VALUES ($1, $2, $3, 'PENDING')`,
+                [bill.id, detail.user_id, detail.amount]
+              );
+            }
           }
         } else {
-          // 如果没有提供分摊详情，默认平均分摊
-          const amount = total_amount / memberCount;
+          // 如果没有提供分摊详情，默认平均分摊 - 使用preciseSplitAmount确保分摊总额与总金额一致
+          const sharesArray = members.map(() => 1); // 每人一份
+          const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(total_amount), sharesArray);
           
-          for (const member of members) {
+          for (let i = 0; i < members.length; i++) {
             await client.query(
               `INSERT INTO bill_splits (bill_id, user_id, amount, status)
                VALUES ($1, $2, $3, 'PENDING')`,
-              [bill.id, member.user_id, amount]
+              [bill.id, members[i].user_id, splitAmounts[i]]
             );
           }
         }
       } else if (split_type === 'PERCENTAGE') {
-        // 百分比分摊
+        // 百分比分摊 - 使用preciseSplitAmount确保分摊总额与总金额一致
         if (split_details.length > 0) {
           // 使用提供的分摊详情
-          for (const detail of split_details) {
-            const amount = (parseFloat(detail.amount) / 100) * total_amount;
-            await client.query(
-              `INSERT INTO bill_splits (bill_id, user_id, amount, status)
-               VALUES ($1, $2, $3, 'PENDING')`,
-              [bill.id, detail.user_id, amount]
+          const percentages = split_details.map(detail => parseFloat(detail.amount));
+          const totalPercentage = percentages.reduce((sum, percentage) => PrecisionCalculator.add(sum, percentage), 0);
+          
+          // 确保百分比总和为100%
+          if (!PrecisionCalculator.equals(totalPercentage, 100)) {
+            // 按比例调整百分比，使总和为100%
+            const adjustedPercentages = PrecisionCalculator.preciseSplitAmount(100, percentages);
+            
+            for (let i = 0; i < split_details.length; i++) {
+              const amount = PrecisionCalculator.divide(
+                PrecisionCalculator.multiply(adjustedPercentages[i], parseFloat(total_amount)), 
+                100
+              );
+              await client.query(
+                `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+                 VALUES ($1, $2, $3, 'PENDING')`,
+                [bill.id, split_details[i].user_id, amount]
+              );
+            }
+          } else {
+            // 百分比总和为100%，直接计算金额
+            const sharesArray = percentages.map(percentage => 
+              PrecisionCalculator.divide(percentage, 100)
             );
+            const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(total_amount), sharesArray);
+            
+            for (let i = 0; i < split_details.length; i++) {
+              await client.query(
+                `INSERT INTO bill_splits (bill_id, user_id, amount, status)
+                 VALUES ($1, $2, $3, 'PENDING')`,
+                [bill.id, split_details[i].user_id, splitAmounts[i]]
+              );
+            }
           }
         } else {
-          // 如果没有提供分摊详情，默认平均分摊
-          const amount = total_amount / memberCount;
+          // 如果没有提供分摊详情，默认平均分摊 - 使用preciseSplitAmount确保分摊总额与总金额一致
+          const sharesArray = members.map(() => 1); // 每人一份
+          const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(total_amount), sharesArray);
           
-          for (const member of members) {
+          for (let i = 0; i < members.length; i++) {
             await client.query(
               `INSERT INTO bill_splits (bill_id, user_id, amount, status)
                VALUES ($1, $2, $3, 'PENDING')`,
-              [bill.id, member.user_id, amount]
+              [bill.id, members[i].user_id, splitAmounts[i]]
             );
           }
         }
@@ -681,25 +731,29 @@ class BillController {
       
       // 如果总金额发生变化，重新计算分摊金额
       if (total_amount && total_amount !== bill.total_amount) {
-        // 获取寝室成员数量
-        const memberCountQuery = `
-          SELECT COUNT(*) as count
+        // 获取寝室成员
+        const membersQuery = `
+          SELECT user_id
           FROM room_members
           WHERE room_id = $1
         `;
         
-        const memberCountResult = await client.query(memberCountQuery, [bill.room_id]);
-        const memberCount = parseInt(memberCountResult.rows[0].count);
+        const membersResult = await client.query(membersQuery, [bill.room_id]);
+        const members = membersResult.rows;
         
-        // 更新分摊金额
-        const newAmount = total_amount / memberCount;
+        // 使用尾差处理机制重新计算分摊金额
+        const sharesArray = members.map(() => 1); // 每人一份
+        const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(total_amount), sharesArray);
         
-        await client.query(
-          `UPDATE bill_splits
-           SET amount = $1
-           WHERE bill_id = $2`,
-          [newAmount, id]
-        );
+        // 更新每个成员的分摊金额
+        for (let i = 0; i < members.length; i++) {
+          await client.query(
+            `UPDATE bill_splits
+             SET amount = $1
+             WHERE bill_id = $2 AND user_id = $3`,
+            [splitAmounts[i], id, members[i].user_id]
+          );
+        }
       }
       
       await client.query('COMMIT');
@@ -1101,11 +1155,11 @@ class BillController {
         data: {
           pending: {
             count: parseInt(pendingStats.count),
-            total_amount: parseFloat(pendingStats.total_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(pendingStats.total_amount), 2)
           },
           paid: {
             count: parseInt(paidStats.count),
-            total_amount: parseFloat(paidStats.total_amount)
+            total_amount: PrecisionCalculator.round(parseFloat(paidStats.total_amount), 2)
           },
           trend: trendData
         }
@@ -1226,41 +1280,65 @@ class BillController {
       let splits = [];
       
       if (split_type === 'EQUAL') {
-        // 平均分摊
-        const amountPerPerson = bill.total_amount / members.length;
-        splits = members.map(member => ({
+        // 平均分摊 - 使用尾差处理机制确保分摊总额等于账单总金额
+        const sharesArray = members.map(() => 1); // 每人一份
+        const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(bill.total_amount), sharesArray);
+        splits = members.map((member, index) => ({
           user_id: member.user_id,
-          amount: amountPerPerson
+          amount: splitAmounts[index]
         }));
       } else if (split_type === 'PERCENTAGE') {
-        // 百分比分摊
+        // 百分比分摊 - 使用尾差处理机制确保分摊总额等于账单总金额
         if (!custom_splits || custom_splits.length !== members.length) {
           throw new Error('百分比分摊需要为每个成员指定百分比');
         }
         
-        const totalPercentage = custom_splits.reduce((sum, split) => sum + parseFloat(split.percentage), 0);
-        if (Math.abs(totalPercentage - 100) > 0.01) {
-          throw new Error('百分比总和必须等于100%');
+        // 验证百分比总和
+        let totalPercentage = custom_splits.reduce((sum, split) => PrecisionCalculator.add(sum, parseFloat(split.percentage)), 0);
+        
+        // 如果百分比总和不为100%，按比例调整
+        if (Math.abs(PrecisionCalculator.subtract(totalPercentage, 100)) > 0.01) {
+          // 按比例调整每个百分比
+          custom_splits = custom_splits.map(split => ({
+            ...split,
+            percentage: PrecisionCalculator.divide(PrecisionCalculator.multiply(parseFloat(split.percentage), 100), totalPercentage)
+          }));
         }
         
-        splits = custom_splits.map(split => ({
+        // 计算分摊金额
+        const sharesArray = custom_splits.map(split => parseFloat(split.percentage));
+        const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(bill.total_amount), sharesArray);
+        
+        splits = custom_splits.map((split, index) => ({
           user_id: split.user_id,
-          amount: (parseFloat(split.percentage) / 100) * bill.total_amount
+          amount: splitAmounts[index]
         }));
       } else if (split_type === 'CUSTOM') {
-        // 自定义金额分摊
+        // 自定义金额分摊 - 使用尾差处理机制确保分摊总额等于账单总金额
         if (!custom_splits || custom_splits.length !== members.length) {
           throw new Error('自定义分摊需要为每个成员指定金额');
         }
         
-        const totalAmount = custom_splits.reduce((sum, split) => sum + parseFloat(split.amount), 0);
-        if (Math.abs(totalAmount - bill.total_amount) > 0.01) {
-          throw new Error('分摊金额总和必须等于账单总金额');
+        // 验证分摊金额总和
+        const totalAmount = custom_splits.reduce((sum, split) => PrecisionCalculator.add(sum, parseFloat(split.amount)), 0);
+        
+        // 如果分摊金额总和与账单总金额不一致，按比例调整
+        if (Math.abs(PrecisionCalculator.subtract(totalAmount, parseFloat(bill.total_amount))) > 0.01) {
+          // 按比例调整每个分摊金额
+          const ratio = PrecisionCalculator.divide(parseFloat(bill.total_amount), totalAmount);
+          custom_splits = custom_splits.map(split => ({
+            ...split,
+            amount: PrecisionCalculator.multiply(parseFloat(split.amount), ratio)
+          }));
         }
         
-        splits = custom_splits.map(split => ({
+        // 使用尾差处理机制确保分摊总额等于账单总金额
+        const sharesArray = custom_splits.map(split => parseFloat(split.amount));
+        const splitAmounts = PrecisionCalculator.preciseSplitAmount(parseFloat(bill.total_amount), sharesArray);
+        
+        splits = custom_splits.map((split, index) => ({
           user_id: split.user_id,
-          amount: parseFloat(split.amount)
+          amount: splitAmounts[index]
         }));
       } else {
         throw new Error('无效的分摊类型');
@@ -1588,7 +1666,7 @@ class BillController {
           },
           overall: {
             total_bills: parseInt(overallStats.total_bills),
-            total_amount: parseFloat(overallStats.total_amount),
+            total_amount: PrecisionCalculator.round(parseFloat(overallStats.total_amount), 2),
             pending_bills: parseInt(overallStats.pending_bills),
             approved_bills: parseInt(overallStats.approved_bills),
             completed_bills: parseInt(overallStats.completed_bills),
@@ -1598,11 +1676,11 @@ class BillController {
             user_id: member.user_id,
             username: member.username,
             total_bills: parseInt(member.total_bills),
-            total_amount: parseFloat(member.total_amount),
+            total_amount: PrecisionCalculator.round(parseFloat(member.total_amount), 2),
             pending_bills: parseInt(member.pending_bills),
-            pending_amount: parseFloat(member.pending_amount),
+            pending_amount: PrecisionCalculator.round(parseFloat(member.pending_amount), 2),
             paid_bills: parseInt(member.paid_bills),
-            paid_amount: parseFloat(member.paid_amount)
+            paid_amount: PrecisionCalculator.round(parseFloat(member.paid_amount), 2)
           })),
           trend: trendData,
           categories: categoryStats
@@ -1749,7 +1827,7 @@ class BillController {
           stats: statsData.map(stat => ({
             period: stat.period,
             count: parseInt(stat.count),
-            total_amount: parseFloat(stat.total_amount),
+            total_amount: PrecisionCalculator.round(parseFloat(stat.total_amount), 2),
             pending_count: parseInt(stat.pending_count),
             approved_count: parseInt(stat.approved_count),
             completed_count: parseInt(stat.completed_count),
@@ -1760,11 +1838,11 @@ class BillController {
             user_id: user.user_id,
             username: user.username,
             bill_count: parseInt(user.bill_count),
-            total_amount: parseFloat(user.total_amount),
+            total_amount: PrecisionCalculator.round(parseFloat(user.total_amount), 2),
             pending_count: parseInt(user.pending_count),
-            pending_amount: parseFloat(user.pending_amount),
+            pending_amount: PrecisionCalculator.round(parseFloat(user.pending_amount), 2),
             paid_count: parseInt(user.paid_count),
-            paid_amount: parseFloat(user.paid_amount)
+            paid_amount: PrecisionCalculator.round(parseFloat(user.paid_amount), 2)
           }))
         }
       });

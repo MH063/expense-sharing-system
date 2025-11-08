@@ -162,6 +162,75 @@ export const userApi = {
    */
   getUserActivityLogs(params) {
     return http.get('/users/activity-logs', { params });
+  },
+
+  /**
+   * 获取用户角色
+   * @returns {Promise} 用户角色
+   */
+  getUserRoles() {
+    return http.get('/users/roles');
+  },
+
+  /**
+   * 获取用户权限
+   * @returns {Promise} 用户权限
+   */
+  getUserPermissions() {
+    return http.get('/users/permissions');
+  },
+
+  /**
+   * 获取用户会话列表
+   * @returns {Promise} 会话列表
+   */
+  getUserSessions() {
+    return http.get('/users/sessions');
+  },
+
+  /**
+   * 终止用户会话
+   * @param {string} sessionId - 会话ID
+   * @returns {Promise} 终止结果
+   */
+  terminateUserSession(sessionId) {
+    return http.delete(`/users/sessions/${sessionId}`);
+  },
+
+  /**
+   * 获取通知渠道
+   * @returns {Promise} 通知渠道列表
+   */
+  getNotificationChannels() {
+    return http.get('/users/notification-channels');
+  },
+
+  /**
+   * 添加通知渠道
+   * @param {Object} data - 通知渠道数据
+   * @returns {Promise} 添加结果
+   */
+  addNotificationChannel(data) {
+    return http.post('/users/notification-channels', data);
+  },
+
+  /**
+   * 更新通知渠道
+   * @param {string} channelId - 渠道ID
+   * @param {Object} data - 通知渠道数据
+   * @returns {Promise} 更新结果
+   */
+  updateNotificationChannel(channelId, data) {
+    return http.put(`/users/notification-channels/${channelId}`, data);
+  },
+
+  /**
+   * 删除通知渠道
+   * @param {string} channelId - 渠道ID
+   * @returns {Promise} 删除结果
+   */
+  deleteNotificationChannel(channelId) {
+    return http.delete(`/users/notification-channels/${channelId}`);
   }
 };
 
@@ -183,6 +252,14 @@ export const updateUserSettings = userApi.updateUserSettings;
 export const bindThirdPartyAccount = userApi.bindThirdPartyAccount;
 export const unbindThirdPartyAccount = userApi.unbindThirdPartyAccount;
 export const getUserActivityLogs = userApi.getUserActivityLogs;
+export const getUserRoles = userApi.getUserRoles;
+export const getUserPermissions = userApi.getUserPermissions;
+export const getUserSessions = userApi.getUserSessions;
+export const terminateUserSession = userApi.terminateUserSession;
+export const getNotificationChannels = userApi.getNotificationChannels;
+export const addNotificationChannel = userApi.addNotificationChannel;
+export const updateNotificationChannel = userApi.updateNotificationChannel;
+export const deleteNotificationChannel = userApi.deleteNotificationChannel;
 
 // 默认导出用户API
 export default userApi;

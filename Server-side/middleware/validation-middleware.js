@@ -265,12 +265,14 @@ const expenseValidationRules = {
   createExpense: [
     body('title').exists({ checkFalsy: true }).withMessage('title 为必填项').isString(),
     body('amount').exists().isFloat({ gt: 0 }).withMessage('amount 必须为正数'),
-    body('roomId').exists().isInt().withMessage('roomId 必须为整数')
+    body('roomId').exists().isInt().withMessage('roomId 必须为整数'),
+    body('selected_members').optional().isArray().withMessage('selected_members 必须是数组')
   ],
   updateExpense: [
     param('id').exists().isInt().withMessage('id 必须为整数'),
     body('title').optional().isString(),
-    body('amount').optional().isFloat({ gt: 0 })
+    body('amount').optional().isFloat({ gt: 0 }),
+    body('selected_members').optional().isArray().withMessage('selected_members 必须是数组')
   ],
   confirmSplitPayment: [
     param('id').exists().isInt().withMessage('id 必须为整数'),
@@ -300,6 +302,27 @@ const notificationValidationRules = {
   ]
 };
 
+/** 角色相关校验规则 */
+const roleValidationRules = {
+  createRole: [
+    body('name').exists({ checkFalsy: true }).withMessage('name 为必填项').isString(),
+    body('description').optional().isString(),
+    body('level').optional().isInt().withMessage('level 必须为整数'),
+    body('is_active').optional().isBoolean().withMessage('is_active 必须为布尔值')
+  ],
+  updateRole: [
+    param('id').exists().isInt().withMessage('id 必须为整数'),
+    body('name').optional().isString(),
+    body('description').optional().isString(),
+    body('level').optional().isInt().withMessage('level 必须为整数'),
+    body('is_active').optional().isBoolean().withMessage('is_active 必须为布尔值')
+  ],
+  assignPermission: [
+    param('id').exists().isInt().withMessage('id 必须为整数'),
+    body('permissionId').exists().isInt().withMessage('permissionId 必须为整数')
+  ]
+};
+
 module.exports = {
   handleValidationErrors,
   userValidationRules,
@@ -313,5 +336,6 @@ module.exports = {
   paymentTransferValidationRules,
   billValidationRules,
   expenseValidationRules,
-  notificationValidationRules
+  notificationValidationRules,
+  roleValidationRules
 };

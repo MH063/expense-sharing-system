@@ -9,12 +9,10 @@ const fs = require('fs');
 
 // 配置参数
 const config = {
-  // 脚本路径
+  // 脚本路径 - 只包含实际存在的脚本
   scripts: {
-    securityScanner: path.join(__dirname, 'security-scanner.js'),
-    performanceTester: path.join(__dirname, 'performance-tester.js'),
-    reportGenerator: path.join(__dirname, 'report-generator.js'),
-    scheduler: path.join(__dirname, 'scheduler.js')
+    scheduler: path.join(__dirname, 'scheduler.js'),
+    runPaymentOptimizationTests: path.join(__dirname, 'run-payment-optimization-tests.js')
   },
   // 输出目录
   outputDir: path.join(__dirname, 'logs'),
@@ -92,9 +90,7 @@ async function runFullTestSuite() {
   ensureOutputDirectory();
   
   const results = {
-    security: null,
-    performance: null,
-    report: null,
+    paymentOptimization: null,
     summary: {
       startTime: new Date().toISOString(),
       endTime: null,
@@ -104,29 +100,16 @@ async function runFullTestSuite() {
   };
   
   try {
-    // 1. 运行安全测试
-    console.log('步骤 1/3: 运行安全测试...');
-    results.security = await runScript(config.scripts.securityScanner);
-    
-    // 2. 运行性能测试
-    console.log('步骤 2/3: 运行性能测试...');
-    results.performance = await runScript(config.scripts.performanceTester);
-    
-    // 3. 生成综合报告
-    if (config.options.generateReport) {
-      console.log('步骤 3/3: 生成综合报告...');
-      results.report = await runScript(config.scripts.reportGenerator);
-    }
+    // 1. 运行支付流程优化测试
+    console.log('步骤 1/1: 运行支付流程优化测试...');
+    results.paymentOptimization = await runScript(config.scripts.runPaymentOptimizationTests);
     
     // 计算总时间
     results.summary.endTime = new Date().toISOString();
     results.summary.duration = new Date(results.summary.endTime) - new Date(results.summary.startTime);
     
     // 确定整体成功状态
-    results.summary.overallSuccess = 
-      results.security.success && 
-      results.performance.success && 
-      (!config.options.generateReport || results.report.success);
+    results.summary.overallSuccess = results.paymentOptimization.success;
     
     // 打印摘要
     printSummary(results);
@@ -151,21 +134,9 @@ function printSummary(results) {
   console.log(`总耗时: ${(results.summary.duration / 1000).toFixed(2)} 秒`);
   
   console.log('\n测试结果:');
-  console.log(`安全测试: ${results.security.success ? '✅ 成功' : '❌ 失败'} (退出码: ${results.security.code})`);
-  if (results.security.logFile) {
-    console.log(`  日志文件: ${results.security.logFile}`);
-  }
-  
-  console.log(`性能测试: ${results.performance.success ? '✅ 成功' : '❌ 失败'} (退出码: ${results.performance.code})`);
-  if (results.performance.logFile) {
-    console.log(`  日志文件: ${results.performance.logFile}`);
-  }
-  
-  if (results.report) {
-    console.log(`报告生成: ${results.report.success ? '✅ 成功' : '❌ 失败'} (退出码: ${results.report.code})`);
-    if (results.report.logFile) {
-      console.log(`  日志文件: ${results.report.logFile}`);
-    }
+  console.log(`支付流程优化测试: ${results.paymentOptimization.success ? '✅ 成功' : '❌ 失败'} (退出码: ${results.paymentOptimization.code})`);
+  if (results.paymentOptimization.logFile) {
+    console.log(`  日志文件: ${results.paymentOptimization.logFile}`);
   }
   
   console.log(`\n整体状态: ${results.summary.overallSuccess ? '✅ 成功' : '❌ 失败'}`);

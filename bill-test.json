@@ -1,9 +1,0 @@
-{
-  "title": "测试账单",
-  "description": "这是一个测试账单",
-  "due_date": "2025-12-31",
-  "room_id": 1,
-  "total_amount": 100.50,
-  "split_type": "equal",
-  "category": "食物"
-}

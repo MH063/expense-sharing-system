@@ -9,13 +9,13 @@ const websocketManager = require('../config/websocket');
 
 router.get('/stats', authenticateToken, checkRole('admin'), roleAwareRateLimiter('loose'), (req, res) => {
   const stats = websocketManager.getStats();
-  res.status(200).json({ success: true, data: stats });
+  res.success(200, '获取WebSocket统计信息成功', stats);
 });
 
 router.post('/broadcast', authenticateToken, checkRole('admin'), roleAwareRateLimiter('strict'), (req, res) => {
   const { message = { type: 'system', data: { message: 'test' } } } = req.body || {};
   websocketManager.broadcast(message);
-  res.status(200).json({ success: true, message: '已广播占位消息' });
+  res.success(200, '已广播占位消息');
 });
 
 module.exports = router;

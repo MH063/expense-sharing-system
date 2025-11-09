@@ -19,11 +19,7 @@ const getPaymentTransfers = async (req, res) => {
     // 验证请求参数
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: '请求参数验证失败',
-        errors: errors.array()
-      });
+      return res.error(400, '请求参数验证失败', {errors: errors.array()});
     }
     
     const {
@@ -139,24 +135,16 @@ const getPaymentTransfers = async (req, res) => {
     
     logger.info(`成功查询到 ${count} 条支付转移记录`);
     
-    res.status(200).json({
-      success: true,
-      data: {
-        items: transfers,
-        total: count,
-        page: parseInt(page),
-        pageSize: parseInt(pageSize),
-        totalPages: Math.ceil(count / parseInt(pageSize))
-      },
-      message: '获取支付转移记录列表成功'
+    res.success(200, '获取支付转移记录列表成功', {
+      items: transfers,
+      total: count,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      totalPages: Math.ceil(count / parseInt(pageSize))
     });
   } catch (error) {
     logger.error('获取支付转移记录列表失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.error(500, '服务器内部错误', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 };
 
@@ -172,11 +160,7 @@ const createPaymentTransfer = async (req, res) => {
     // 验证请求参数
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: '请求参数验证失败',
-        errors: errors.array()
-      });
+      return res.error(400, '请求参数验证失败', {errors: errors.array()});
     }
     
     const {
@@ -195,10 +179,7 @@ const createPaymentTransfer = async (req, res) => {
     );
     
     if (billResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '账单不存在'
-      });
+      return res.error(404, '账单不存在');
     }
     
     // 检查付款人是否存在
@@ -208,10 +189,7 @@ const createPaymentTransfer = async (req, res) => {
     );
     
     if (fromUserResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '付款人不存在'
-      });
+      return res.error(404, '付款人不存在');
     }
     
     // 检查收款人是否存在
@@ -221,26 +199,17 @@ const createPaymentTransfer = async (req, res) => {
     );
     
     if (toUserResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '收款人不存在'
-      });
+      return res.error(404, '收款人不存在');
     }
     
     // 检查付款人和收款人是否相同（除非是本人支付）
     if (transferType !== 'self_pay' && fromUserId === toUserId) {
-      return res.status(400).json({
-        success: false,
-        message: '付款人和收款人不能相同'
-      });
+      return res.error(400, '付款人和收款人不能相同');
     }
     
     // 检查金额是否有效
     if (amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: '金额必须大于0'
-      });
+      return res.error(400, '金额必须大于0');
     }
     
     // 创建支付转移记录
@@ -312,11 +281,7 @@ const createPaymentTransfer = async (req, res) => {
       
       logger.info(`成功创建支付转移记录，ID: ${transfer.id}`);
       
-      res.status(201).json({
-        success: true,
-        data: formattedTransfer,
-        message: '创建支付转移记录成功'
-      });
+      res.success(201, '创建支付转移记录成功', formattedTransfer);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -325,11 +290,7 @@ const createPaymentTransfer = async (req, res) => {
     }
   } catch (error) {
     logger.error('创建支付转移记录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.error(500, '服务器内部错误', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 };
 
@@ -345,11 +306,7 @@ const confirmPaymentTransfer = async (req, res) => {
     // 验证请求参数
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: '请求参数验证失败',
-        errors: errors.array()
-      });
+      return res.error(400, '请求参数验证失败', {errors: errors.array()});
     }
     
     const { id } = req.params;
@@ -370,20 +327,14 @@ const confirmPaymentTransfer = async (req, res) => {
     );
     
     if (transferResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '支付转移记录不存在'
-      });
+      return res.error(404, '支付转移记录不存在');
     }
     
     const transfer = transferResult.rows[0];
     
     // 检查转移记录状态
     if (transfer.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: '只能确认待确认状态的转移记录'
-      });
+      return res.error(400, '只能确认待确认状态的转移记录');
     }
     
     // 检查权限：只有收款人或管理员可以确认
@@ -391,10 +342,7 @@ const confirmPaymentTransfer = async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     
     if (transfer.to_user_id !== currentUserId && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限确认此转移记录'
-      });
+      return res.error(403, '没有权限确认此转移记录');
     }
     
     // 更新转移记录状态
@@ -465,11 +413,7 @@ const confirmPaymentTransfer = async (req, res) => {
       
       logger.info(`成功确认支付转移记录，ID: ${id}`);
       
-      res.status(200).json({
-        success: true,
-        data: formattedTransfer,
-        message: '确认支付转移记录成功'
-      });
+      res.success(200, '确认支付转移记录成功', formattedTransfer);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -478,11 +422,7 @@ const confirmPaymentTransfer = async (req, res) => {
     }
   } catch (error) {
     logger.error('确认支付转移记录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.error(500, '服务器内部错误', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 };
 
@@ -498,11 +438,7 @@ const cancelPaymentTransfer = async (req, res) => {
     // 验证请求参数
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: '请求参数验证失败',
-        errors: errors.array()
-      });
+      return res.error(400, '请求参数验证失败', {errors: errors.array()});
     }
     
     const { id } = req.params;
@@ -523,20 +459,14 @@ const cancelPaymentTransfer = async (req, res) => {
     );
     
     if (transferResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '支付转移记录不存在'
-      });
+      return res.error(404, '支付转移记录不存在');
     }
     
     const transfer = transferResult.rows[0];
     
     // 检查转移记录状态
     if (transfer.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: '只能取消待确认状态的转移记录'
-      });
+      return res.error(400, '只能取消待确认状态的转移记录');
     }
     
     // 检查权限：只有付款人、收款人或管理员可以取消
@@ -546,10 +476,7 @@ const cancelPaymentTransfer = async (req, res) => {
     if (transfer.from_user_id !== currentUserId && 
         transfer.to_user_id !== currentUserId && 
         !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限取消此转移记录'
-      });
+      return res.error(403, '没有权限取消此转移记录');
     }
     
     // 更新转移记录状态
@@ -620,11 +547,7 @@ const cancelPaymentTransfer = async (req, res) => {
       
       logger.info(`成功取消支付转移记录，ID: ${id}`);
       
-      res.status(200).json({
-        success: true,
-        data: formattedTransfer,
-        message: '取消支付转移记录成功'
-      });
+      res.success(200, '取消支付转移记录成功', formattedTransfer);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -633,11 +556,7 @@ const cancelPaymentTransfer = async (req, res) => {
     }
   } catch (error) {
     logger.error('取消支付转移记录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.error(500, '服务器内部错误', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 };
 
@@ -653,11 +572,7 @@ const getPaymentTransferById = async (req, res) => {
     // 验证请求参数
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: '请求参数验证失败',
-        errors: errors.array()
-      });
+      return res.error(400, '请求参数验证失败', {errors: errors.array()});
     }
     
     const { id } = req.params;
@@ -680,10 +595,7 @@ const getPaymentTransferById = async (req, res) => {
     );
     
     if (transferResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '支付转移记录不存在'
-      });
+      return res.error(404, '支付转移记录不存在');
     }
     
     const transfer = transferResult.rows[0];
@@ -730,18 +642,10 @@ const getPaymentTransferById = async (req, res) => {
     
     logger.info(`成功获取支付转移记录详情，ID: ${id}`);
     
-    res.status(200).json({
-      success: true,
-      data: formattedTransfer,
-      message: '获取支付转移记录详情成功'
-    });
+    res.success(200, '获取支付转移记录详情成功', formattedTransfer);
   } catch (error) {
     logger.error('获取支付转移记录详情失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.error(500, '服务器内部错误', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 };
 

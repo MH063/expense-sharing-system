@@ -504,31 +504,31 @@ const loadRoomData = async () => {
   
   try {
     // 获取用户当前寝室信息
-    const response = await roomsApi.getCurrentRoom()
+    const res = await roomsApi.getCurrentRoom()
     
-    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-    if (response.data.success && response.data.data) {
-      room.value = response.data.data
+    // 新风格：使用 res.success / res.payload
+    if (res.success && res.payload) {
+      room.value = res.payload
       
       // 获取寝室成员
-      const membersResponse = await roomsApi.getRoomMembers(room.value.id)
-      if (membersResponse.data.success) {
-        members.value = membersResponse.data.data || []
+      const membersRes = await roomsApi.getRoomMembers(room.value.id)
+      if (membersRes.success) {
+        members.value = membersRes.payload || []
       }
       
       // 获取费用统计
-      const statsResponse = await roomsApi.getRoomStatistics(room.value.id)
-      if (statsResponse.data.success) {
-        const stats = statsResponse.data.data
-        totalExpense.value = stats.totalExpense || 0
-        averageExpense.value = stats.averageExpense || 0
-        pendingAmount.value = stats.pendingAmount || 0
+      const statsRes = await roomsApi.getRoomStatistics(room.value.id)
+      if (statsRes.success) {
+        const stats = statsRes.payload
+        totalExpense.value = stats?.totalExpense || 0
+        averageExpense.value = stats?.averageExpense || 0
+        pendingAmount.value = stats?.pendingAmount || 0
       }
       
       // 获取最近支出
-      const expensesResponse = await roomsApi.getRecentExpenses(room.value.id)
-      if (expensesResponse.data.success) {
-        recentExpenses.value = expensesResponse.data.data || []
+      const expensesRes = await roomsApi.getRecentExpenses(room.value.id)
+      if (expensesRes.success) {
+        recentExpenses.value = expensesRes.payload || []
       }
       
       // 初始化设置表单
@@ -597,10 +597,9 @@ const leaveRoom = async () => {
   }
   
   try {
-    const response = await roomsApi.leaveRoom(room.value.id)
-    
-    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-    if (response.data.success) {
+    const res = await roomsApi.leaveRoom(room.value.id)
+
+    if (res.success) {
       successMessage.value = '已成功退出寝室'
       
       // 3秒后跳转到首页
@@ -626,10 +625,9 @@ const promoteMember = async (member) => {
   if (!confirm(`确定要将 ${member.displayName || member.username} 设为寝室长吗？`)) return
   
   try {
-    const response = await roomsApi.promoteMember(room.value.id, member.id)
-    
-    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-    if (response.data.success) {
+    const res = await roomsApi.promoteMember(room.value.id, member.id)
+
+    if (res.success) {
       // 更新本地状态
       const currentUser = members.value.find(m => m.id === currentUserId.value)
       const promotedMember = members.value.find(m => m.id === member.id)
@@ -672,10 +670,9 @@ const removeMember = async (member) => {
   }
   
   try {
-    const response = await roomsApi.removeMember(room.value.id, member.id)
-    
-    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-    if (response.data.success) {
+    const res = await roomsApi.removeMember(room.value.id, member.id)
+
+    if (res.success) {
       // 更新本地状态
       members.value = members.value.filter(m => m.id !== member.id)
       
@@ -705,10 +702,9 @@ const updateRoomSettings = async () => {
   errorMessage.value = ''
   
   try {
-    const response = await roomsApi.updateRoomSettings(room.value.id, roomSettings)
-    
-    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-    if (response.data.success) {
+    const res = await roomsApi.updateRoomSettings(room.value.id, roomSettings)
+
+    if (res.success) {
       // 更新本地状态
       room.value.name = roomSettings.name
       room.value.description = roomSettings.description
@@ -783,11 +779,10 @@ const regenerateInviteCode = async () => {
   if (!confirm('确定要重新生成邀请码吗？旧邀请码将失效。')) return
   
   try {
-    const response = await roomsApi.regenerateInviteCode(room.value.id)
-    
-    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-    if (response.data.success && response.data.data) {
-      room.value.inviteCode = response.data.data.inviteCode
+    const res = await roomsApi.regenerateInviteCode(room.value.id)
+
+    if (res.success && res.payload) {
+      room.value.inviteCode = res.payload.inviteCode
       
       successMessage.value = '邀请码已重新生成'
       
@@ -827,10 +822,9 @@ const deleteRoom = async () => {
   }
   
   try {
-    const response = await roomsApi.deleteRoom(room.value.id)
-    
-    // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-    if (response.data.success) {
+    const res = await roomsApi.deleteRoom(room.value.id)
+
+    if (res.success) {
       successMessage.value = '寝室已删除'
       
       // 3秒后跳转到首页

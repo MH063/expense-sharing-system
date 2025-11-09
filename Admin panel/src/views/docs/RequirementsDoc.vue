@@ -19,7 +19,7 @@
               使用模板
             </el-button>
             <el-button @click="showVersionHistory">
-              <el-icon><Clock /></el-icon>
+              <el-icon><AlarmClock /></el-icon>
               版本历史
             </el-button>
             <el-button type="primary" @click="saveDocument">保存更改</el-button>
@@ -70,13 +70,13 @@
             <div class="editor-toolbar">
               <el-button-group>
                 <el-button size="small" @click="insertText('**', '**')">
-                  <el-icon><Bold /></el-icon>
+                  <el-icon><EditPen /></el-icon>
                 </el-button>
                 <el-button size="small" @click="insertText('*', '*')">
-                  <el-icon><Italic /></el-icon>
+                  <el-icon><Edit /></el-icon>
                 </el-button>
                 <el-button size="small" @click="insertText('~~', '~~')">
-                  <el-icon><Strikethrough /></el-icon>
+                  <el-icon><Minus /></el-icon>
                 </el-button>
               </el-button-group>
               
@@ -95,7 +95,7 @@
                   <el-icon><List /></el-icon>
                 </el-button>
                 <el-button size="small" @click="insertText('1. ', '')">
-                  <el-icon><OrderedList /></el-icon>
+                  <el-icon><List /></el-icon>
                 </el-button>
                 <el-button size="small" @click="insertText('> ', '')">
                   <el-icon><ChatDotRound /></el-icon>
@@ -109,7 +109,7 @@
                   <el-icon><Link /></el-icon>
                 </el-button>
                 <el-button size="small" @click="insertText('```\n', '\n```')">
-                  <el-icon><Code /></el-icon>
+                  <el-icon><Cpu /></el-icon>
                 </el-button>
                 <el-button size="small" @click="insertTable">
                   <el-icon><Grid /></el-icon>
@@ -242,9 +242,9 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  ArrowLeft, Document, Clock, Bold, Italic, Strikethrough, 
-  List, OrderedList, ChatDotRound, Link, Code, Grid
+import {
+  ArrowLeft, Document, AlarmClock, EditPen, Edit, Minus,
+  List, ChatDotRound, Link, Cpu, Grid
 } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 

@@ -189,6 +189,60 @@ const Bill = sequelize.define('Bill', {
   updatedAt: 'updated_at'
 });
 
+// 定义BillSplit模型
+const BillSplit = sequelize.define('BillSplit', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  bill_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  percentage: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: false
+  },
+  is_paid: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  paid_at: {
+    type: DataTypes.DATE
+  },
+  // 新增字段，用于支持按天数分摊
+  present_days: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: '在寝天数，用于按天数分摊计算'
+  },
+  split_ratio: {
+    type: DataTypes.DECIMAL(10, 4),
+    defaultValue: 0.0000,
+    comment: '分摊比例，用于精确分摊计算'
+  },
+  rounding_adjustment: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+    comment: '尾差调整，用于处理舍入误差'
+  }
+}, {
+  tableName: 'bill_splits',
+  underscored: true,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+});
+
 // 定义Payment模型
 const Payment = sequelize.define('Payment', {
   id: {
@@ -199,6 +253,10 @@ const Payment = sequelize.define('Payment', {
   bill_id: {
     type: DataTypes.INTEGER,
     allowNull: false
+  },
+  bill_split_id: {
+    type: DataTypes.INTEGER,
+    comment: '账单分摊ID，用于关联到具体的分摊记录'
   },
   user_id: {
     type: DataTypes.INTEGER,
@@ -361,6 +419,12 @@ const ExpenseType = sequelize.define('ExpenseType', {
   is_system: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  // 新增字段，用于支持按天数分摊
+  supports_days_based_split: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: '是否支持按天数分摊'
   }
 }, {
   tableName: 'expense_types',
@@ -410,6 +474,44 @@ const Expense = sequelize.define('Expense', {
   is_verified: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  // 新增字段，用于支持按天数分摊
+  calculation_method: {
+    type: DataTypes.ENUM('amount', 'days'),
+    allowNull: false,
+    defaultValue: 'amount',
+    comment: '计算方式：amount-按金额分摊，days-按天数分摊'
+  },
+  last_reading: {
+    type: DataTypes.DECIMAL(10, 2),
+    comment: '上次读数，用于水电费等按用量计算的费用'
+  },
+  current_reading: {
+    type: DataTypes.DECIMAL(10, 2),
+    comment: '当前读数，用于水电费等按用量计算的费用'
+  },
+  unit_price: {
+    type: DataTypes.DECIMAL(10, 4),
+    comment: '单价，用于水电费等按用量计算的费用'
+  },
+  billing_start_date: {
+    type: DataTypes.DATE,
+    comment: '计费开始日期，用于按时间段计算的费用'
+  },
+  billing_end_date: {
+    type: DataTypes.DATE,
+    comment: '计费结束日期，用于按时间段计算的费用'
+  },
+  precision_version: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+    comment: '精度计算版本，用于兼容不同精度算法'
+  },
+  rounding_method: {
+    type: DataTypes.ENUM('bankers', 'standard'),
+    allowNull: false,
+    defaultValue: 'bankers',
+    comment: '舍入方法：bankers-银行家舍入法，standard-标准四舍五入'
   }
 }, {
   tableName: 'expenses',
@@ -445,6 +547,22 @@ const ExpenseSplit = sequelize.define('ExpenseSplit', {
   is_paid: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  // 新增字段，用于支持按天数分摊
+  present_days: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: '在寝天数，用于按天数分摊计算'
+  },
+  split_ratio: {
+    type: DataTypes.DECIMAL(10, 4),
+    defaultValue: 0.0000,
+    comment: '分摊比例，用于精确分摊计算'
+  },
+  rounding_adjustment: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+    comment: '尾差调整，用于处理舍入误差'
   }
 }, {
   tableName: 'expense_splits',
@@ -975,6 +1093,12 @@ Bill.belongsTo(User, { foreignKey: 'creator_id', as: 'creator' });
 Bill.hasMany(Payment, { foreignKey: 'bill_id', as: 'payments' });
 Bill.hasMany(OfflinePayment, { foreignKey: 'bill_id', as: 'offlinePayments' });
 Bill.hasMany(PaymentReminder, { foreignKey: 'bill_id', as: 'reminders' });
+Bill.hasMany(BillSplit, { foreignKey: 'bill_id', as: 'splits' });
+
+// BillSplit关联
+BillSplit.belongsTo(Bill, { foreignKey: 'bill_id', as: 'bill' });
+BillSplit.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+BillSplit.hasMany(Payment, { foreignKey: 'bill_split_id', as: 'payments' });
 
 // Payment关联
 Payment.belongsTo(Bill, { foreignKey: 'bill_id', as: 'bill' });
@@ -1056,6 +1180,7 @@ const db = {
   Room,
   RoomMember,
   Bill,
+  BillSplit,
   Payment,
   OfflinePayment,
   PaymentReminder,

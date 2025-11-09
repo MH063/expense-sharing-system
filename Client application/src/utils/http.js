@@ -101,7 +101,13 @@ http.interceptors.request.use(
   },
   (error) => {
     console.error('[HTTP请求错误]', error)
-    return Promise.reject(error)
+    // 标准化错误对象并保持兼容结构
+    const resp = error.response
+    const serverRaw = resp?.data
+    const message = (serverRaw && (serverRaw.message || serverRaw.msg)) || error.message || '请求失败'
+    const code = resp?.status || error.code
+    const normalizedError = { success: false, data: null, message, code, error }
+    return Promise.reject({ ...normalizedError, data: normalizedError })
   }
 )
 
@@ -132,13 +138,21 @@ http.interceptors.response.use(
     const skip = shouldSkipCaseConvert(response?.config?.url)
     const dataCamel = skip ? payload : deepCamelCase(payload)
 
-    return {
+    const normalized = {
       success,
-      data: dataCamel,
       message,
       code,
+      payload: dataCamel,
       raw
     }
+    // 兼容返回：res.data 保留为后端风格 {success,data,message,code}
+    const envelope = {
+      success: normalized.success,
+      data: normalized.payload,
+      message: normalized.message,
+      code: normalized.code
+    }
+    return { ...normalized, data: envelope }
   },
   (error) => {
     console.error('[HTTP响应错误]', error)
@@ -174,7 +188,13 @@ http.interceptors.response.use(
       ElMessage.error('网络错误，请检查网络连接')
     }
 
-    return Promise.reject(error)
+    // 标准化错误对象并保持兼容结构
+    const resp = error.response
+    const serverRaw = resp?.data
+    const message = (serverRaw && (serverRaw.message || serverRaw.msg)) || error.message || '请求失败'
+    const code = resp?.status || error.code
+    const normalizedError = { success: false, data: null, message, code, error }
+    return Promise.reject({ ...normalizedError, data: normalizedError })
   }
 )
 

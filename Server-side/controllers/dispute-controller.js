@@ -9,9 +9,9 @@ class DisputeController {
       const userId = req.user.sub;
       const { page = 1, limit = 20 } = req.query;
       const data = await disputeService.listUserDisputes(userId, { page: parseInt(page), limit: parseInt(limit) });
-      res.status(200).json({ success: true, data });
+      res.success(200, '获取争议列表成功', data);
     } catch (error) {
-      res.status(500).json({ success: false, message: '获取争议列表失败', error: error.message });
+      res.error(500, '获取争议列表失败', error.message);
     }
   }
 
@@ -20,10 +20,10 @@ class DisputeController {
       const userId = req.user.sub;
       const { id } = req.params;
       const data = await disputeService.getById(id, userId);
-      if (!data) return res.status(404).json({ success: false, message: '争议不存在' });
-      res.status(200).json({ success: true, data });
+      if (!data) return res.error(404, '争议不存在');
+      res.success(200, '获取争议详情成功', data);
     } catch (error) {
-      res.status(500).json({ success: false, message: '获取争议详情失败', error: error.message });
+      res.error(500, '获取争议详情失败', error.message);
     }
   }
 
@@ -33,13 +33,13 @@ class DisputeController {
       // 统一请求字段为 camelCase：billId、reason、details
       const { billId, reason, details } = req.body;
       if (!billId || !reason) {
-        return res.status(400).json({ success: false, message: '缺少必要参数 billId 或 reason' });
+        return res.error(400, '缺少必要参数 billId 或 reason');
       }
       // 服务层仍使用数据库字段命名 bill_id，这里进行一次映射
       const data = await disputeService.createDispute(userId, { bill_id: billId, reason, details });
-      res.status(201).json({ success: true, data });
+      res.success(201, '创建争议成功', data);
     } catch (error) {
-      res.status(500).json({ success: false, message: '创建争议失败', error: error.message });
+      res.error(500, '创建争议失败', error.message);
     }
   }
 
@@ -48,12 +48,12 @@ class DisputeController {
       const userId = req.user.sub;
       const { id } = req.params;
       const { status } = req.body;
-      if (!status) return res.status(400).json({ success: false, message: '缺少必要参数 status' });
+      if (!status) return res.error(400, '缺少必要参数 status');
       const data = await disputeService.updateStatus(id, userId, status);
-      if (!data) return res.status(404).json({ success: false, message: '争议不存在或无权限' });
-      res.status(200).json({ success: true, data });
+      if (!data) return res.error(404, '争议不存在或无权限');
+      res.success(200, '更新争议状态成功', data);
     } catch (error) {
-      res.status(500).json({ success: false, message: '更新争议状态失败', error: error.message });
+      res.error(500, '更新争议状态失败', error.message);
     }
   }
 }

@@ -10,10 +10,10 @@ router.get('/status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.sub;
     const result = await pool.query('SELECT mfa_enabled FROM users WHERE id = $1', [userId]);
-    if (result.rows.length === 0) return res.status(404).json({ success: false, message: '用户不存在' });
-    return res.json({ success: true, data: { mfaEnabled: result.rows[0].mfa_enabled === true } });
+    if (result.rows.length === 0) return res.notFound('用户不存在');
+    return res.success(200, '查询成功', { mfaEnabled: result.rows[0].mfa_enabled === true });
   } catch (e) {
-    return res.status(500).json({ success: false, message: '查询失败' });
+    return res.error(500, '查询失败');
   }
 });
 
@@ -26,9 +26,9 @@ router.post('/setup', authenticateToken, async (req, res) => {
     const issuer = 'ExpenseSharingSystem';
     const label = req.user.username || `user-${userId}`;
     const otpauth = buildOtpAuthURL({ secret, label, issuer });
-    return res.json({ success: true, data: { secret, otpauth } });
+    return res.success(200, '生成成功', { secret, otpauth });
   } catch (e) {
-    return res.status(500).json({ success: false, message: '生成失败' });
+    return res.error(500, '生成失败');
   }
 });
 
@@ -37,17 +37,17 @@ router.post('/verify', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.sub;
     const { code } = req.body || {};
-    if (!code) return res.status(400).json({ success: false, message: '缺少验证码' });
+    if (!code) return res.clientError('缺少验证码');
     const result = await pool.query('SELECT mfa_secret FROM users WHERE id = $1', [userId]);
-    if (result.rows.length === 0) return res.status(404).json({ success: false, message: '用户不存在' });
+    if (result.rows.length === 0) return res.notFound('用户不存在');
     const secret = result.rows[0].mfa_secret;
-    if (!secret) return res.status(400).json({ success: false, message: '请先发起设置' });
+    if (!secret) return res.clientError('请先发起设置');
     const ok = totpVerify(String(code), secret, { window: 1 });
-    if (!ok) return res.status(400).json({ success: false, message: '验证码错误' });
+    if (!ok) return res.clientError('验证码错误');
     await pool.query('UPDATE users SET mfa_enabled = TRUE, updated_at = NOW() WHERE id = $1', [userId]);
-    return res.json({ success: true, message: 'MFA 已启用' });
+    return res.success(200, 'MFA 已启用');
   } catch (e) {
-    return res.status(500).json({ success: false, message: '验证失败' });
+    return res.error(500, '验证失败');
   }
 });
 
@@ -56,9 +56,9 @@ router.post('/disable', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.sub;
     await pool.query('UPDATE users SET mfa_enabled = FALSE, mfa_secret = NULL, updated_at = NOW() WHERE id = $1', [userId]);
-    return res.json({ success: true, message: 'MFA 已禁用' });
+    return res.success(200, 'MFA 已禁用');
   } catch (e) {
-    return res.status(500).json({ success: false, message: '禁用失败' });
+    return res.error(500, '禁用失败');
   }
 });
 

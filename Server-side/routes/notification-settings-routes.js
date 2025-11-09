@@ -22,17 +22,10 @@ router.get('/', authenticateToken, async (req, res) => {
 
     const settings = await notificationSettingsController.getUserNotificationSettings(userId);
 
-    res.status(200).json({
-      success: true,
-      data: settings
-    });
+    res.success(200, '获取通知设置成功', settings);
   } catch (error) {
     console.error('获取通知设置失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取通知设置失败',
-      error: error.message
-    });
+    res.error(500, '获取通知设置失败', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 });
 
@@ -48,26 +41,15 @@ router.put('/', authenticateToken, async (req, res) => {
     
     // 验证请求数据
     if (!settings || typeof settings !== 'object') {
-      return res.status(400).json({
-        success: false,
-        message: '无效的请求数据'
-      });
+      return res.error(400, '无效的请求数据');
     }
     
     const updatedSettings = await notificationSettingsController.updateUserNotificationSettings(userId, settings);
     
-    res.status(200).json({
-      success: true,
-      data: updatedSettings,
-      message: '通知设置更新成功'
-    });
+    res.success(200, '通知设置更新成功', updatedSettings);
   } catch (error) {
     console.error('更新通知设置失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '更新通知设置失败',
-      error: error.message
-    });
+    res.error(500, '更新通知设置失败', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 });
 
@@ -83,27 +65,15 @@ router.get('/check', authenticateToken, async (req, res) => {
     const { notificationType, eventType } = req.query;
     
     if (!notificationType || !eventType) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少必要的查询参数: notificationType 和 eventType'
-      });
+      return res.error(400, '缺少必要的查询参数: notificationType 和 eventType');
     }
     
     const isEnabled = await notificationSettingsController.checkNotificationEnabled(userId, notificationType, eventType);
     
-    res.status(200).json({
-      success: true,
-      data: {
-        isEnabled
-      }
-    });
+    res.success(200, '检查通知设置成功', { isEnabled });
   } catch (error) {
     console.error('检查通知设置失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '检查通知设置失败',
-      error: error.message
-    });
+    res.error(500, '检查通知设置失败', process.env.NODE_ENV === 'development' ? error.message : undefined);
   }
 });
 

@@ -13,6 +13,8 @@ CREATE TYPE IF NOT EXISTS notification_channel AS ENUM ('app', 'email', 'sms', '
 CREATE TYPE IF NOT EXISTS dispute_status AS ENUM ('open', 'under_review', 'resolved', 'rejected');
 CREATE TYPE IF NOT EXISTS expense_category AS ENUM ('food', 'transport', 'entertainment', 'shopping', 'utilities', 'rent', 'healthcare', 'education', 'other');
 CREATE TYPE IF NOT EXISTS role_type AS ENUM ('system', 'room', 'custom');
+CREATE TYPE IF NOT EXISTS leave_type AS ENUM ('leave', 'checkout');
+CREATE TYPE IF NOT EXISTS leave_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled', 'active', 'completed');
 
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (
@@ -103,6 +105,24 @@ CREATE TABLE IF NOT EXISTS room_members (
     UNIQUE(room_id, user_id)
 );
 
+-- 请假记录表
+CREATE TABLE IF NOT EXISTS leave_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    leave_type leave_type NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    status leave_status NOT NULL DEFAULT 'pending',
+    reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by INTEGER REFERENCES users(id),
+    reviewed_by INTEGER REFERENCES users(id),
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    notes TEXT
+);
+
 -- 账单表
 CREATE TABLE IF NOT EXISTS bills (
     id SERIAL PRIMARY KEY,
@@ -114,6 +134,15 @@ CREATE TABLE IF NOT EXISTS bills (
     room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     status bill_status DEFAULT 'pending',
     due_date DATE,
+    -- 添加与按在寝天数分摊相关的字段
+    calculation_method VARCHAR(20) DEFAULT 'amount', -- 'amount' 或 'reading'
+    last_reading DECIMAL(10,2),
+    current_reading DECIMAL(10,2),
+    unit_price DECIMAL(10,2),
+    billing_start_date DATE,
+    billing_end_date DATE,
+    precision_version INTEGER DEFAULT 1,
+    rounding_method VARCHAR(20) DEFAULT 'bankers', -- 'bankers' 或 'standard'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -126,6 +155,9 @@ CREATE TABLE IF NOT EXISTS bill_splits (
     amount DECIMAL(10,2) NOT NULL,
     is_paid BOOLEAN DEFAULT FALSE,
     paid_at TIMESTAMP WITH TIME ZONE,
+    present_days INTEGER DEFAULT 0,
+    split_ratio DECIMAL(10,4) DEFAULT 0.0000,
+    rounding_adjustment DECIMAL(10,2) DEFAULT 0.00,
     UNIQUE(bill_id, user_id)
 );
 
@@ -299,6 +331,10 @@ CREATE INDEX IF NOT EXISTS idx_rooms_owner_id ON rooms(owner_id);
 CREATE INDEX IF NOT EXISTS idx_rooms_invite_code ON rooms(invite_code);
 CREATE INDEX IF NOT EXISTS idx_room_members_room_id ON room_members(room_id);
 CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_leave_records_user_id ON leave_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_leave_records_room_id ON leave_records(room_id);
+CREATE INDEX IF NOT EXISTS idx_leave_records_status ON leave_records(status);
+CREATE INDEX IF NOT EXISTS idx_leave_records_dates ON leave_records(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_bills_room_id ON bills(room_id);
 CREATE INDEX IF NOT EXISTS idx_bills_payer_id ON bills(payer_id);
 CREATE INDEX IF NOT EXISTS idx_bills_status ON bills(status);
@@ -335,6 +371,10 @@ INSERT INTO permissions (name, description, resource, action) VALUES
 ('支付管理', '管理所有支付', 'payment', 'manage'),
 ('系统配置', '管理系统配置', 'system', 'config'),
 ('审计日志', '查看审计日志', 'audit', 'view'),
+('请假管理', '管理所有请假记录', 'leave', 'manage'),
+('请假审批', '审批请假申请', 'leave', 'approve'),
+('请假查看', '查看请假记录', 'leave', 'view'),
+('请假统计', '查看请假统计数据', 'leave', 'stats'),
 ('创建房间', '创建房间', 'room', 'create'),
 ('加入房间', '加入房间', 'room', 'join'),
 ('离开房间', '离开房间', 'room', 'leave'),
@@ -368,7 +408,8 @@ WHERE r.name = '用户' AND p.name IN (
     '创建房间', '加入房间', '离开房间', 
     '创建账单', '查看账单', '编辑账单', '删除账单', 
     '支付账单', '查看支付', 
-    '创建争议', '查看争议'
+    '创建争议', '查看争议',
+    '请假查看'
 )
 ON CONFLICT DO NOTHING;
 
@@ -379,7 +420,8 @@ WHERE r.name = '房主' AND p.name IN (
     '创建房间', '加入房间', '离开房间', 
     '创建账单', '查看账单', '编辑账单', '删除账单', 
     '支付账单', '查看支付', 
-    '创建争议', '查看争议', '解决争议'
+    '创建争议', '查看争议', '解决争议',
+    '请假审批', '请假查看', '请假统计'
 )
 ON CONFLICT DO NOTHING;
 
@@ -389,7 +431,8 @@ SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = '管理员' AND p.name IN (
     '创建账单', '查看账单', '编辑账单', '删除账单', 
     '支付账单', '查看支付', 
-    '创建争议', '查看争议', '解决争议'
+    '创建争议', '查看争议', '解决争议',
+    '请假审批', '请假查看'
 )
 ON CONFLICT DO NOTHING;
 
@@ -398,7 +441,8 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p 
 WHERE r.name = '成员' AND p.name IN (
     '查看账单', '支付账单', '查看支付', 
-    '创建争议', '查看争议'
+    '创建争议', '查看争议',
+    '请假查看'
 )
 ON CONFLICT DO NOTHING;
 
@@ -425,6 +469,7 @@ $$ language 'plpgsql';
 -- 为需要的表添加更新时间戳的触发器
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_rooms_updated_at BEFORE UPDATE ON rooms FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_leave_records_updated_at BEFORE UPDATE ON leave_records FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_bills_updated_at BEFORE UPDATE ON bills FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_payment_transfers_updated_at BEFORE UPDATE ON payment_transfers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -436,3 +481,18 @@ CREATE TRIGGER update_qr_codes_updated_at BEFORE UPDATE ON qr_codes FOR EACH ROW
 CREATE TRIGGER update_system_configs_updated_at BEFORE UPDATE ON system_configs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_permissions_updated_at BEFORE UPDATE ON permissions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- 添加bills表字段注释
+COMMENT ON COLUMN bills.calculation_method IS '费用计算方式：amount-固定金额，reading-读数计算';
+COMMENT ON COLUMN bills.last_reading IS '上次读数，用于读数计算方式';
+COMMENT ON COLUMN bills.current_reading IS '当前读数，用于读数计算方式';
+COMMENT ON COLUMN bills.unit_price IS '单价，用于读数计算方式';
+COMMENT ON COLUMN bills.billing_start_date IS '计费周期开始日期，用于按天数分摊';
+COMMENT ON COLUMN bills.billing_end_date IS '计费周期结束日期，用于按天数分摊';
+COMMENT ON COLUMN bills.precision_version IS '精度计算版本，用于兼容不同精度算法';
+COMMENT ON COLUMN bills.rounding_method IS '舍入方法：bankers-银行家舍入法，standard-标准四舍五入';
+
+-- 添加bill_splits表字段注释
+COMMENT ON COLUMN bill_splits.present_days IS '在寝天数，用于按天数分摊计算';
+COMMENT ON COLUMN bill_splits.split_ratio IS '分摊比例，用于精确分摊计算';
+COMMENT ON COLUMN bill_splits.rounding_adjustment IS '尾差调整，用于处理舍入误差';

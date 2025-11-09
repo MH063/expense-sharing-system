@@ -132,7 +132,7 @@
                   表格视图
                 </el-button>
                 <el-button :type="viewMode === 'timeline' ? 'primary' : ''" @click="viewMode = 'timeline'">
-                  <el-icon><Clock /></el-icon>
+                  <el-icon><AlarmClock /></el-icon>
                   时间线视图
                 </el-button>
               </el-button-group>
@@ -280,7 +280,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, ArrowUp, ArrowDown, List, Clock } from '@element-plus/icons-vue'
+import { Download, ArrowUp, ArrowDown, List, AlarmClock } from '@element-plus/icons-vue'
 
 // 搜索表单
 const searchForm = reactive({

@@ -19,10 +19,7 @@ const createOfflinePayment = async (req, res) => {
     
     // 验证必要参数
     if (!billId || !userId || !amount || !paymentMethod) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少必要参数'
-      });
+      return res.error(400, '缺少必要参数');
     }
     
     // 创建离线支付记录
@@ -35,18 +32,10 @@ const createOfflinePayment = async (req, res) => {
       createdBy: req.user.id
     });
     
-    res.status(201).json({
-      success: true,
-      data: result,
-      message: '离线支付记录创建成功'
-    });
+    res.success(201, '离线支付记录创建成功', result);
   } catch (error) {
     console.error('创建离线支付记录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '创建离线支付记录失败',
-      error: error.message
-    });
+    res.error(500, '创建离线支付记录失败', error.message);
   }
 };
 
@@ -61,27 +50,16 @@ const syncOfflinePayment = async (req, res) => {
     
     // 验证参数
     if (!paymentId) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少支付记录ID'
-      });
+      return res.error(400, '缺少支付记录ID');
     }
     
     // 同步离线支付记录
     const result = await offlinePaymentService.syncOfflinePayment(paymentId, req.user.id);
     
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: '离线支付记录同步成功'
-    });
+    res.success(200, '离线支付记录同步成功', result);
   } catch (error) {
     console.error('同步离线支付记录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '同步离线支付记录失败',
-      error: error.message
-    });
+    res.error(500, '同步离线支付记录失败', error.message);
   }
 };
 
@@ -97,10 +75,7 @@ const getUserOfflinePayments = async (req, res) => {
     
     // 验证参数
     if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少用户ID'
-      });
+      return res.error(400, '缺少用户ID');
     }
     
     // 获取离线支付记录
@@ -111,17 +86,10 @@ const getUserOfflinePayments = async (req, res) => {
       status
     );
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取用户离线支付记录成功', result);
   } catch (error) {
     console.error('获取用户离线支付记录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取用户离线支付记录失败',
-      error: error.message
-    });
+    res.error(500, '获取用户离线支付记录失败', error.message);
   }
 };
 
@@ -140,17 +108,10 @@ const getPendingSyncPayments = async (req, res) => {
       parseInt(limit)
     );
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取待同步离线支付记录成功', result);
   } catch (error) {
     console.error('获取待同步离线支付记录失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取待同步离线支付记录失败',
-      error: error.message
-    });
+    res.error(500, '获取待同步离线支付记录失败', error.message);
   }
 };
 
@@ -165,10 +126,7 @@ const createPaymentReminder = async (req, res) => {
     
     // 验证必要参数
     if (!billId || !userId || !reminderTime || !reminderType) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少必要参数'
-      });
+      return res.error(400, '缺少必要参数');
     }
     
     // 创建支付提醒
@@ -181,18 +139,10 @@ const createPaymentReminder = async (req, res) => {
       createdBy: req.user.id
     });
     
-    res.status(201).json({
-      success: true,
-      data: result,
-      message: '支付提醒创建成功'
-    });
+    res.success(201, '支付提醒创建成功', result);
   } catch (error) {
     console.error('创建支付提醒失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '创建支付提醒失败',
-      error: error.message
-    });
+    res.error(500, '创建支付提醒失败', error.message);
   }
 };
 
@@ -208,10 +158,7 @@ const getUserPaymentReminders = async (req, res) => {
     
     // 验证参数
     if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少用户ID'
-      });
+      return res.error(400, '缺少用户ID');
     }
     
     // 获取用户支付提醒列表
@@ -222,17 +169,10 @@ const getUserPaymentReminders = async (req, res) => {
       status
     );
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取用户支付提醒列表成功', result);
   } catch (error) {
     console.error('获取用户支付提醒列表失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取用户支付提醒列表失败',
-      error: error.message
-    });
+    res.error(500, '获取用户支付提醒列表失败', error.message);
   }
 };
 
@@ -262,17 +202,10 @@ const getPaymentRecords = async (req, res) => {
     // 获取支付记录列表
     const result = await paymentQueryService.getPaymentRecords(queryParams);
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取支付记录列表成功', result);
   } catch (error) {
     console.error('获取支付记录列表失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取支付记录列表失败',
-      error: error.message
-    });
+    res.error(500, '获取支付记录列表失败', error.message);
   }
 };
 
@@ -287,33 +220,20 @@ const getPaymentRecordById = async (req, res) => {
     
     // 验证参数
     if (!paymentId) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少支付记录ID'
-      });
+      return res.error(400, '缺少支付记录ID');
     }
     
     // 获取支付记录详情
     const result = await paymentQueryService.getPaymentRecordById(paymentId);
     
     if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: '支付记录不存在'
-      });
+      return res.error(404, '支付记录不存在');
     }
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取支付记录详情成功', result);
   } catch (error) {
     console.error('获取支付记录详情失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取支付记录详情失败',
-      error: error.message
-    });
+    res.error(500, '获取支付记录详情失败', error.message);
   }
 };
 
@@ -329,10 +249,7 @@ const getUserPaymentStats = async (req, res) => {
     
     // 验证参数
     if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少用户ID'
-      });
+      return res.error(400, '缺少用户ID');
     }
     
     // 构建查询参数
@@ -344,17 +261,10 @@ const getUserPaymentStats = async (req, res) => {
     // 获取用户支付统计
     const result = await paymentQueryService.getUserPaymentStats(queryParams);
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取用户支付统计成功', result);
   } catch (error) {
     console.error('获取用户支付统计失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取用户支付统计失败',
-      error: error.message
-    });
+    res.error(500, '获取用户支付统计失败', error.message);
   }
 };
 
@@ -370,10 +280,7 @@ const getRoomPaymentStats = async (req, res) => {
     
     // 验证参数
     if (!roomId) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少房间ID'
-      });
+      return res.error(400, '缺少房间ID');
     }
     
     // 构建查询参数
@@ -385,17 +292,10 @@ const getRoomPaymentStats = async (req, res) => {
     // 获取房间支付统计
     const result = await paymentQueryService.getRoomPaymentStats(queryParams);
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取房间支付统计成功', result);
   } catch (error) {
     console.error('获取房间支付统计失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取房间支付统计失败',
-      error: error.message
-    });
+    res.error(500, '获取房间支付统计失败', error.message);
   }
 };
 
@@ -410,26 +310,16 @@ const triggerTask = async (req, res) => {
     
     // 验证参数
     if (!taskName) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少任务名称'
-      });
+      return res.error(400, '缺少任务名称');
     }
     
     // 触发定时任务
     const result = await scheduler.triggerTask(taskName);
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '触发定时任务成功', result);
   } catch (error) {
     console.error('触发定时任务失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '触发定时任务失败',
-      error: error.message
-    });
+    res.error(500, '触发定时任务失败', error.message);
   }
 };
 
@@ -443,17 +333,10 @@ const getTaskStatus = async (req, res) => {
     // 获取定时任务状态
     const result = scheduler.getTasksStatus();
     
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    res.success(200, '获取定时任务状态成功', result);
   } catch (error) {
     console.error('获取定时任务状态失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取定时任务状态失败',
-      error: error.message
-    });
+    res.error(500, '获取定时任务状态失败', error.message);
   }
 };
 
@@ -463,13 +346,13 @@ const markSyncFailed = async (req, res) => {
     const { paymentId } = req.params;
     const { reason } = req.body;
     if (!paymentId) {
-      return res.status(400).json({ success: false, message: '缺少支付记录ID' });
+      return res.error(400, '缺少支付记录ID');
     }
     const result = await offlinePaymentService.markPaymentSyncFailed(paymentId, reason || '');
-    res.status(200).json({ success: true, data: result, message: '已标记同步失败' });
+    res.success(200, '已标记同步失败', result);
   } catch (error) {
     console.error('标记同步失败错误:', error);
-    res.status(500).json({ success: false, message: '标记同步失败错误', error: error.message });
+    res.error(500, '标记同步失败错误', error.message);
   }
 };
 
@@ -478,13 +361,13 @@ const retrySyncOfflinePayment = async (req, res) => {
   try {
     const { paymentId } = req.params;
     if (!paymentId) {
-      return res.status(400).json({ success: false, message: '缺少支付记录ID' });
+      return res.error(400, '缺少支付记录ID');
     }
     const result = await offlinePaymentService.retryPaymentSync(paymentId);
-    res.status(200).json({ success: true, data: result, message: '重试已触发' });
+    res.success(200, '重试已触发', result);
   } catch (error) {
     console.error('重试同步失败错误:', error);
-    res.status(500).json({ success: false, message: '重试同步失败错误', error: error.message });
+    res.error(500, '重试同步失败错误', error.message);
   }
 };
 

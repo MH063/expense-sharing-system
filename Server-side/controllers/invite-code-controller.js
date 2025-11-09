@@ -25,17 +25,11 @@ class InviteCodeController {
       const roomResult = await this.pool.query(roomQuery, [roomId]);
       
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({ 
-          success: false, 
-          message: '房间不存在' 
-        });
+        return res.error(404, '房间不存在');
       }
 
       if (roomResult.rows[0].creator_id !== userId) {
-        return res.status(403).json({ 
-          success: false, 
-          message: '只有房间管理员可以生成邀请码' 
-        });
+        return res.error(403, '只有房间管理员可以生成邀请码');
       }
 
       // 生成唯一的邀请码
@@ -57,17 +51,10 @@ class InviteCodeController {
       const values = [code, roomId, userId, maxUses, expirationDate];
       const result = await this.pool.query(insertQuery, values);
 
-      res.status(201).json({
-        success: true,
-        data: result.rows[0],
-        message: '邀请码生成成功'
-      });
+      res.success(201, '邀请码生成成功', result.rows[0]);
     } catch (error) {
       console.error('生成邀请码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -82,10 +69,7 @@ class InviteCodeController {
       const userId = req.user.sub;
 
       if (!code) {
-        return res.status(400).json({
-          success: false,
-          message: '邀请码不能为空'
-        });
+        return res.error(400, '邀请码不能为空');
       }
 
       // 查询邀请码信息
@@ -99,28 +83,19 @@ class InviteCodeController {
       const result = await this.pool.query(query, [code]);
       
       if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '邀请码不存在'
-        });
+        return res.error(404, '邀请码不存在');
       }
 
       const inviteCode = result.rows[0];
 
       // 检查邀请码是否已过期
       if (new Date() > new Date(inviteCode.expires_at)) {
-        return res.status(400).json({
-          success: false,
-          message: '邀请码已过期'
-        });
+        return res.error(400, '邀请码已过期');
       }
 
       // 检查邀请码是否已达到最大使用次数
       if (inviteCode.used_count >= inviteCode.max_uses) {
-        return res.status(400).json({
-          success: false,
-          message: '邀请码使用次数已达上限'
-        });
+        return res.error(400, '邀请码使用次数已达上限');
       }
 
       // 检查用户是否已经是房间成员
@@ -128,29 +103,19 @@ class InviteCodeController {
       const memberResult = await this.pool.query(memberQuery, [inviteCode.room_id, userId]);
       
       if (memberResult.rows.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: '您已经是该房间的成员'
-        });
+        return res.error(400, '您已经是该房间的成员');
       }
 
       // 返回验证成功信息
-      res.status(200).json({
-        success: true,
-        data: {
-          id: inviteCode.id,
-          room_id: inviteCode.room_id,
-          room_name: inviteCode.room_name,
-          room_admin: inviteCode.room_admin
-        },
-        message: '邀请码验证成功'
+      res.success(200, '邀请码验证成功', {
+        id: inviteCode.id,
+        room_id: inviteCode.room_id,
+        room_name: inviteCode.room_name,
+        room_admin: inviteCode.room_admin
       });
     } catch (error) {
       console.error('验证邀请码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -180,10 +145,7 @@ class InviteCodeController {
       
       if (codeResult.rows.length === 0) {
         await client.query('ROLLBACK');
-        return res.status(404).json({
-          success: false,
-          message: '邀请码不存在'
-        });
+        return res.error(404, '邀请码不存在');
       }
 
       const inviteCode = codeResult.rows[0];
@@ -191,18 +153,12 @@ class InviteCodeController {
       // 再次检查邀请码有效性
       if (new Date() > new Date(inviteCode.expires_at)) {
         await client.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          message: '邀请码已过期'
-        });
+        return res.error(400, '邀请码已过期');
       }
 
       if (inviteCode.used_count >= inviteCode.max_uses) {
         await client.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          message: '邀请码使用次数已达上限'
-        });
+        return res.error(400, '邀请码使用次数已达上限');
       }
 
       // 检查用户是否已经是房间成员
@@ -211,10 +167,7 @@ class InviteCodeController {
       
       if (memberResult.rows.length > 0) {
         await client.query('ROLLBACK');
-        return res.status(400).json({
-          success: false,
-          message: '您已经是该房间的成员'
-        });
+        return res.error(400, '您已经是该房间的成员');
       }
 
       // 将用户添加到房间
@@ -245,22 +198,15 @@ class InviteCodeController {
 
       await client.query('COMMIT');
 
-      res.status(200).json({
-        success: true,
-        data: {
-          room_id: inviteCode.room_id,
-          room_name: inviteCode.room_name,
-          member_id: joinResult.rows[0].id
-        },
-        message: '成功加入房间'
+      res.success(200, '成功加入房间', {
+        room_id: inviteCode.room_id,
+        room_name: inviteCode.room_name,
+        member_id: joinResult.rows[0].id
       });
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('使用邀请码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     } finally {
       client.release();
     }
@@ -281,17 +227,11 @@ class InviteCodeController {
       const roomResult = await this.pool.query(roomQuery, [roomId]);
       
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({ 
-          success: false, 
-          message: '房间不存在' 
-        });
+        return res.error(404, '房间不存在');
       }
 
       if (roomResult.rows[0].creator_id !== userId) {
-        return res.status(403).json({ 
-          success: false, 
-          message: '只有房间管理员可以查看邀请码' 
-        });
+        return res.error(403, '只有房间管理员可以查看邀请码');
       }
 
       // 查询邀请码列表
@@ -307,17 +247,10 @@ class InviteCodeController {
       
       const result = await this.pool.query(query, [roomId]);
 
-      res.status(200).json({
-        success: true,
-        data: result.rows,
-        message: '获取邀请码列表成功'
-      });
+      res.success(200, '获取邀请码列表成功', result.rows);
     } catch (error) {
       console.error('获取邀请码列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -342,35 +275,23 @@ class InviteCodeController {
       const result = await this.pool.query(query, [id]);
       
       if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '邀请码不存在'
-        });
+        return res.error(404, '邀请码不存在');
       }
 
       const inviteCode = result.rows[0];
 
       if (inviteCode.room_admin !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有房间管理员可以撤销邀请码'
-        });
+        return res.error(403, '只有房间管理员可以撤销邀请码');
       }
 
       // 撤销邀请码（设置过期时间为当前时间）
       const revokeQuery = 'UPDATE invite_codes SET revoked = TRUE, updated_at = NOW() WHERE id = $1';
       await this.pool.query(revokeQuery, [id]);
 
-      res.status(200).json({
-        success: true,
-        message: '邀请码已撤销'
-      });
+      res.success(200, '邀请码已撤销');
     } catch (error) {
       console.error('撤销邀请码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 

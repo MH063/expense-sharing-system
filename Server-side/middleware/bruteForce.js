@@ -61,7 +61,7 @@ function loginBruteProtector(req, res, next) {
   const status = isBlocked(ip, username);
   if (status.blocked) {
     logger.warn('登录被防暴力机制阻止', { ip, username, reason: status.reason });
-    return res.status(429).json({ success: false, message: '尝试次数过多，请稍后再试' });
+    return res.tooManyRequests('尝试次数过多，请稍后再试');
   }
   // 挂载帮助函数，供控制器在失败/成功时调用
   req._recordLoginFailure = () => recordFailure(ip, username);

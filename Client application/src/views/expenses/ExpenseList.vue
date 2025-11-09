@@ -629,9 +629,8 @@ const loadExpensesData = async (loadAllData = false) => {
       limit: itemsPerPage
     })
     
-    if (expensesResponse.success && expensesResponse.data) {
-      // 后端统一返回 { success, data }，其中 data 可能包含分页结构 { data, total }
-      const payload = expensesResponse.data
+    if (expensesResponse.success && expensesResponse.payload) {
+      const payload = expensesResponse.payload
       expenses.value = Array.isArray(payload) ? payload : (payload.data || [])
       console.log('费用列表加载成功:', expenses.value)
     } else {
@@ -644,11 +643,11 @@ const loadExpensesData = async (loadAllData = false) => {
       console.log('加载费用类别列表')
       const categoriesResponse = await expenseApi.getExpenseCategories()
       
-      if (categoriesResponse.data && categoriesResponse.data.success) {
-        categories.value = categoriesResponse.data.data || []
+      if (categoriesResponse.success) {
+        categories.value = categoriesResponse.payload || []
         console.log('费用类别列表加载成功:', categories.value)
       } else {
-        console.error('费用类别列表加载失败:', categoriesResponse.data?.message || '未知错误')
+        console.error('费用类别列表加载失败:', categoriesResponse.message || '未知错误')
       }
     }
     
@@ -658,13 +657,13 @@ const loadExpensesData = async (loadAllData = false) => {
       console.log('加载寝室成员列表')
       const roomsResponse = await roomsApi.getUserRooms()
       
-      if (roomsResponse.success && roomsResponse.data) {
+      if (roomsResponse.success && roomsResponse.payload) {
         // 获取第一个房间的成员列表
-        const rooms = roomsResponse.data || []
+        const rooms = roomsResponse.payload || []
         if (rooms.length > 0) {
           const membersResponse = await roomsApi.getRoomMembers(rooms[0].id)
-          if (membersResponse.success && membersResponse.data) {
-            roomMembers.value = membersResponse.data || []
+          if (membersResponse.success) {
+            roomMembers.value = membersResponse.payload || []
             console.log('寝室成员列表加载成功:', roomMembers.value)
           } else {
             console.error('寝室成员列表加载失败:', membersResponse.message || '未知错误')

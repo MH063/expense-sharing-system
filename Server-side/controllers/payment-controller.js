@@ -55,7 +55,7 @@ class PaymentController {
           qr_type
         });
         
-        return res.status(400).json({ success: false, message: '收款码类型必须是wechat或alipay' });
+        return res.error(400, '收款码类型必须是wechat或alipay');
       }
 
       // 检查账单是否存在
@@ -75,7 +75,7 @@ class PaymentController {
           billId
         });
         
-        return res.status(404).json({ success: false, message: '账单不存在' });
+        return res.error(404, '账单不存在');
       }
 
       const bill = billCheck.rows[0];
@@ -95,7 +95,7 @@ class PaymentController {
           roomId: bill.room_id
         });
         
-        return res.status(403).json({ success: false, message: '您没有权限查看此账单' });
+        return res.error(403, '您没有权限查看此账单');
       }
 
       // 获取账单分摊信息
@@ -117,7 +117,7 @@ class PaymentController {
           billId
         });
         
-        return res.status(403).json({ success: false, message: '您不在此账单的分摊中' });
+        return res.error(403, '您不在此账单的分摊中');
       }
 
       // 检查用户是否已支付
@@ -128,7 +128,7 @@ class PaymentController {
           billId
         });
         
-        return res.status(400).json({ success: false, message: '您已支付此账单' });
+        return res.error(400, '您已支付此账单');
       }
 
       // 获取收款人的默认收款码
@@ -149,7 +149,7 @@ class PaymentController {
           payeeId: bill.payee_id || bill.creator_id
         });
         
-        return res.status(404).json({ success: false, message: `收款人未设置默认的${qr_type === 'wechat' ? '微信' : '支付宝'}收款码` });
+        return res.error(404, `收款人未设置默认的${qr_type === 'wechat' ? '微信' : '支付宝'}收款码`);
       }
 
       // 构建支付信息
@@ -181,7 +181,7 @@ class PaymentController {
         duration
       });
 
-      res.status(200).json({ success: true, data: { payment_info: paymentInfo } });
+      res.success(200, '获取账单收款码成功', { payment_info: paymentInfo });
     } catch (error) {
       const duration = Date.now() - startTime;
       
@@ -195,7 +195,7 @@ class PaymentController {
         duration
       });
       
-      res.status(500).json({ success: false, message: '获取账单收款码失败', error: error.message });
+      res.error(500, '获取账单收款码失败', error.message);
     } finally {
       client.release();
     }
@@ -237,7 +237,7 @@ class PaymentController {
           amount
         });
         
-        return res.status(400).json({ success: false, message: '请提供完整的支付信息' });
+        return res.error(400, '请提供完整的支付信息');
       }
       
       // 验证支付方式
@@ -249,7 +249,7 @@ class PaymentController {
           paymentMethod
         });
         
-        return res.status(400).json({ success: false, message: '无效的支付方式' });
+        return res.error(400, '无效的支付方式');
       }
 
       // 检查账单是否存在
@@ -264,7 +264,7 @@ class PaymentController {
           billId
         });
         
-        return res.status(404).json({ success: false, message: '账单不存在' });
+        return res.error(404, '账单不存在');
       }
       const bill = billCheck.rows[0];
 
@@ -281,7 +281,7 @@ class PaymentController {
           roomId: bill.room_id
         });
         
-        return res.status(403).json({ success: false, message: '您没有权限支付此账单' });
+        return res.error(403, '您没有权限支付此账单');
       }
 
       // 获取用户的分摊信息
@@ -296,7 +296,7 @@ class PaymentController {
           billId
         });
         
-        return res.status(403).json({ success: false, message: '您不在此账单的分摊中' });
+        return res.error(403, '您不在此账单的分摊中');
       }
       const userSplit = splitCheck.rows[0];
 
@@ -314,7 +314,7 @@ class PaymentController {
           existingPaymentId: existingByTxn.rows[0].id
         });
         
-        return res.status(200).json({ success: true, data: { payment: existingByTxn.rows[0], message: '重复请求（已确认）' } });
+        return res.success(200, '重复请求（已确认）', { payment: existingByTxn.rows[0] });
       }
       if (idempotencyKey) {
         const idemCheck = await client.query(
@@ -330,7 +330,7 @@ class PaymentController {
             existingPaymentId: idemCheck.rows[0].id
           });
           
-          return res.status(200).json({ success: true, data: { payment: idemCheck.rows[0], message: '重复请求（已确认）' } });
+          return res.success(200, '重复请求（幂等性键）', { payment: idemCheck.rows[0] });
         }
       }
 
@@ -388,7 +388,7 @@ class PaymentController {
         duration
       });
 
-      res.status(200).json({ success: true, data: { payment: confirmed.rows[0], message: '支付确认成功' } });
+      res.success(200, '支付确认成功', { payment: confirmed.rows[0] });
     } catch (error) {
       await client.query('ROLLBACK');
       
@@ -406,7 +406,7 @@ class PaymentController {
         duration
       });
       
-      res.status(500).json({ success: false, message: '确认支付失败', error: error.message });
+      res.error(500, '确认支付失败', error.message);
     } finally {
       client.release();
     }
@@ -446,7 +446,7 @@ class PaymentController {
           billId
         });
         
-        return res.status(404).json({ success: false, message: '账单不存在' });
+        return res.error(404, '账单不存在');
       }
 
       const bill = billCheck.rows[0];
@@ -466,7 +466,7 @@ class PaymentController {
           roomId: bill.room_id
         });
         
-        return res.status(403).json({ success: false, message: '您没有权限查看此账单' });
+        return res.error(403, '您没有权限查看此账单');
       }
 
       // 获取账单分摊信息
@@ -520,7 +520,7 @@ class PaymentController {
         duration
       });
 
-      res.status(200).json({ success: true, data: { payment_status: paymentStatus } });
+      res.success(200, '获取账单支付状态成功', { payment_status: paymentStatus });
     } catch (error) {
       const duration = Date.now() - startTime;
       
@@ -533,7 +533,7 @@ class PaymentController {
         duration
       });
       
-      res.status(500).json({ success: false, message: '获取账单支付状态失败', error: error.message });
+      res.error(500, '获取账单支付状态失败', error.message);
     } finally {
       client.release();
     }
@@ -618,16 +618,13 @@ class PaymentController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          payments: paymentsResult.rows,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / limit)
-          }
+      res.success(200, '获取用户支付记录成功', {
+        payments: paymentsResult.rows,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
         }
       });
     } catch (error) {
@@ -645,7 +642,7 @@ class PaymentController {
         duration
       });
       
-      res.status(500).json({ success: false, message: '获取用户支付记录失败', error: error.message });
+      res.error(500, '获取用户支付记录失败', error.message);
     } finally {
       client.release();
     }

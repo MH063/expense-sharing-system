@@ -71,10 +71,7 @@ class ExpenseController {
           }
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '缺少必填字段'
-        });
+        return res.error(400, '缺少必填字段');
       }
 
       // 验证selected_members参数
@@ -84,10 +81,7 @@ class ExpenseController {
           selected_members
         });
         
-        return res.status(400).json({
-          success: false,
-          message: 'selected_members参数必须是数组'
-        });
+        return res.error(400, 'selected_members参数必须是数组');
       }
 
       // 如果是读数计算方式，验证必填字段
@@ -104,10 +98,7 @@ class ExpenseController {
             }
           });
           
-          return res.status(400).json({
-            success: false,
-            message: '读数计算方式需要提供表计类型、本次读数、上次读数和单价'
-          });
+          return res.error(400, '读数计算方式需要提供表计类型、本次读数、上次读数和单价');
         }
         
         // 验证读数是否合理
@@ -118,10 +109,7 @@ class ExpenseController {
             previous_reading
           });
           
-          return res.status(400).json({
-            success: false,
-            message: '本次读数不能小于上次读数'
-          });
+          return res.error(400, '本次读数不能小于上次读数');
         }
         
         // 计算用量和总费用
@@ -136,20 +124,14 @@ class ExpenseController {
             providedAmount: amount
           });
           
-          return res.status(400).json({
-            success: false,
-            message: `计算金额(${calculatedAmount})与提供金额(${amount})不一致`
-          });
+          return res.error(400, `计算金额(${calculatedAmount})与提供金额(${amount})不一致`);
         }
       } else if (!amount) {
         logger.warn(`[${requestId}] 创建费用记录失败: 金额计算方式需要提供金额`, {
           requestId
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '金额计算方式需要提供金额'
-        });
+        return res.error(400, '金额计算方式需要提供金额');
       }
 
       // 验证用户是否是寝室成员
@@ -165,10 +147,7 @@ class ExpenseController {
           roomId: room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+        return res.error(403, '您不是该寝室的成员');
       }
 
       // 验证费用类型是否存在
@@ -183,10 +162,7 @@ class ExpenseController {
           expense_type_id
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '费用类型不存在'
-        });
+        return res.error(404, '费用类型不存在');
       }
 
       // 开始事务
@@ -268,10 +244,7 @@ class ExpenseController {
             });
             
             await client.query('ROLLBACK');
-            return res.status(400).json({
-              success: false,
-              message: '没有找到有效的分摊成员'
-            });
+            return res.error(400, '没有找到有效的分摊成员');
           }
           
           // 使用尾差处理机制确保分摊总额等于实际金额
@@ -425,11 +398,7 @@ class ExpenseController {
           duration
         });
 
-        res.status(201).json({
-          success: true,
-          message: '费用记录创建成功',
-          data: fullExpense
-        });
+        res.success(201, '费用记录创建成功', fullExpense);
 
       } catch (error) {
         await client.query('ROLLBACK');
@@ -451,10 +420,7 @@ class ExpenseController {
         stack: error.stack,
         duration
       });
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误', error.message);
     }
   }
 
@@ -488,15 +454,12 @@ class ExpenseController {
       const userRoomIds = userRoomsResult.rows.map(row => row.room_id);
       
       if (userRoomIds.length === 0) {
-        return res.status(200).json({
-          success: true,
-          message: '获取费用列表成功',
-          data: {
-            expenses: [],
-            pagination: {
-              page: parseInt(page),
-              limit: parseInt(limit),
-              total: 0,
+        return res.success(200, '获取费用列表成功', {
+          expenses: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: 0,
               totalPages: 0
             }
           }
@@ -567,26 +530,19 @@ class ExpenseController {
 
       logger.info(`获取费用列表成功，共 ${totalCount} 条记录`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取费用列表成功',
-        data: {
-          expenses,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: totalCount,
-            totalPages: Math.ceil(totalCount / limit)
-          }
+      res.success(200, '获取费用列表成功', {
+        expenses,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
         }
       });
 
     } catch (error) {
       logger.error('获取费用列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误', error.message);
     }
   }
 
@@ -613,10 +569,7 @@ class ExpenseController {
       );
 
       if (expenseResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '费用记录不存在'
-        });
+        return res.error(404, '费用记录不存在');
       }
 
       const expense = expenseResult.rows[0];
@@ -628,10 +581,7 @@ class ExpenseController {
       );
 
       if (membershipResult.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看该费用记录'
-        });
+        return res.error(403, '您没有权限查看该费用记录');
       }
 
       // 查询分摊详情
@@ -649,18 +599,11 @@ class ExpenseController {
 
       logger.info(`获取费用详情成功: ${expense.title} (ID: ${expense.id})`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取费用详情成功',
-        data: expense
-      });
+      res.success(200, '获取费用详情成功', expense);
 
     } catch (error) {
       logger.error('获取费用详情失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误', error.message);
     }
   }
 
@@ -710,10 +653,7 @@ class ExpenseController {
           expenseId: id
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '费用记录不存在'
-        });
+        return res.error(404, '费用记录不存在');
       }
 
       const expense = expenseResult.rows[0];
@@ -747,10 +687,7 @@ class ExpenseController {
           roomId: expense.room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+        return res.error(403, '您不是该寝室的成员');
       }
 
       // 验证selected_members参数
@@ -1126,11 +1063,7 @@ class ExpenseController {
           duration
         });
 
-        res.status(200).json({
-          success: true,
-          message: '费用记录更新成功',
-          data: fullExpense
-        });
+        res.success(200, '费用记录更新成功', fullExpense);
 
       } catch (error) {
         await client.query('ROLLBACK');
@@ -1152,10 +1085,7 @@ class ExpenseController {
         stack: error.stack,
         duration
       });
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误', error.message);
     }
   }
 
@@ -1201,10 +1131,7 @@ class ExpenseController {
           creatorId: expense.creator_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '只有费用创建者可以删除费用记录'
-        });
+        return res.error(403, '只有费用创建者可以删除费用记录');
       }
 
       // 开始事务
@@ -1240,10 +1167,7 @@ class ExpenseController {
           duration
         });
 
-        res.status(200).json({
-          success: true,
-          message: '费用记录删除成功'
-        });
+        res.success(200, '费用记录删除成功');
 
       } catch (error) {
         await client.query('ROLLBACK');
@@ -1271,10 +1195,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误', error.message);
     }
   }
 
@@ -1311,10 +1232,7 @@ class ExpenseController {
           userId
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '分摊记录不存在'
-        });
+        return res.error(404, '分摊记录不存在');
       }
 
       const split = splitResult.rows[0];
@@ -1328,10 +1246,7 @@ class ExpenseController {
           splitUserId: split.user_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '只有分摊人本人可以确认支付'
-        });
+        return res.error(403, '只有分摊人本人可以确认支付');
       }
 
       // 验证用户是否是寝室成员
@@ -1348,10 +1263,7 @@ class ExpenseController {
           roomId: split.room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+        return res.error(403, '您不是该寝室的成员');
       }
 
       // 检查是否已经支付
@@ -1363,10 +1275,7 @@ class ExpenseController {
           paidDate: split.paid_date
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '该分摊已确认支付'
-        });
+        return res.error(400, '该分摊已确认支付');
       }
 
       // 更新支付状态
@@ -1391,11 +1300,7 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        message: '支付确认成功',
-        data: updatedSplit
-      });
+      res.success(200, '支付确认成功', updatedSplit);
 
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -1409,10 +1314,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误', error.message);
     }
   }
 
@@ -1446,10 +1348,7 @@ class ExpenseController {
           split_type
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '缺少必填字段'
-        });
+        return res.error(400, '缺少必填字段');
       }
 
       // 验证金额是否为有效数字
@@ -1460,10 +1359,7 @@ class ExpenseController {
           amount
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '金额必须是大于0的数字'
-        });
+        return res.error(400, '金额必须是大于0的数字');
       }
 
       // 验证用户是否是寝室成员
@@ -1479,10 +1375,7 @@ class ExpenseController {
           room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+        return res.error(403, '您不是该寝室的成员');
       }
 
       // 获取寝室成员
@@ -1538,10 +1431,7 @@ class ExpenseController {
               detail
             });
             
-            return res.status(400).json({
-              success: false,
-              message: '分摊详情包含无效数据'
-            });
+            return res.error(400, '分摊详情包含无效数据');
           }
           
           splitDetailsMap.set(detail.user_id, parseFloat(detail.amount));
@@ -1578,10 +1468,7 @@ class ExpenseController {
               detail
             });
             
-            return res.status(400).json({
-              success: false,
-              message: '分摊详情包含无效数据'
-            });
+            return res.error(400, '分摊详情包含无效数据');
           }
           
           const percentage = parseFloat(detail.percentage);
@@ -1629,10 +1516,7 @@ class ExpenseController {
             endDate
           });
           
-          return res.status(400).json({
-            success: false,
-            message: '按在寝天数分摊需要提供开始日期和结束日期'
-          });
+          return res.error(400, '按在寝天数分摊需要提供开始日期和结束日期');
         }
         
         try {
@@ -1666,10 +1550,7 @@ class ExpenseController {
             stack: error.stack
           });
           
-          return res.status(500).json({
-            success: false,
-            message: '按在寝天数分摊计算失败: ' + error.message
-          });
+          return res.error(500, '按在寝天数分摊计算失败: ' + error.message);
         }
       } else {
         logger.warn(`[${requestId}] 智能分摊计算失败: 无效的分摊类型`, {
@@ -1679,10 +1560,7 @@ class ExpenseController {
           split_details_count: split_details ? split_details.length : 0
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '无效的分摊类型或缺少分摊详情'
-        });
+        return res.error(400, '无效的分摊类型或缺少分摊详情');
       }
 
       // 计算总和验证
@@ -1701,17 +1579,13 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        message: '智能分摊计算成功',
-        data: {
-          room_id,
-          total_amount: totalAmount,
-          split_type,
-          split_details: splitResult,
-          calculated_total: PrecisionCalculator.formatCurrency(calculatedTotal),
-          difference: PrecisionCalculator.formatCurrency(difference)
-        }
+      res.success(200, '智能分摊计算成功', {
+        room_id,
+        total_amount: totalAmount,
+        split_type,
+        split_details: splitResult,
+        calculated_total: PrecisionCalculator.formatCurrency(calculatedTotal),
+        difference: PrecisionCalculator.formatCurrency(difference)
       });
 
     } catch (error) {
@@ -1725,10 +1599,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误', error.message);
     }
   }
 
@@ -1759,10 +1630,7 @@ class ExpenseController {
           qr_type
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '收款码类型必须是wechat或alipay'
-        });
+        return res.error(400, '收款码类型必须是wechat或alipay');
       }
 
       // 检查费用是否存在
@@ -1782,10 +1650,7 @@ class ExpenseController {
           expenseId
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '费用不存在'
-        });
+        return res.error(404, '费用不存在');
       }
 
       const expense = expenseCheck.rows[0];
@@ -1805,10 +1670,7 @@ class ExpenseController {
           roomId: expense.room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看此费用'
-        });
+        return res.error(403, '您没有权限查看此费用');
       }
 
       // 获取费用分摊信息
@@ -1831,10 +1693,7 @@ class ExpenseController {
           splitCount: splitDetails.rows.length
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您不在此费用的分摊中'
-        });
+        return res.error(403, '您不在此费用的分摊中');
       }
 
       // 检查用户是否已支付
@@ -1846,10 +1705,7 @@ class ExpenseController {
           isPaid: userSplit.is_paid
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '您已支付此费用'
-        });
+        return res.error(400, '您已支付此费用');
       }
 
       // 获取收款人的收款码
@@ -1870,10 +1726,7 @@ class ExpenseController {
           qr_type
         });
         
-        return res.status(404).json({
-          success: false,
-          message: `收款人未设置默认的${qr_type === 'wechat' ? '微信' : '支付宝'}收款码`
-        });
+        return res.error(404, `收款人未设置默认的${qr_type === 'wechat' ? '微信' : '支付宝'}收款码`);
       }
 
       // 构建支付信息
@@ -1904,12 +1757,7 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          payment_info: paymentInfo
-        }
-      });
+      res.success(200, '获取费用收款码成功', { payment_info: paymentInfo });
     } catch (error) {
       const duration = Date.now() - startTime;
       
@@ -1922,11 +1770,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '获取费用收款码失败',
-        error: error.message
-      });
+      res.error(500, '获取费用收款码失败', error.message);
     } finally {
       client.release();
     }
@@ -1963,10 +1807,7 @@ class ExpenseController {
           payment_time
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '请提供完整的支付信息'
-        });
+        return res.error(400, '请提供完整的支付信息');
       }
 
       // 验证支付方式
@@ -1978,10 +1819,7 @@ class ExpenseController {
           payment_method
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '无效的支付方式'
-        });
+        return res.error(400, '无效的支付方式');
       }
 
       // 检查费用是否存在
@@ -2000,10 +1838,7 @@ class ExpenseController {
           expenseId
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '费用不存在'
-        });
+        return res.error(404, '费用不存在');
       }
 
       const expense = expenseCheck.rows[0];
@@ -2023,10 +1858,7 @@ class ExpenseController {
           roomId: expense.room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限支付此费用'
-        });
+        return res.error(403, '您没有权限支付此费用');
       }
 
       // 获取用户的分摊信息
@@ -2043,10 +1875,7 @@ class ExpenseController {
           expenseId
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您不在此费用的分摊中'
-        });
+        return res.error(403, '您不在此费用的分摊中');
       }
 
       const userSplit = splitCheck.rows[0];
@@ -2067,10 +1896,7 @@ class ExpenseController {
           paymentCount: existingPayment.rows.length
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '您已支付此费用'
-        });
+        return res.error(400, '您已支付此费用');
       }
 
       await client.query('BEGIN');
@@ -2180,12 +2006,9 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          payment: paymentResult.rows[0],
-          message: '支付确认成功'
-        }
+      res.success(200, '支付确认成功', { 
+        payment: paymentResult.rows[0],
+        message: '支付确认成功'
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -2200,11 +2023,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '确认费用支付失败',
-        error: error.message
-      });
+      res.error(500, '确认费用支付失败', error.message);
     } finally {
       client.release();
     }
@@ -2242,10 +2061,7 @@ class ExpenseController {
           expenseId
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '费用不存在'
-        });
+        return res.error(404, '费用不存在');
       }
 
       const expense = expenseCheck.rows[0];
@@ -2265,10 +2081,7 @@ class ExpenseController {
           roomId: expense.room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看此费用'
-        });
+        return res.error(403, '您没有权限查看此费用');
       }
 
       // 获取费用分摊信息
@@ -2319,12 +2132,7 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          payment_status: paymentStatus
-        }
-      });
+      res.success(200, '获取费用支付状态成功', { payment_status: paymentStatus });
     } catch (error) {
       const duration = Date.now() - startTime;
       
@@ -2337,11 +2145,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '获取费用支付状态失败',
-        error: error.message
-      });
+      res.error(500, '获取费用支付状态失败', error.message);
     } finally {
       client.release();
     }
@@ -2414,16 +2218,13 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          payments: paymentsResult.rows,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / limit)
-          }
+      res.success(200, '获取用户费用支付记录成功', {
+        payments: paymentsResult.rows,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
         }
       });
     } catch (error) {
@@ -2440,11 +2241,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '获取用户费用支付记录失败',
-        error: error.message
-      });
+      res.error(500, '获取用户费用支付记录失败', error.message);
     } finally {
       client.release();
     }
@@ -2621,10 +2418,7 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        data: statsData
-      });
+      res.success(200, '获取费用统计成功', statsData);
     } catch (error) {
       const duration = Date.now() - startTime;
       
@@ -2639,11 +2433,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '获取费用统计失败',
-        error: error.message
-      });
+      res.error(500, '获取费用统计失败', error.message);
     } finally {
       client.release();
     }
@@ -2678,10 +2468,7 @@ class ExpenseController {
           room_id
         });
         
-        return res.status(403).json({
-          success: false,
-          message: '您不属于该寝室，无法查看寝室成员'
-        });
+        return res.error(403, '您不属于该寝室，无法查看寝室成员');
       }
 
       // 获取寝室所有活跃成员
@@ -2704,10 +2491,7 @@ class ExpenseController {
         duration
       });
 
-      res.status(200).json({
-        success: true,
-        data: membersResult.rows
-      });
+      res.success(200, '获取寝室成员列表成功', membersResult.rows);
     } catch (error) {
       const duration = Date.now() - startTime;
       
@@ -2720,11 +2504,7 @@ class ExpenseController {
         duration
       });
       
-      res.status(500).json({
-        success: false,
-        message: '获取寝室成员列表失败',
-        error: error.message
-      });
+      res.error(500, '获取寝室成员列表失败', error.message);
     } finally {
       client.release();
     }

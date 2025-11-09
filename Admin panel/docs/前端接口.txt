@@ -40,13 +40,13 @@
 ## 三、费用管理接口 (expenses.js)
 1. 获取费用列表 - GET /expenses
 2. 获取费用详情 - GET /expenses/{expenseId}
-3. 创建费用记录 - POST /expenses
+3. 创建费用记录 - POST /expenses（请求体中添加split_algorithm和period_start_date、period_end_date字段）
 4. 更新费用记录 - PUT /expenses/{expenseId}
 5. 删除费用记录 - DELETE /expenses/{expenseId}
 6. 批量删除费用记录 - POST /expenses/batch-delete
 7. 获取费用分类列表 - GET /expenses/categories
-8. 创建费用分类 - POST /expenses/categories
-9. 更新费用分类 - PUT /expenses/categories/{categoryId}
+8. 创建费用分类 - POST /expenses/categories（请求体中添加supports_days_based_split字段）
+9. 更新费用分类 - PUT /expenses/categories/{categoryId}（请求体中添加supports_days_based_split字段）
 10. 删除费用分类 - DELETE /expenses/categories/{categoryId}
 11. 获取费用统计 - GET /expenses/statistics
 12. 获取费用分类统计 - GET /expenses/category-stats
@@ -58,6 +58,18 @@
 18. 导出费用记录 - GET /expenses/export
 19. 上传费用凭证 - POST /expenses/{expenseId}/receipt
 20. 删除费用凭证 - DELETE /expenses/{expenseId}/receipt/{receiptId}
+21. 按在寝天数计算分摊 - POST /expenses/{expenseId}/calculate-days-based-split
+## 十九、请假记录接口 (leave-records.js)
+1. 获取请假记录列表 - GET /leave-records
+2. 获取请假记录详情 - GET /leave-records/{id}
+3. 创建请假记录 - POST /leave-records
+4. 更新请假记录 - PUT /leave-records/{id}
+5. 删除请假记录 - DELETE /leave-records/{id}
+6. 获取用户请假记录 - GET /leave-records/user/{userId}
+7. 获取房间请假记录 - GET /leave-records/room/{roomId}
+8. 批量导入请假记录 - POST /leave-records/batch-import
+9. 获取请假统计数据 - GET /leave-records/statistics
+10. 获取在寝天数统计 - GET /leave-records/days-statistics
 ## 四、房间管理接口 (rooms.js)
 1. 获取用户加入的房间列表 - GET /rooms/my-rooms
 2. 获取房间详情 - GET /rooms/{roomId}

@@ -26,18 +26,10 @@ class UserPreferencesController {
       
       logger.info(`获取用户偏好设置成功，用户ID: ${userId}`);
       
-      res.status(200).json({
-        success: true,
-        data: preferences,
-        message: '获取用户偏好设置成功'
-      });
+      res.success(200, '获取用户偏好设置成功', preferences);
     } catch (error) {
       logger.error('获取用户偏好设置失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取用户偏好设置失败',
-        error: error.message
-      });
+      res.error(500, '获取用户偏好设置失败', error.message);
     }
   }
 
@@ -54,26 +46,15 @@ class UserPreferencesController {
       const preference = await userPreferencesService.getUserPreference(userId, category, key);
       
       if (!preference) {
-        return res.status(404).json({
-          success: false,
-          message: '偏好设置不存在'
-        });
+        return res.error(404, '偏好设置不存在');
       }
       
       logger.info(`获取用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
       
-      res.status(200).json({
-        success: true,
-        data: preference,
-        message: '获取用户偏好设置成功'
-      });
+      res.success(200, '获取用户偏好设置成功', preference);
     } catch (error) {
       logger.error('获取用户偏好设置失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取用户偏好设置失败',
-        error: error.message
-      });
+      res.error(500, '获取用户偏好设置失败', error.message);
     }
   }
 
@@ -89,28 +70,17 @@ class UserPreferencesController {
       const { value } = req.body;
       
       if (value === undefined) {
-        return res.status(400).json({
-          success: false,
-          message: '偏好设置值不能为空'
-        });
+        return res.error(400, '偏好设置值不能为空');
       }
       
       const preference = await userPreferencesService.upsertUserPreference(userId, category, key, value);
       
       logger.info(`更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
       
-      res.status(200).json({
-        success: true,
-        data: preference,
-        message: '更新用户偏好设置成功'
-      });
+      res.success(200, '更新用户偏好设置成功', preference);
     } catch (error) {
       logger.error('更新用户偏好设置失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '更新用户偏好设置失败',
-        error: error.message
-      });
+      res.error(500, '更新用户偏好设置失败', error.message);
     }
   }
 
@@ -126,28 +96,17 @@ class UserPreferencesController {
       const { preferences } = req.body;
       
       if (!preferences || typeof preferences !== 'object') {
-        return res.status(400).json({
-          success: false,
-          message: '偏好设置对象不能为空'
-        });
+        return res.error(400, '偏好设置对象不能为空');
       }
       
       const results = await userPreferencesService.batchUpdateUserPreferences(userId, category, preferences);
       
       logger.info(`批量更新用户偏好设置成功，用户ID: ${userId}, 类别: ${category}`);
       
-      res.status(200).json({
-        success: true,
-        data: results,
-        message: '批量更新用户偏好设置成功'
-      });
+      res.success(200, '批量更新用户偏好设置成功', results);
     } catch (error) {
       logger.error('批量更新用户偏好设置失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '批量更新用户偏好设置失败',
-        error: error.message
-      });
+      res.error(500, '批量更新用户偏好设置失败', error.message);
     }
   }
 
@@ -164,25 +123,15 @@ class UserPreferencesController {
       const success = await userPreferencesService.deleteUserPreference(userId, category, key);
       
       if (!success) {
-        return res.status(404).json({
-          success: false,
-          message: '偏好设置不存在'
-        });
+        return res.error(404, '偏好设置不存在');
       }
       
       logger.info(`删除用户偏好设置成功，用户ID: ${userId}, 类别: ${category}, 键: ${key}`);
       
-      res.status(200).json({
-        success: true,
-        message: '删除用户偏好设置成功'
-      });
+      res.success(200, '删除用户偏好设置成功');
     } catch (error) {
       logger.error('删除用户偏好设置失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '删除用户偏好设置失败',
-        error: error.message
-      });
+      res.error(500, '删除用户偏好设置失败', error.message);
     }
   }
 }

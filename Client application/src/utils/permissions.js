@@ -52,7 +52,14 @@ export const PERMISSIONS = {
   
   // 个人信息权限
   PROFILE_VIEW: 'profile:view',                    // 查看个人资料
-  PROFILE_EDIT: 'profile:edit'                     // 编辑个人资料
+  PROFILE_EDIT: 'profile:edit',                    // 编辑个人资料
+  
+  // 请假记录权限
+  LEAVE_RECORD_CREATE: 'leave_record:create',       // 创建请假记录
+  LEAVE_RECORD_VIEW: 'leave_record:view',           // 查看请假记录
+  LEAVE_RECORD_EDIT: 'leave_record:edit',           // 编辑请假记录
+  LEAVE_RECORD_DELETE: 'leave_record:delete',       // 删除请假记录
+  LEAVE_RECORD_APPROVE: 'leave_record:approve'      // 审批请假记录
 }
 
 // 角色权限映射
@@ -90,7 +97,21 @@ export const ROLE_PERMISSIONS = {
     
     // 个人信息权限
     PERMISSIONS.PROFILE_VIEW,
-    PERMISSIONS.PROFILE_EDIT
+    PERMISSIONS.PROFILE_EDIT,
+    
+    // 请假记录权限
+    PERMISSIONS.LEAVE_RECORD_CREATE,
+    PERMISSIONS.LEAVE_RECORD_VIEW,
+    PERMISSIONS.LEAVE_RECORD_EDIT,
+    PERMISSIONS.LEAVE_RECORD_DELETE,
+    PERMISSIONS.LEAVE_RECORD_APPROVE,
+    
+    // 请假记录权限
+    PERMISSIONS.LEAVE_RECORD_CREATE,
+    PERMISSIONS.LEAVE_RECORD_VIEW,
+    PERMISSIONS.LEAVE_RECORD_EDIT,
+    PERMISSIONS.LEAVE_RECORD_DELETE,
+    PERMISSIONS.LEAVE_RECORD_APPROVE
   ],
   
   [ROLES.ADMIN]: [

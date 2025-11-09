@@ -19,8 +19,14 @@
     "docs:check": "cd Server-side && npm run docs:check"
   },
   "devDependencies": {
+    "@pinia/testing": "^1.0.3",
+    "@vitest/coverage-v8": "^4.0.8",
+    "@vitest/ui": "^4.0.8",
+    "@vue/test-utils": "^2.4.6",
     "codebuddy": "^1.0.0",
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.1.2",
+    "jsdom": "^27.1.0",
+    "vitest": "^4.0.8"
   },
   "engines": {
     "node": ">=18.0.0",

@@ -22,20 +22,20 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.post('/upload', authenticateToken, roleAwareRateLimiter('strict'), upload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ success: false, message: '未接收到文件' });
-  res.status(201).json({ success: true, file: { filename: req.file.filename, size: req.file.size } });
+  if (!req.file) return res.clientError('未接收到文件');
+  res.success(201, '文件上传成功', { filename: req.file.filename, size: req.file.size });
 });
 
 router.get('/', authenticateToken, roleAwareRateLimiter('loose'), async (req, res) => {
   const files = fs.readdirSync(uploadDir).map(name => ({ name }));
-  res.status(200).json({ success: true, files });
+  res.success(200, '获取文件列表成功', files);
 });
 
 router.delete('/:name', authenticateToken, roleAwareRateLimiter('strict'), async (req, res) => {
   const filePath = path.join(uploadDir, req.params.name);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, message: '文件不存在' });
+  if (!fs.existsSync(filePath)) return res.notFound('文件不存在');
   fs.unlinkSync(filePath);
-  res.status(200).json({ success: true, message: '已删除' });
+  res.success(200, '文件删除成功');
 });
 
 module.exports = router;

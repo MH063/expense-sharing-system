@@ -122,11 +122,9 @@
                 查看
               </el-button>
               <el-button type="success" size="small" @click="confirmAbnormal(row)" v-if="row.status === 'pending'">
-                <el-icon><Check /></el-icon>
                 确认
               </el-button>
               <el-button type="warning" size="small" @click="ignoreAbnormal(row)" v-if="row.status === 'pending'">
-                <el-icon><Close /></el-icon>
                 忽略
               </el-button>
             </template>
@@ -266,7 +264,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Refresh, Plus, Edit, Delete, View, Check, Close } from '@element-plus/icons-vue'
+import { Download, Refresh, Plus, Edit, Delete, View } from '@element-plus/icons-vue'
 
 // 响应式数据
 const loading = ref(false)
@@ -539,9 +537,6 @@ const saveRule = async () => {
     ElMessage.error('保存规则失败，请重试')
   } finally {
     loading.value = false
-  }
-  catch (error) {
-    console.log('表单验证失败:', error)
   }
 }
 

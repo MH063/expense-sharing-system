@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import errorHandler from '@/utils/errorHandler'
 
 // 工具函数：类型与键名转换
 const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]'
@@ -122,43 +122,36 @@ request.interceptors.response.use(
 
     const normalized = {
       success,
-      data: dataCamel,
       message,
       code,
+      payload: dataCamel,
       raw
     }
 
-    // 兼容旧用法：调用方仍可用 response.data.xxx 访问
-    return normalized
+    // 兼容返回：
+    // - 新用法：res.success / res.payload（载荷）
+    // - 旧用法：res.data.success / res.data.data（载荷）
+    const envelope = {
+      success: normalized.success,
+      data: normalized.payload,
+      message: normalized.message,
+      code: normalized.code
+    }
+    return { ...normalized, data: envelope }
   },
   (error) => {
-    console.error('[Admin][HTTP响应错误]', error)
-    if (error.response) {
-      const { status, data } = error.response
-      const serverMsg = (data && (data.message || data.msg)) || error.message || '请求失败'
-      switch (status) {
-        case 401:
-          ElMessage.error('未授权，请重新登录')
-          localStorage.removeItem('admin-token')
-          localStorage.removeItem('admin-user')
-          window.location.href = '/login'
-          break
-        case 403:
-          ElMessage.error('拒绝访问')
-          break
-        case 404:
-          ElMessage.error('请求地址不存在')
-          break
-        case 500:
-          ElMessage.error('服务器内部错误')
-          break
-        default:
-          ElMessage.error(serverMsg)
-      }
-    } else {
-      ElMessage.error('网络错误，请检查网络连接')
+    // 使用统一的错误处理机制
+    const errorInfo = errorHandler.handleHttpError(error)
+    // 返回标准化的错误响应
+    const normalizedError = {
+      success: false,
+      data: null,
+      message: errorInfo.message,
+      code: errorInfo.code,
+      error
     }
-    return Promise.reject(error)
+    // 兼容错误返回：支持 res.data.success 判定
+    return Promise.reject({ ...normalizedError, data: normalizedError })
   }
 )
 

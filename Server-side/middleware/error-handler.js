@@ -64,14 +64,19 @@ function errorHandler(err, req, res, next) {
     };
   }
 
-  // 返回错误响应
-  res.status(statusCode).json({
-    success: false,
-    message: message,
-    code: err && err.name ? err.name : (statusCode === 500 ? 'INTERNAL_ERROR' : 'ERROR'),
-    error: errorDetails,
-    timestamp: new Date().toISOString()
-  });
+  // 如果响应对象有error方法，使用新响应格式
+  if (res.error) {
+    res.error(statusCode, message, errorDetails);
+  } else {
+    // 否则使用旧响应格式（向后兼容）
+    res.status(statusCode).json({
+      success: false,
+      message: message,
+      code: err && err.name ? err.name : (statusCode === 500 ? 'INTERNAL_ERROR' : 'ERROR'),
+      error: errorDetails,
+      timestamp: new Date().toISOString()
+    });
+  }
 }
 
 /**
@@ -101,12 +106,17 @@ function notFoundHandler(req, res) {
     // 对于静态资源请求，返回空内容而不是JSON，避免浏览器控制台错误
     res.status(404).send('');
   } else {
-    // 对于API请求，返回JSON响应
-    res.status(404).json({
-      success: false,
-      message: '请求的资源不存在',
-      timestamp: new Date().toISOString()
-    });
+    // 如果响应对象有error方法，使用新响应格式
+    if (res.error) {
+      res.error(404, '请求的资源不存在');
+    } else {
+      // 否则使用旧响应格式（向后兼容）
+      res.status(404).json({
+        success: false,
+        message: '请求的资源不存在',
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 }
 

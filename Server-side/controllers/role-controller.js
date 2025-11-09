@@ -57,26 +57,19 @@ class RoleController {
       
       logger.info(`获取角色列表成功: 页码 ${page}, 每页 ${limit}, 总数 ${total}`);
       
-      res.status(200).json({
-        success: true,
-        message: '获取角色列表成功',
-        data: {
-          roles: rolesWithUserCount,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / limit)
-          }
+      res.success(200, '获取角色列表成功', {
+        roles: rolesWithUserCount,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
         }
       });
       
     } catch (error) {
       logger.error('获取角色列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -97,10 +90,7 @@ class RoleController {
       );
       
       if (roleResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '角色不存在'
-        });
+        return res.error(404, '角色不存在');
       }
       
       const role = roleResult.rows[0];
@@ -115,18 +105,11 @@ class RoleController {
       
       logger.info(`获取角色详情成功: ID ${id}, 名称 ${role.name}`);
       
-      res.status(200).json({
-        success: true,
-        message: '获取角色详情成功',
-        data: role
-      });
+      res.success(200, '获取角色详情成功', role);
       
     } catch (error) {
       logger.error('获取角色详情失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -137,10 +120,7 @@ class RoleController {
       
       // 验证必填字段
       if (!name) {
-        return res.status(400).json({
-          success: false,
-          message: '角色名称为必填项'
-        });
+        return res.error(400, '角色名称为必填项');
       }
       
       // 检查角色名称是否已存在
@@ -150,10 +130,7 @@ class RoleController {
       );
       
       if (existingRoleResult.rows.length > 0) {
-        return res.status(409).json({
-          success: false,
-          message: '角色名称已存在'
-        });
+        return res.error(409, '角色名称已存在');
       }
       
       // 创建角色
@@ -168,18 +145,11 @@ class RoleController {
       
       logger.info(`创建角色成功: ${name}`);
       
-      res.status(201).json({
-        success: true,
-        message: '创建角色成功',
-        data: role
-      });
+      res.success(201, '创建角色成功', role);
       
     } catch (error) {
       logger.error('创建角色失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -196,10 +166,7 @@ class RoleController {
       );
       
       if (roleResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '角色不存在'
-        });
+        return res.error(404, '角色不存在');
       }
       
       const existingRole = roleResult.rows[0];
@@ -212,10 +179,7 @@ class RoleController {
         );
         
         if (duplicateRoleResult.rows.length > 0) {
-          return res.status(409).json({
-            success: false,
-            message: '角色名称已存在'
-          });
+          return res.error(409, '角色名称已存在');
         }
       }
       
@@ -245,10 +209,7 @@ class RoleController {
       }
       
       if (updateFields.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '没有提供要更新的字段'
-        });
+        return res.error(400, '没有提供要更新的字段');
       }
       
       updateFields.push(`updated_at = NOW()`);
@@ -267,18 +228,11 @@ class RoleController {
       
       logger.info(`更新角色成功: ${existingRole.name} -> ${updatedRole.name}`);
       
-      res.status(200).json({
-        success: true,
-        message: '更新角色成功',
-        data: updatedRole
-      });
+      res.success(200, '更新角色成功', updatedRole);
       
     } catch (error) {
       logger.error('更新角色失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -294,10 +248,7 @@ class RoleController {
       );
       
       if (roleResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '角色不存在'
-        });
+        return res.error(404, '角色不存在');
       }
       
       const role = roleResult.rows[0];
@@ -311,10 +262,7 @@ class RoleController {
       const userCount = parseInt(userCountResult.rows[0].count);
       
       if (userCount > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `无法删除角色，该角色关联了 ${userCount} 个用户`
-        });
+        return res.error(400, `无法删除角色，该角色关联了 ${userCount} 个用户`);
       }
       
       // 开始事务
@@ -339,13 +287,9 @@ class RoleController {
         
         logger.info(`删除角色成功: ${role.name}`);
         
-        res.status(200).json({
-          success: true,
-          message: '删除角色成功',
-          data: {
-            roleId: id,
-            roleName: role.name
-          }
+        res.success(200, '删除角色成功', {
+          roleId: id,
+          roleName: role.name
         });
         
       } catch (error) {
@@ -357,10 +301,7 @@ class RoleController {
       
     } catch (error) {
       logger.error('删除角色失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -376,10 +317,7 @@ class RoleController {
       );
       
       if (roleResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '角色不存在'
-        });
+        return res.error(404, '角色不存在');
       }
       
       const role = roleResult.rows[0];
@@ -398,22 +336,15 @@ class RoleController {
       
       logger.info(`获取角色权限成功: ${role.name}`);
       
-      res.status(200).json({
-        success: true,
-        message: '获取角色权限成功',
-        data: {
-          roleId: id,
-          roleName: role.name,
-          permissions: permissions
-        }
+      res.success(200, '获取角色权限成功', {
+        roleId: id,
+        roleName: role.name,
+        permissions: permissions
       });
       
     } catch (error) {
       logger.error('获取角色权限失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -429,10 +360,7 @@ class RoleController {
       );
       
       if (roleResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '角色不存在'
-        });
+        return res.error(404, '角色不存在');
       }
       
       const role = roleResult.rows[0];
@@ -444,10 +372,7 @@ class RoleController {
       );
       
       if (permissionResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '权限不存在'
-        });
+        return res.error(404, '权限不存在');
       }
       
       const permission = permissionResult.rows[0];
@@ -459,10 +384,7 @@ class RoleController {
       );
       
       if (existingRolePermissionResult.rows.length > 0) {
-        return res.status(409).json({
-          success: false,
-          message: '角色已拥有该权限'
-        });
+        return res.error(409, '角色已拥有该权限');
       }
       
       // 分配权限给角色
@@ -473,23 +395,16 @@ class RoleController {
       
       logger.info(`分配权限给角色成功: ${role.name} -> ${permission.name}`);
       
-      res.status(201).json({
-        success: true,
-        message: '分配权限给角色成功',
-        data: {
-          roleId: id,
-          roleName: role.name,
-          permissionId: permissionId,
-          permissionName: permission.name
-        }
+      res.success(201, '分配权限给角色成功', {
+        roleId: id,
+        roleName: role.name,
+        permissionId: permissionId,
+        permissionName: permission.name
       });
       
     } catch (error) {
       logger.error('分配权限给角色失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -505,10 +420,7 @@ class RoleController {
       );
       
       if (roleResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '角色不存在'
-        });
+        return res.error(404, '角色不存在');
       }
       
       const role = roleResult.rows[0];
@@ -520,10 +432,7 @@ class RoleController {
       );
       
       if (permissionResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '权限不存在'
-        });
+        return res.error(404, '权限不存在');
       }
       
       const permission = permissionResult.rows[0];
@@ -535,10 +444,7 @@ class RoleController {
       );
       
       if (rolePermissionResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '角色未拥有该权限'
-        });
+        return res.error(404, '角色未拥有该权限');
       }
       
       // 从角色移除权限
@@ -549,23 +455,16 @@ class RoleController {
       
       logger.info(`从角色移除权限成功: ${role.name} -> ${permission.name}`);
       
-      res.status(200).json({
-        success: true,
-        message: '从角色移除权限成功',
-        data: {
-          roleId: id,
-          roleName: role.name,
-          permissionId: permissionId,
-          permissionName: permission.name
-        }
+      res.success(200, '从角色移除权限成功', {
+        roleId: id,
+        roleName: role.name,
+        permissionId: permissionId,
+        permissionName: permission.name
       });
       
     } catch (error) {
       logger.error('从角色移除权限失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -605,21 +504,14 @@ class RoleController {
       
       logger.info(`获取权限列表成功: 总数 ${permissions.length}`);
       
-      res.status(200).json({
-        success: true,
-        message: '获取权限列表成功',
-        data: {
-          permissions,
-          permissionsByResource
-        }
+      res.success(200, '获取权限列表成功', {
+        permissions,
+        permissionsByResource
       });
       
     } catch (error) {
       logger.error('获取权限列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 }

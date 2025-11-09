@@ -90,7 +90,21 @@
 - POST /admin/dorms/{id}/members - 添加寝室成员
 - DELETE /admin/dorms/{id}/members/{memberId} - 移除寝室成员
 - PUT /admin/dorms/{id}/leader - 设置寝室长
-## 14. 文档管理相关API (docs)
+## 14. 请假记录管理相关API (leaveRecordApi)
+- GET /admin/leave-records - 获取所有请假记录列表
+- GET /admin/leave-records/{id} - 获取请假记录详情
+- POST /admin/leave-records - 创建请假记录
+- PUT /admin/leave-records/{id} - 更新请假记录
+- DELETE /admin/leave-records/{id} - 删除请假记录
+- GET /admin/leave-records/user/{userId} - 获取用户请假记录
+- GET /admin/leave-records/room/{roomId} - 获取房间请假记录
+- POST /admin/leave-records/batch-import - 批量导入请假记录
+- GET /admin/leave-records/statistics - 获取请假统计数据
+- GET /admin/leave-records/days-statistics - 获取在寝天数统计
+- POST /admin/leave-records/{id}/approve - 审批请假记录
+- POST /admin/leave-records/{id}/reject - 拒绝请假记录
+- GET /admin/leave-records/pending - 获取待审批请假记录
+## 15. 文档管理相关API (docs)
 - GET /api/docs/view - 查看文档
 - POST /api/docs/edit - 编辑文档
 - GET /api/docs/history - 获取文档历史

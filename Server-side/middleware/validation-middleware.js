@@ -14,9 +14,7 @@ function handleValidationErrors(req, res, next) {
       value: err.value,
       location: err.location
     }));
-    return res.status(400).json({
-      success: false,
-      message: '请求参数校验失败',
+    return res.clientError('请求参数校验失败', {
       code: 'ValidationError',
       errors: formatted,
       timestamp: new Date().toISOString()
@@ -119,15 +117,15 @@ const businessValidation = {
     try {
       const username = req.body && req.body.username;
       if (!username) {
-        return res.status(400).json({ success: false, message: 'username 为必填项' });
+        return res.clientError('username 为必填项');
       }
       const result = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
       if (result.rows.length > 0) {
-        return res.status(409).json({ success: false, message: '用户名已被注册' });
+        return res.conflict('用户名已被注册');
       }
       next();
     } catch (error) {
-      return res.status(500).json({ success: false, message: '服务器内部错误' });
+      return res.error(500, '服务器内部错误');
     }
   },
   // 检查邮箱是否可用（未被占用）
@@ -135,15 +133,15 @@ const businessValidation = {
     try {
       const email = req.body && req.body.email;
       if (!email) {
-        return res.status(400).json({ success: false, message: 'email 为必填项' });
+        return res.clientError('email 为必填项');
       }
       const result = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
       if (result.rows.length > 0) {
-        return res.status(409).json({ success: false, message: '邮箱已被注册' });
+        return res.conflict('邮箱已被注册');
       }
       next();
     } catch (error) {
-      return res.status(500).json({ success: false, message: '服务器内部错误' });
+      return res.error(500, '服务器内部错误');
     }
   }
 };

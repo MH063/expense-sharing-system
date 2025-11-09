@@ -17,11 +17,34 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    // 启用代码分割
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // 将Element Plus单独打包
+          'element-plus': ['element-plus'],
+          // 将ECharts单独打包
+          'echarts': ['echarts'],
+          // 将其他第三方库打包
+          'vendor': ['axios', 'vue-router', 'pinia']
+        }
+      }
+    },
+    // 启用gzip压缩
+    reportCompressedSize: true,
+    // 启用CSS代码分割
+    cssCodeSplit: true,
+    // 设置chunk大小警告限制
+    chunkSizeWarningLimit: 1000
   },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
     }
+  },
+  // 启用依赖预构建优化
+  optimizeDeps: {
+    include: ['vue', 'vue-router', 'pinia', 'axios', 'element-plus', 'echarts']
   }
 })

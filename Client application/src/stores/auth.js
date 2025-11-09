@@ -163,11 +163,11 @@ export const useAuthStore = defineStore('auth', () => {
         refreshToken: refreshToken.value
       })
       
-      const response = await refreshPromise.value
+      const res = await refreshPromise.value
       
       // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-      if (response.data.success && response.data.data) {
-        const { token: newAccessToken, refreshToken: newRefreshToken } = response.data.data
+      if (res.success && res.payload) {
+        const { token: newAccessToken, refreshToken: newRefreshToken } = res.payload
         
         // 获取当前用户名，确保Token刷新时使用正确的用户上下文
         const currentUsername = tokenManager.getCurrentUser()
@@ -220,15 +220,15 @@ export const useAuthStore = defineStore('auth', () => {
       
       // 使用Token管理器刷新Token
       const newTokens = await tokenManager.refreshToken(async () => {
-        const response = await http.post('/auth/refresh-token', {
+        const res = await http.post('/auth/refresh-token', {
           refreshToken: tokenManager.getRefreshToken()
         })
         
         // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-        if (response.data.success && response.data.data) {
+        if (res.success && res.payload) {
           return response.data.data
         } else {
-          throw new Error(response.data.message || '刷新令牌失败')
+          throw new Error(res.message || '刷新令牌失败')
         }
       })
       
@@ -276,18 +276,18 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('调用登录API:', credentials)
       
       // 使用http客户端调用后端登录接口
-      const response = await http.post('/auth/login', credentials)
+      const res = await http.post('/auth/login', credentials)
       
       // 处理后端返回的数据结构 {success: true, data: {token, refreshToken, user}}
       // 从response.data.data获取实际数据
-      if (response.data.success && response.data.data) {
+      if (res.success && res.payload) {
         const { token, refreshToken: refreshTkn, user: userData } = response.data.data
         
         console.log('登录成功，收到Token:', {
           hasToken: !!token,
           hasRefreshToken: !!refreshTkn,
           userData,
-          fullResponse: response.data
+          fullResponse: res
         })
         
         // 存储Token到Token管理器，支持多用户
@@ -315,7 +315,7 @@ export const useAuthStore = defineStore('auth', () => {
         
         return { success: true, user: userData }
       } else {
-        throw new Error(response.data.message || '登录失败')
+        throw new Error(res.message || '登录失败')
       }
     } catch (error) {
       console.error('登录失败:', error)

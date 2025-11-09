@@ -336,13 +336,12 @@ const getUserList = async () => {
     }
     console.log('获取用户列表参数:', params)
     
-    const response = await userApi.getUserList(params)
-    console.log('获取用户列表响应:', response)
+    const res = await userApi.getUserList(params)
+    console.log('获取用户列表响应:', res)
     
-    // 处理后端返回的双层嵌套结构
-    if (response && response.data && response.data.success) {
-      userList.value = response.data.data.list || []
-      pagination.total = response.data.data.total || 0
+    if (res && res.success) {
+      userList.value = res.payload?.list || []
+      pagination.total = res.payload?.total || 0
     } else {
       ElMessage.error('获取用户列表失败')
     }
@@ -411,11 +410,10 @@ const handleDelete = (row) => {
   ).then(async () => {
     try {
       console.log('删除用户ID:', row.id)
-      const response = await userApi.deleteUser(row.id)
-      console.log('删除用户响应:', response)
+      const res = await userApi.deleteUser(row.id)
+      console.log('删除用户响应:', res)
       
-      // 处理后端返回的双层嵌套结构
-      if (response && response.data && response.data.success) {
+      if (res && res.success) {
         ElMessage.success('删除成功')
         getUserList()
       } else {
@@ -437,11 +435,10 @@ const toggleStatus = async (row) => {
   
   try {
     console.log('切换用户状态:', row.id, newStatus)
-    const response = await userApi.updateUserStatus(row.id, newStatus)
-    console.log('切换用户状态响应:', response)
+    const res = await userApi.updateUserStatus(row.id, newStatus)
+    console.log('切换用户状态响应:', res)
     
-    // 处理后端返回的双层嵌套结构
-    if (response && response.data && response.data.success) {
+    if (res && res.success) {
       ElMessage.success(`${statusText}成功`)
       row.status = newStatus
     } else {
@@ -466,12 +463,11 @@ const resetPassword = (row) => {
   ).then(async () => {
     try {
       console.log('重置用户密码:', row.id)
-      const response = await userApi.resetUserPassword(row.id)
-      console.log('重置用户密码响应:', response)
+      const res = await userApi.resetUserPassword(row.id)
+      console.log('重置用户密码响应:', res)
       
-      // 处理后端返回的双层嵌套结构
-      if (response && response.data && response.data.success) {
-        ElMessage.success('密码重置成功，新密码为: ' + (response.data.data.newPassword || '123456'))
+      if (res && res.success) {
+        ElMessage.success('密码重置成功，新密码为: ' + (res.payload?.newPassword || '123456'))
       } else {
         ElMessage.error('密码重置失败')
       }
@@ -504,17 +500,16 @@ const submitUserForm = () => {
         
         console.log('提交用户表单:', formData)
         
-        let response
+        let res
         if (isEdit.value) {
-          response = await userApi.updateUser(userForm.id, formData)
-          console.log('更新用户响应:', response)
+          res = await userApi.updateUser(userForm.id, formData)
+          console.log('更新用户响应:', res)
         } else {
-          response = await userApi.createUser(formData)
-          console.log('添加用户响应:', response)
+          res = await userApi.createUser(formData)
+          console.log('添加用户响应:', res)
         }
         
-        // 处理后端返回的双层嵌套结构
-        if (response && response.data && response.data.success) {
+        if (res && res.success) {
           ElMessage.success(isEdit.value ? '更新成功' : '添加成功')
           userDialogVisible.value = false
           getUserList()

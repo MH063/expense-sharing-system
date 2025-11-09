@@ -148,6 +148,12 @@ const routes = [
     ]
   },
   {
+    path: '/test',
+    name: 'TestPage',
+    component: () => import('../views/TestPage.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('../views/NotFound.vue')

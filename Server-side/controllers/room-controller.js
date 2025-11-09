@@ -39,10 +39,7 @@ class RoomController {
 
       // 验证必填字段
       if (!name) {
-        return res.status(400).json({
-          success: false,
-          message: '寝室名称为必填项'
-        });
+        return res.error(400, '寝室名称为必填项');
       }
 
       // 生成唯一的寝室邀请码
@@ -92,11 +89,7 @@ class RoomController {
 
         logger.info(`寝室创建成功: ${name} (ID: ${room.id})`);
 
-        res.status(201).json({
-          success: true,
-          message: '寝室创建成功',
-          data: fullRoom
-        });
+        res.success(201, '寝室创建成功', fullRoom);
 
       } catch (error) {
         await client.query('ROLLBACK');
@@ -107,10 +100,7 @@ class RoomController {
 
     } catch (error) {
       logger.error('寝室创建失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -175,26 +165,19 @@ class RoomController {
 
       logger.info(`获取寝室列表成功，共 ${totalCount} 条记录`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取寝室列表成功',
-        data: {
-          rooms,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: totalCount,
-            totalPages: Math.ceil(totalCount / limit)
-          }
+      res.success(200, '获取寝室列表成功', {
+        rooms,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
         }
       });
 
     } catch (error) {
       logger.error('获取寝室列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -221,18 +204,11 @@ class RoomController {
 
       logger.info(`获取用户寝室列表成功，用户ID: ${userId}, 共 ${rooms.length} 条记录`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取用户寝室列表成功',
-        data: rooms
-      });
+      res.success(200, '获取用户寝室列表成功', rooms);
 
     } catch (error) {
       logger.error('获取用户寝室列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -252,10 +228,7 @@ class RoomController {
       );
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
@@ -275,18 +248,11 @@ class RoomController {
 
       logger.info(`获取寝室详情成功: ${room.name} (ID: ${room.id})`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取寝室详情成功',
-        data: room
-      });
+      res.success(200, '获取寝室详情成功', room);
 
     } catch (error) {
       logger.error('获取寝室详情失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -301,10 +267,7 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
@@ -319,10 +282,7 @@ class RoomController {
 
       if (permissionResult.rows.length === 0 || 
           (permissionResult.rows[0].relation_type !== 'owner' && room.creator_id !== userId)) {
-        return res.status(403).json({
-          success: false,
-          message: '权限不足'
-        });
+        return res.error(403, '权限不足');
       }
 
       // 构建更新字段
@@ -366,18 +326,11 @@ class RoomController {
 
       logger.info(`寝室信息更新成功: ${updatedRoom.name} (ID: ${updatedRoom.id})`);
 
-      res.status(200).json({
-        success: true,
-        message: '寝室信息更新成功',
-        data: updatedRoom
-      });
+      res.success(200, '寝室信息更新成功', updatedRoom);
 
     } catch (error) {
       logger.error('寝室信息更新失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -391,20 +344,14 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证用户是否有权限删除寝室（只有创建者可以删除）
       if (room.creator_id !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以删除寝室'
-        });
+        return res.error(403, '只有寝室创建者可以删除寝室');
       }
 
       // 开始事务
@@ -426,10 +373,7 @@ class RoomController {
 
         logger.info(`寝室删除成功: ${room.name} (ID: ${room.id})`);
 
-        res.status(200).json({
-          success: true,
-          message: '寝室删除成功'
-        });
+        res.success(200, '寝室删除成功');
 
       } catch (error) {
         await client.query('ROLLBACK');
@@ -440,10 +384,7 @@ class RoomController {
 
     } catch (error) {
       logger.error('寝室删除失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -468,28 +409,19 @@ class RoomController {
         );
 
         if (inviteCodeResult.rows.length === 0) {
-          return res.status(404).json({
-            success: false,
-            message: '邀请码无效或已被撤销'
-          });
+          return res.error(404, '邀请码无效或已被撤销');
         }
 
         const inviteCodeData = inviteCodeResult.rows[0];
 
         // 检查邀请码是否已过期
         if (inviteCodeData.expires_at && new Date(inviteCodeData.expires_at) < new Date()) {
-          return res.status(410).json({
-            success: false,
-            message: '邀请码已过期'
-          });
+          return res.error(410, '邀请码已过期');
         }
 
         // 检查邀请码使用次数是否已达上限
         if (inviteCodeData.uses_count >= inviteCodeData.max_uses) {
-          return res.status(410).json({
-            success: false,
-            message: '邀请码使用次数已达上限'
-          });
+          return res.error(410, '邀请码使用次数已达上限');
         }
 
         room = inviteCodeData;
@@ -502,18 +434,12 @@ class RoomController {
         );
 
         if (roomResult.rows.length === 0) {
-          return res.status(404).json({
-            success: false,
-            message: '邀请码无效或寝室不存在'
-          });
+          return res.error(404, '邀请码无效或寝室不存在');
         }
 
         room = roomResult.rows[0];
       } else {
-        return res.status(400).json({
-          success: false,
-          message: '请提供寝室码或邀请码'
-        });
+        return res.error(400, '请提供寝室码或邀请码');
       }
 
       // 检查用户是否已经是寝室成员
@@ -523,10 +449,7 @@ class RoomController {
       );
 
       if (membershipResult.rows.length > 0) {
-        return res.status(409).json({
-          success: false,
-          message: '您已经是该寝室的成员'
-        });
+        return res.error(409, '您已经是该寝室的成员');
       }
 
       // 检查寝室是否已满员
@@ -538,10 +461,7 @@ class RoomController {
       const currentMembers = parseInt(memberCountResult.rows[0].count);
 
       if (currentMembers >= room.max_members) {
-        return res.status(409).json({
-          success: false,
-          message: '寝室已满员'
-        });
+        return res.error(409, '寝室已满员');
       }
 
       // 开始事务
@@ -569,13 +489,9 @@ class RoomController {
 
         logger.info(`用户加入寝室成功: 用户ID ${userId} -> 寝室 ${room.name} (ID: ${room.id})`);
 
-        res.status(200).json({
-          success: true,
-          message: '加入寝室成功',
-          data: {
-            roomId: room.id,
-            roomName: room.name
-          }
+        res.success(200, '加入寝室成功', {
+          roomId: room.id,
+          roomName: room.name
         });
 
       } catch (error) {
@@ -587,10 +503,7 @@ class RoomController {
 
     } catch (error) {
       logger.error('加入寝室失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -604,10 +517,7 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
@@ -619,18 +529,12 @@ class RoomController {
       );
 
       if (membershipResult.rows.length === 0) {
-        return res.status(409).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+        return res.error(409, '您不是该寝室的成员');
       }
 
       // 创建者不能离开自己的寝室
       if (room.creator_id === userId) {
-        return res.status(403).json({
-          success: false,
-          message: '寝室创建者不能离开寝室，请先转让寝室或删除寝室'
-        });
+        return res.error(403, '寝室创建者不能离开寝室，请先转让寝室或删除寝室');
       }
 
       // 离开寝室
@@ -641,17 +545,11 @@ class RoomController {
 
       logger.info(`用户离开寝室成功: 用户ID ${userId} -> 寝室 ${room.name} (ID: ${room.id})`);
 
-      res.status(200).json({
-        success: true,
-        message: '离开寝室成功'
-      });
+      res.success(200, '离开寝室成功');
 
     } catch (error) {
       logger.error('离开寝室失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -666,20 +564,14 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [roomId]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证操作者是否有权限（寝室创建者）
       if (room.creator_id !== operatorId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以管理成员'
-        });
+        return res.error(403, '只有寝室创建者可以管理成员');
       }
 
       // 验证目标用户是否是寝室成员
@@ -689,10 +581,7 @@ class RoomController {
       );
 
       if (membershipResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不是该寝室的成员'
-        });
+        return res.error(404, '用户不是该寝室的成员');
       }
 
       // 更新成员关系类型
@@ -703,22 +592,15 @@ class RoomController {
 
       logger.info(`寝室成员管理成功: 寝室 ${room.name} (ID: ${room.id}) -> 用户ID ${userId} -> 角色 ${relation_type}`);
 
-      res.status(200).json({
-        success: true,
-        message: '成员角色更新成功',
-        data: {
-          userId,
-          roomId,
-          relation_type
-        }
+      res.success(200, '成员角色更新成功', {
+        userId,
+        roomId,
+        relation_type
       });
 
     } catch (error) {
       logger.error('寝室成员管理失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -733,20 +615,14 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证当前用户是否是寝室创建者
       if (room.creator_id !== currentOwnerId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以转移所有权'
-        });
+        return res.error(403, '只有寝室创建者可以转移所有权');
       }
 
       // 验证新所有者是否是寝室成员
@@ -756,10 +632,7 @@ class RoomController {
       );
 
       if (membershipResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '新所有者不是该寝室的成员'
-        });
+        return res.error(404, '新所有者不是该寝室的成员');
       }
 
       // 开始事务
@@ -790,14 +663,10 @@ class RoomController {
 
         logger.info(`寝室所有权转移成功: 寝室 ${room.name} (ID: ${room.id}) -> 从用户ID ${currentOwnerId} 到用户ID ${newOwnerId}`);
 
-        res.status(200).json({
-          success: true,
-          message: '寝室所有权转移成功',
-          data: {
-            roomId: id,
-            previousOwnerId: currentOwnerId,
-            newOwnerId
-          }
+        res.success(200, '寝室所有权转移成功', {
+          roomId: id,
+          previousOwnerId: currentOwnerId,
+          newOwnerId
         });
 
       } catch (error) {
@@ -809,10 +678,7 @@ class RoomController {
 
     } catch (error) {
       logger.error('寝室所有权转移失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -826,10 +692,7 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
@@ -841,10 +704,7 @@ class RoomController {
       );
 
       if (membershipResult.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+        return res.error(403, '您不是该寝室的成员');
       }
 
       // 获取寝室成员列表
@@ -863,23 +723,16 @@ class RoomController {
 
       logger.info(`获取寝室成员列表成功: 寝室 ${room.name} (ID: ${room.id}), 共 ${members.length} 名成员`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取寝室成员列表成功',
-        data: {
-          roomId: id,
-          roomName: room.name,
-          members: members,
-          memberCount: members.length
-        }
+      res.success(200, '获取寝室成员列表成功', {
+        roomId: id,
+        roomName: room.name,
+        members: members,
+        memberCount: members.length
       });
 
     } catch (error) {
       logger.error('获取寝室成员列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -893,28 +746,19 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证操作者是否有权限（寝室创建者）
       if (room.creator_id !== operatorId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以删除成员'
-        });
+        return res.error(403, '只有寝室创建者可以删除成员');
       }
 
       // 不能删除寝室创建者
       if (room.creator_id === parseInt(userId)) {
-        return res.status(403).json({
-          success: false,
-          message: '不能删除寝室创建者'
-        });
+        return res.error(403, '不能删除寝室创建者');
       }
 
       // 验证目标用户是否是寝室成员
@@ -924,10 +768,7 @@ class RoomController {
       );
 
       if (membershipResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不是该寝室的成员'
-        });
+        return res.error(404, '用户不是该寝室的成员');
       }
 
       // 删除成员
@@ -938,21 +779,14 @@ class RoomController {
 
       logger.info(`寝室成员删除成功: 寝室 ${room.name} (ID: ${room.id}) -> 用户ID ${userId}`);
 
-      res.status(200).json({
-        success: true,
-        message: '成员删除成功',
-        data: {
-          roomId: id,
-          removedUserId: userId
-        }
+      res.success(200, '成员删除成功', {
+        roomId: id,
+        removedUserId: userId
       });
 
     } catch (error) {
       logger.error('寝室成员删除失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -967,20 +801,14 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证用户是否有权限（寝室创建者）
       if (room.creator_id !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以生成邀请码'
-        });
+        return res.error(403, '只有寝室创建者可以生成邀请码');
       }
 
       // 生成唯一的邀请码
@@ -997,10 +825,7 @@ class RoomController {
       }
 
       if (!isUnique) {
-        return res.status(500).json({
-          success: false,
-          message: '生成唯一邀请码失败，请重试'
-        });
+        return res.error(500, '生成唯一邀请码失败，请重试');
       }
 
       // 创建邀请码
@@ -1015,18 +840,11 @@ class RoomController {
 
       logger.info(`邀请码生成成功: 寝室 ${room.name} (ID: ${room.id}) -> 邀请码 ${code}`);
 
-      res.status(201).json({
-        success: true,
-        message: '邀请码生成成功',
-        data: inviteCode
-      });
+      res.success(201, '邀请码生成成功', inviteCode);
 
     } catch (error) {
       logger.error('邀请码生成失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1040,20 +858,14 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证用户是否有权限（寝室创建者）
       if (room.creator_id !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以查看邀请码列表'
-        });
+        return res.error(403, '只有寝室创建者可以查看邀请码列表');
       }
 
       // 获取邀请码列表
@@ -1070,18 +882,11 @@ class RoomController {
 
       logger.info(`获取邀请码列表成功: 寝室 ${room.name} (ID: ${room.id}), 共 ${inviteCodes.length} 条记录`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取邀请码列表成功',
-        data: inviteCodes
-      });
+      res.success(200, '获取邀请码列表成功', inviteCodes);
 
     } catch (error) {
       logger.error('获取邀请码列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1101,28 +906,19 @@ class RoomController {
       );
 
       if (inviteCodeResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '邀请码无效或已被撤销'
-        });
+        return res.error(404, '邀请码无效或已被撤销');
       }
 
       const inviteCode = inviteCodeResult.rows[0];
 
       // 检查邀请码是否已过期
       if (inviteCode.expires_at && new Date(inviteCode.expires_at) < new Date()) {
-        return res.status(410).json({
-          success: false,
-          message: '邀请码已过期'
-        });
+        return res.error(410, '邀请码已过期');
       }
 
       // 检查邀请码使用次数是否已达上限
       if (inviteCode.uses_count >= inviteCode.max_uses) {
-        return res.status(410).json({
-          success: false,
-          message: '邀请码使用次数已达上限'
-        });
+        return res.error(410, '邀请码使用次数已达上限');
       }
 
       // 检查用户是否已经是寝室成员
@@ -1132,10 +928,7 @@ class RoomController {
       );
 
       if (membershipResult.rows.length > 0) {
-        return res.status(409).json({
-          success: false,
-          message: '您已经是该寝室的成员'
-        });
+        return res.error(409, '您已经是该寝室的成员');
       }
 
       // 检查寝室是否已满员
@@ -1147,30 +940,20 @@ class RoomController {
       const currentMembers = parseInt(memberCountResult.rows[0].count);
 
       if (currentMembers >= inviteCode.max_members) {
-        return res.status(409).json({
-          success: false,
-          message: '寝室已满员'
-        });
+        return res.error(409, '寝室已满员');
       }
 
       logger.info(`邀请码验证成功: 邀请码 ${code} -> 寝室 ${inviteCode.room_name} (ID: ${inviteCode.room_id})`);
 
-      res.status(200).json({
-        success: true,
-        message: '邀请码验证成功',
-        data: {
-          roomId: inviteCode.room_id,
-          roomName: inviteCode.room_name,
-          code: inviteCode.code
-        }
+      res.success(200, '邀请码验证成功', {
+        roomId: inviteCode.room_id,
+        roomName: inviteCode.room_name,
+        code: inviteCode.code
       });
 
     } catch (error) {
       logger.error('邀请码验证失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1185,20 +968,14 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证用户是否有权限（寝室创建者）
       if (room.creator_id !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以撤销邀请码'
-        });
+        return res.error(403, '只有寝室创建者可以撤销邀请码');
       }
 
       // 验证邀请码是否存在
@@ -1208,10 +985,7 @@ class RoomController {
       );
 
       if (inviteCodeResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '邀请码不存在'
-        });
+        return res.error(404, '邀请码不存在');
       }
 
       // 撤销邀请码
@@ -1222,17 +996,11 @@ class RoomController {
 
       logger.info(`邀请码撤销成功: 寝室 ${room.name} (ID: ${room.id}) -> 邀请码 ${code}`);
 
-      res.status(200).json({
-        success: true,
-        message: '邀请码撤销成功'
-      });
+      res.success(200, '邀请码撤销成功');
 
     } catch (error) {
       logger.error('邀请码撤销失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1246,20 +1014,14 @@ class RoomController {
       const roomResult = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
 
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '寝室不存在'
-        });
+        return res.error(404, '寝室不存在');
       }
 
       const room = roomResult.rows[0];
 
       // 验证用户是否有权限（寝室创建者）
       if (room.creator_id !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室创建者可以删除邀请码'
-        });
+        return res.error(403, '只有寝室创建者可以删除邀请码');
       }
 
       // 验证邀请码是否存在
@@ -1269,10 +1031,7 @@ class RoomController {
       );
 
       if (inviteCodeResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '邀请码不存在'
-        });
+        return res.error(404, '邀请码不存在');
       }
 
       // 删除邀请码
@@ -1283,17 +1042,11 @@ class RoomController {
 
       logger.info(`邀请码删除成功: 寝室 ${room.name} (ID: ${room.id}) -> 邀请码ID ${codeId}`);
 
-      res.status(200).json({
-        success: true,
-        message: '邀请码删除成功'
-      });
+      res.success(200, '邀请码删除成功');
 
     } catch (error) {
       logger.error('邀请码删除失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 

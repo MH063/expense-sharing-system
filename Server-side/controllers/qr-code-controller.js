@@ -53,18 +53,12 @@ class QrCodeController {
       
       // 验证收款码类型
       if (!qr_type || !['wechat', 'alipay'].includes(qr_type)) {
-        return res.status(400).json({
-          success: false,
-          message: '收款码类型必须是wechat或alipay'
-        });
+        return res.error(400, '收款码类型必须是wechat或alipay');
       }
       
       // 检查是否有上传的文件
       if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: '请上传收款码图片'
-        });
+        return res.error(400, '请上传收款码图片');
       }
       
       // 验证文件类型
@@ -72,20 +66,14 @@ class QrCodeController {
       if (!allowedTypes.includes(req.file.mimetype)) {
         // 删除已上传的文件
         fs.unlinkSync(req.file.path);
-        return res.status(400).json({
-          success: false,
-          message: '只支持JPEG、JPG和PNG格式的图片'
-        });
+        return res.error(400, '只支持JPEG、JPG和PNG格式的图片');
       }
       
       // 检查文件大小（限制为5MB）
       if (req.file.size > 5 * 1024 * 1024) {
         // 删除已上传的文件
         fs.unlinkSync(req.file.path);
-        return res.status(400).json({
-          success: false,
-          message: '图片大小不能超过5MB'
-        });
+        return res.error(400, '图片大小不能超过5MB');
       }
       
       // 生成文件名
@@ -142,12 +130,8 @@ class QrCodeController {
       
       logger.info(`用户 ${user_id} 上传了 ${qr_type} 收款码: ${qrCode.id}`);
       
-      res.status(201).json({
-        success: true,
-        data: {
-          qr_code: qrCode,
-          message: '收款码上传成功'
-        }
+      res.success(201, '收款码上传成功', {
+        qr_code: qrCode
       });
     } catch (error) {
       // 删除已上传的文件（如果有）
@@ -156,11 +140,7 @@ class QrCodeController {
       }
       
       logger.error('上传收款码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '上传收款码失败',
-        error: error.message
-      });
+      res.error(500, '上传收款码失败', error.message);
     } finally {
       client.release();
     }
@@ -184,19 +164,12 @@ class QrCodeController {
         [user_id]
       );
       
-      res.status(200).json({
-        success: true,
-        data: {
-          qr_codes: result.rows
-        }
+      res.success(200, '获取收款码列表成功', {
+        qr_codes: result.rows
       });
     } catch (error) {
       logger.error('获取用户收款码列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取收款码列表失败',
-        error: error.message
-      });
+      res.error(500, '获取收款码列表失败', error.message);
     } finally {
       client.release();
     }
@@ -221,10 +194,7 @@ class QrCodeController {
       );
       
       if (qrCodeCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '收款码不存在或无权限访问'
-        });
+        return res.error(404, '收款码不存在或无权限访问');
       }
       
       // 更新状态
@@ -240,20 +210,12 @@ class QrCodeController {
       
       logger.info(`用户 ${user_id} ${is_active ? '激活' : '停用'}了收款码: ${id}`);
       
-      res.status(200).json({
-        success: true,
-        data: {
-          qr_code: qrCode,
-          message: `收款码已${is_active ? '激活' : '停用'}`
-        }
+      res.success(200, `收款码已${is_active ? '激活' : '停用'}`, {
+        qr_code: qrCode
       });
     } catch (error) {
       logger.error('更新收款码状态失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '更新收款码状态失败',
-        error: error.message
-      });
+      res.error(500, '更新收款码状态失败', error.message);
     } finally {
       client.release();
     }
@@ -277,10 +239,7 @@ class QrCodeController {
       );
       
       if (qrCodeCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '收款码不存在或无权限访问'
-        });
+        return res.error(404, '收款码不存在或无权限访问');
       }
       
       const qr_type = qrCodeCheck.rows[0].qr_type;
@@ -310,21 +269,13 @@ class QrCodeController {
       
       logger.info(`用户 ${user_id} 设置了默认${qr_type}收款码: ${id}`);
       
-      res.status(200).json({
-        success: true,
-        data: {
-          qr_code: qrCode,
-          message: '默认收款码设置成功'
-        }
+      res.success(200, '默认收款码设置成功', {
+        qr_code: qrCode
       });
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('设置默认收款码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '设置默认收款码失败',
-        error: error.message
-      });
+      res.error(500, '设置默认收款码失败', error.message);
     } finally {
       client.release();
     }
@@ -348,10 +299,7 @@ class QrCodeController {
       );
       
       if (qrCodeCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '收款码不存在或无权限访问'
-        });
+        return res.error(404, '收款码不存在或无权限访问');
       }
       
       const qr_image_url = qrCodeCheck.rows[0].qr_image_url;
@@ -369,17 +317,10 @@ class QrCodeController {
       
       logger.info(`用户 ${user_id} 删除了收款码: ${id}`);
       
-      res.status(200).json({
-        success: true,
-        message: '收款码删除成功'
-      });
+      res.success(200, '收款码删除成功');
     } catch (error) {
       logger.error('删除收款码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '删除收款码失败',
-        error: error.message
-      });
+      res.error(500, '删除收款码失败', error.message);
     } finally {
       client.release();
     }
@@ -398,10 +339,7 @@ class QrCodeController {
       
       // 验证收款码类型
       if (!qr_type || !['wechat', 'alipay'].includes(qr_type)) {
-        return res.status(400).json({
-          success: false,
-          message: '收款码类型必须是wechat或alipay'
-        });
+        return res.error(400, '收款码类型必须是wechat或alipay');
       }
       
       const result = await client.query(
@@ -413,25 +351,15 @@ class QrCodeController {
       );
       
       if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: `未找到默认的${qr_type}收款码`
-        });
+        return res.error(404, `未找到默认的${qr_type}收款码`);
       }
       
-      res.status(200).json({
-        success: true,
-        data: {
-          qr_code: result.rows[0]
-        }
+      res.success(200, '获取默认收款码成功', {
+        qr_code: result.rows[0]
       });
     } catch (error) {
       logger.error('获取默认收款码失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取默认收款码失败',
-        error: error.message
-      });
+      res.error(500, '获取默认收款码失败', error.message);
     } finally {
       client.release();
     }

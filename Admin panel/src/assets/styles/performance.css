@@ -1,0 +1,128 @@
+/* 全局样式 */
+
+/* 懒加载图片样式 */
+.lazy-loading {
+  opacity: 0.7;
+  filter: blur(2px);
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+.lazy-loaded {
+  opacity: 1;
+  filter: blur(0);
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+/* 性能优化相关样式 */
+/* 避免布局偏移的占位容器 */
+.image-placeholder {
+  background-color: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  font-size: 14px;
+}
+
+/* 优化滚动性能 */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  /* 启用硬件加速 */
+  transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+/* 优化动画性能 */
+.optimize-animation {
+  /* 启用硬件加速 */
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* 减少重绘和回流的样式 */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-size {
+  contain: size;
+}
+
+/* 优化文本渲染 */
+.optimize-text {
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 优化表格渲染 */
+.optimize-table {
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+/* 优化列表渲染 */
+.virtual-list {
+  contain: strict;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* 响应式图片优化 */
+.responsive-image {
+  max-width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+/* 优化按钮点击性能 */
+.fast-click {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 减少重绘的样式 */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-scroll {
+  will-change: scroll-position;
+}
+
+/* 优化字体加载 */
+.font-display-swap {
+  font-display: swap;
+}
+
+/* 优化背景渲染 */
+.background-attachment-fixed {
+  background-attachment: fixed;
+  will-change: transform;
+}
+
+/* 优化视频渲染 */
+.optimize-video {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* 优化Canvas渲染 */
+.optimize-canvas {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* 优化SVG渲染 */
+.optimize-svg {
+  will-change: transform;
+  transform: translateZ(0);
+}

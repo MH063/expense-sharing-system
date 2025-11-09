@@ -50,10 +50,7 @@ class SpecialPaymentRulesController {
       );
 
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看此房间的支付规则'
-        });
+        return res.error(403, '您没有权限查看此房间的支付规则');
       }
 
       // 获取房间的特殊支付规则
@@ -66,19 +63,12 @@ class SpecialPaymentRulesController {
         [roomId]
       );
 
-      res.status(200).json({
-        success: true,
-        data: {
-          rules: rulesResult.rows
-        }
+      res.success(200, '获取房间支付规则成功', {
+        rules: rulesResult.rows
       });
     } catch (error) {
       logger.error('获取房间支付规则失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取房间支付规则失败',
-        error: error.message
-      });
+      res.error(500, '获取房间支付规则失败', error.message);
     } finally {
       client.release();
     }
@@ -98,18 +88,12 @@ class SpecialPaymentRulesController {
 
       // 验证必填字段
       if (!name || !rule_type || !conditions) {
-        return res.status(400).json({
-          success: false,
-          message: '请提供完整的规则信息'
-        });
+        return res.error(400, '请提供完整的规则信息');
       }
 
       // 验证规则类型
       if (!['self_only', 'multiple_payers', 'payer_to_payer'].includes(rule_type)) {
-        return res.status(400).json({
-          success: false,
-          message: '无效的规则类型'
-        });
+        return res.error(400, '无效的规则类型');
       }
 
       // 检查用户是否有权限创建房间规则
@@ -120,10 +104,7 @@ class SpecialPaymentRulesController {
       );
 
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限创建此房间的支付规则'
-        });
+        return res.error(403, '您没有权限创建此房间的支付规则');
       }
 
       // 创建特殊支付规则
@@ -137,20 +118,12 @@ class SpecialPaymentRulesController {
 
       logger.info(`用户 ${userId} 创建了支付规则 ${ruleResult.rows[0].id}`);
 
-      res.status(201).json({
-        success: true,
-        data: {
-          rule: ruleResult.rows[0]
-        },
-        message: '支付规则创建成功'
+      res.success(201, '支付规则创建成功', {
+        rule: ruleResult.rows[0]
       });
     } catch (error) {
       logger.error('创建支付规则失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '创建支付规则失败',
-        error: error.message
-      });
+      res.error(500, '创建支付规则失败', error.message);
     } finally {
       client.release();
     }
@@ -179,10 +152,7 @@ class SpecialPaymentRulesController {
       );
 
       if (ruleCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '支付规则不存在或您没有权限访问'
-        });
+        return res.error(404, '支付规则不存在或您没有权限访问');
       }
 
       const rule = ruleCheck.rows[0];
@@ -190,10 +160,7 @@ class SpecialPaymentRulesController {
 
       // 检查用户是否有权限更新规则（只有房间管理员或创建者可以更新）
       if (userRelationType !== 'owner' && userRelationType !== 'admin' && rule.created_by !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限更新此支付规则'
-        });
+        return res.error(403, '您没有权限更新此支付规则');
       }
 
       // 构建更新查询
@@ -227,10 +194,7 @@ class SpecialPaymentRulesController {
       }
 
       if (updateFields.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '没有提供要更新的字段'
-        });
+        return res.error(400, '没有提供要更新的字段');
       }
 
       updateFields.push(`updated_at = NOW()`);
@@ -248,20 +212,12 @@ class SpecialPaymentRulesController {
 
       logger.info(`用户 ${userId} 更新了支付规则 ${ruleId}`);
 
-      res.status(200).json({
-        success: true,
-        data: {
-          rule: updateResult.rows[0]
-        },
-        message: '支付规则更新成功'
+      res.success(200, '支付规则更新成功', {
+        rule: updateResult.rows[0]
       });
     } catch (error) {
       logger.error('更新支付规则失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '更新支付规则失败',
-        error: error.message
-      });
+      res.error(500, '更新支付规则失败', error.message);
     } finally {
       client.release();
     }
@@ -289,10 +245,7 @@ class SpecialPaymentRulesController {
       );
 
       if (ruleCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '支付规则不存在或您没有权限访问'
-        });
+        return res.error(404, '支付规则不存在或您没有权限访问');
       }
 
       const rule = ruleCheck.rows[0];
@@ -300,10 +253,7 @@ class SpecialPaymentRulesController {
 
       // 检查用户是否有权限删除规则（只有房间管理员或创建者可以删除）
       if (userRelationType !== 'owner' && userRelationType !== 'admin' && rule.created_by !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限删除此支付规则'
-        });
+        return res.error(403, '您没有权限删除此支付规则');
       }
 
       // 删除规则
@@ -311,17 +261,10 @@ class SpecialPaymentRulesController {
 
       logger.info(`用户 ${userId} 删除了支付规则 ${ruleId}`);
 
-      res.status(200).json({
-        success: true,
-        message: '支付规则删除成功'
-      });
+      res.success(200, '支付规则删除成功');
     } catch (error) {
       logger.error('删除支付规则失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '删除支付规则失败',
-        error: error.message
-      });
+      res.error(500, '删除支付规则失败', error.message);
     } finally {
       client.release();
     }
@@ -348,10 +291,7 @@ class SpecialPaymentRulesController {
       );
 
       if (billCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '账单不存在'
-        });
+        return res.error(404, '账单不存在');
       }
 
       const bill = billCheck.rows[0];
@@ -365,10 +305,7 @@ class SpecialPaymentRulesController {
       );
 
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看此账单'
-        });
+        return res.error(403, '您没有权限查看此账单');
       }
 
       // 获取账单关联的费用类型
@@ -417,20 +354,13 @@ class SpecialPaymentRulesController {
         return true;
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          bill_id: billId,
-          applicable_rules: applicableRules
-        }
+      res.success(200, '获取适用支付规则成功', {
+        bill_id: billId,
+        applicable_rules: applicableRules
       });
     } catch (error) {
       logger.error('获取适用支付规则失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取适用支付规则失败',
-        error: error.message
-      });
+      res.error(500, '获取适用支付规则失败', error.message);
     } finally {
       client.release();
     }
@@ -458,10 +388,7 @@ class SpecialPaymentRulesController {
       );
 
       if (billCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '账单不存在'
-        });
+        return res.error(404, '账单不存在');
       }
 
       const bill = billCheck.rows[0];
@@ -476,20 +403,14 @@ class SpecialPaymentRulesController {
       );
 
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限操作此账单'
-        });
+        return res.error(403, '您没有权限操作此账单');
       }
 
       const userRelationType = permissionCheck.rows[0].relation_type;
 
       // 只有房间管理员或账单创建者可以应用规则
       if (userRelationType !== 'owner' && userRelationType !== 'admin' && bill.created_by !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限应用支付规则到此账单'
-        });
+        return res.error(403, '您没有权限应用支付规则到此账单');
       }
 
       // 检查规则是否存在
@@ -500,10 +421,7 @@ class SpecialPaymentRulesController {
       );
 
       if (ruleCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '支付规则不存在或不适用于此房间'
-        });
+        return res.error(404, '支付规则不存在或不适用于此房间');
       }
 
       const rule = ruleCheck.rows[0];
@@ -535,22 +453,14 @@ class SpecialPaymentRulesController {
 
       logger.info(`用户 ${userId} 将支付规则 ${ruleId} 应用到账单 ${billId}`);
 
-      res.status(200).json({
-        success: true,
-        data: {
-          application: applicationResult.rows[0],
-          rule: rule
-        },
-        message: '支付规则应用成功'
+      res.success(200, '支付规则应用成功', {
+        application: applicationResult.rows[0],
+        rule: rule
       });
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('应用支付规则失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '应用支付规则失败',
-        error: error.message
-      });
+      res.error(500, '应用支付规则失败', error.message);
     } finally {
       client.release();
     }
@@ -614,18 +524,12 @@ class SpecialPaymentRulesController {
 
       // 验证必填字段
       if (!to_user_id || !amount || !payment_method) {
-        return res.status(400).json({
-          success: false,
-          message: '请提供完整的支付转移信息'
-        });
+        return res.error(400, '请提供完整的支付转移信息');
       }
 
       // 验证支付方式
       if (!['wechat', 'alipay', 'cash', 'bank_transfer'].includes(payment_method)) {
-        return res.status(400).json({
-          success: false,
-          message: '无效的支付方式'
-        });
+        return res.error(400, '无效的支付方式');
       }
 
       // 检查账单是否存在
@@ -638,10 +542,7 @@ class SpecialPaymentRulesController {
       );
 
       if (billCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '账单不存在'
-        });
+        return res.error(404, '账单不存在');
       }
 
       const bill = billCheck.rows[0];
@@ -655,10 +556,7 @@ class SpecialPaymentRulesController {
       );
 
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限操作此账单'
-        });
+        return res.error(403, '您没有权限操作此账单');
       }
 
       // 检查目标用户是否在房间中
@@ -669,10 +567,7 @@ class SpecialPaymentRulesController {
       );
 
       if (targetUserCheck.rows.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '目标用户不在房间中'
-        });
+        return res.error(400, '目标用户不在房间中');
       }
 
       // 检查是否有适用的缴费人之间支付规则
@@ -684,10 +579,7 @@ class SpecialPaymentRulesController {
       );
 
       if (ruleCheck.rows.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '此账单不允许缴费人之间支付'
-        });
+        return res.error(400, '此账单不允许缴费人之间支付');
       }
 
       await client.query('BEGIN');
@@ -738,21 +630,13 @@ class SpecialPaymentRulesController {
 
       logger.info(`用户 ${userId} 为账单 ${billId} 的用户 ${to_user_id} 支付了金额 ${amount}`);
 
-      res.status(201).json({
-        success: true,
-        data: {
-          transfer: transferResult.rows[0]
-        },
-        message: '支付转移记录创建成功'
+      res.success(201, '支付转移记录创建成功', {
+        transfer: transferResult.rows[0]
       });
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('创建支付转移记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '创建支付转移记录失败',
-        error: error.message
-      });
+      res.error(500, '创建支付转移记录失败', error.message);
     } finally {
       client.release();
     }
@@ -779,10 +663,7 @@ class SpecialPaymentRulesController {
       );
 
       if (billCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '账单不存在'
-        });
+        return res.error(404, '账单不存在');
       }
 
       const bill = billCheck.rows[0];
@@ -796,10 +677,7 @@ class SpecialPaymentRulesController {
       );
 
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看此账单'
-        });
+        return res.error(403, '您没有权限查看此账单');
       }
 
       // 获取支付转移记录
@@ -815,20 +693,13 @@ class SpecialPaymentRulesController {
         [billId]
       );
 
-      res.status(200).json({
-        success: true,
-        data: {
-          bill_id: billId,
-          transfers: transfersResult.rows
-        }
+      res.success(200, '获取账单支付转移记录成功', {
+        bill_id: billId,
+        transfers: transfersResult.rows
       });
     } catch (error) {
       logger.error('获取账单支付转移记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取账单支付转移记录失败',
-        error: error.message
-      });
+      res.error(500, '获取账单支付转移记录失败', error.message);
     } finally {
       client.release();
     }

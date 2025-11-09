@@ -96,7 +96,7 @@ console.log('CORS配置加载完成');
 
 // 导入响应处理中间件
 console.log('即将加载响应处理中间件...');
-const { standardResponseMiddleware } = require('./middleware/responseHandler');
+const { newResponseMiddleware } = require('./middleware/newResponseHandler');
 console.log('响应处理中间件加载完成');
 
 // 导入token管理中间件
@@ -157,6 +157,7 @@ const fileRoutes = require('./routes/file-routes');
 const websocketManagementRoutes = require('./routes/websocket-management-routes');
 const roleRoutes = require('./routes/role-routes');
 const leaveRecordRoutes = require('./routes/leave-record-routes');
+const stayDaysRoutes = require('./routes/stay-days-routes');
 
 // 导入错误处理中间件
 const { errorHandler, notFoundHandler } = require('./middleware/error-handler');
@@ -203,7 +204,7 @@ app.use(metricsMiddleware);
 setupSecurityHeaders(app);
 
 // 响应处理中间件
-app.use(standardResponseMiddleware);
+app.use(newResponseMiddleware);
 
 // Token 相关中间件（长度/大小校验应早于限流）
 app.use(checkRequestBodySize);
@@ -261,6 +262,7 @@ app.use('/api/mfa', mfaRoutes);
 app.use('/api/user-preferences', userPreferencesRoutes);
 app.use('/api/abnormal-expenses', abnormalExpenseRoutes);
 app.use('/api/leave-records', leaveRecordRoutes);
+app.use('/api/stay-days', stayDaysRoutes);
 app.use('/api/cache-test', cacheTestRoutes);
 
 // 前端应用路由（使用绝对路径，兼容空格路径；目录不存在则跳过挂载并记录日志）

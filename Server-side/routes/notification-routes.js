@@ -25,10 +25,10 @@ router.get('/', authenticateToken, roleAwareRateLimiter('loose'), async (req, re
       limit: parseInt(limit)
     });
     logger.info('audit:notifications:list', { userId: req.user.sub, page, limit, unreadOnly, type });
-    res.status(200).json({ success: true, data: result });
+    res.success(200, '获取通知列表成功', result);
   } catch (error) {
     logger.error('audit:notifications:list:error', { userId: req.user.sub, error: error.message });
-    res.status(500).json({ success: false, message: '获取通知失败', error: error.message });
+    res.error(500, '获取通知失败', error.message);
   }
 });
 
@@ -37,10 +37,10 @@ router.get('/unread-count', authenticateToken, roleAwareRateLimiter('loose'), as
   try {
     const count = await NotificationController.getUnreadNotificationsCount(req.user.sub);
     logger.info('audit:notifications:unread_count', { userId: req.user.sub, count });
-    res.status(200).json({ success: true, data: { count } });
+    res.success(200, '获取未读通知数量成功', { count });
   } catch (error) {
     logger.error('audit:notifications:unread_count:error', { userId: req.user.sub, error: error.message });
-    res.status(500).json({ success: false, message: '获取未读通知数量失败', error: error.message });
+    res.error(500, '获取未读通知数量失败', error.message);
   }
 });
 
@@ -53,10 +53,10 @@ router.put(
     try {
       const success = await NotificationController.markNotificationAsRead(req.params.id, req.user.sub);
       logger.info('audit:notifications:mark_read', { userId: req.user.sub, notificationId: req.params.id, success });
-      res.status(200).json({ success, message: success ? '标记成功' : '标记失败' });
+      res.success(200, success ? '标记成功' : '标记失败', { success });
     } catch (error) {
       logger.error('audit:notifications:mark_read:error', { userId: req.user.sub, notificationId: req.params.id, error: error.message });
-      res.status(500).json({ success: false, message: '标记通知为已读失败', error: error.message });
+      res.error(500, '标记通知为已读失败', error.message);
     }
   }
 );
@@ -72,10 +72,10 @@ router.put(
     try {
       const updated = await NotificationController.markAllNotificationsAsRead(req.user.sub, req.body.type);
       logger.info('audit:notifications:mark_all_read', { userId: req.user.sub, type: req.body.type, updated });
-      res.status(200).json({ success: true, data: { updated } });
+      res.success(200, '批量标记已读成功', { updated });
     } catch (error) {
       logger.error('audit:notifications:mark_all_read:error', { userId: req.user.sub, type: req.body.type, error: error.message });
-      res.status(500).json({ success: false, message: '批量标记已读失败', error: error.message });
+      res.error(500, '批量标记已读失败', error.message);
     }
   }
 );
@@ -85,10 +85,10 @@ router.delete('/:id', authenticateToken, roleAwareRateLimiter('strict'), async (
   try {
     const success = await NotificationController.deleteNotification(req.params.id, req.user.sub);
     logger.info('audit:notifications:delete', { userId: req.user.sub, notificationId: req.params.id, success });
-    res.status(200).json({ success, message: success ? '删除成功' : '删除失败' });
+    res.success(200, success ? '删除成功' : '删除失败', { success });
   } catch (error) {
     logger.error('audit:notifications:delete:error', { userId: req.user.sub, notificationId: req.params.id, error: error.message });
-    res.status(500).json({ success: false, message: '删除通知失败', error: error.message });
+    res.error(500, '删除通知失败', error.message);
   }
 });
 
@@ -109,10 +109,10 @@ router.post(
         related_id: req.body.related_id
       });
       logger.info('audit:notifications:create', { adminUserId: req.user.sub, targetUserId: req.body.user_id, type: req.body.type, notificationId: notification.id });
-      res.status(201).json({ success: true, data: notification });
+      res.success(201, '创建通知成功', notification);
     } catch (error) {
       logger.error('audit:notifications:create:error', { adminUserId: req.user.sub, targetUserId: req.body.user_id, error: error.message });
-      res.status(500).json({ success: false, message: '创建通知失败', error: error.message });
+      res.error(500, '创建通知失败', error.message);
     }
   }
 );
@@ -122,10 +122,10 @@ router.get('/bill-due-reminders', authenticateToken, roleAwareRateLimiter('loose
   try {
     const reminders = await NotificationController.getBillDueReminders(req.user.sub);
     logger.info('audit:notifications:bill_due_reminders', { userId: req.user.sub, count: Array.isArray(reminders) ? reminders.length : undefined });
-    res.status(200).json({ success: true, data: reminders });
+    res.success(200, '获取账单到期提醒成功', reminders);
   } catch (error) {
     logger.error('audit:notifications:bill_due_reminders:error', { userId: req.user.sub, error: error.message });
-    res.status(500).json({ success: false, message: '获取账单到期提醒失败', error: error.message });
+    res.error(500, '获取账单到期提醒失败', error.message);
   }
 });
 
@@ -134,10 +134,10 @@ router.get('/payment-status-changes', authenticateToken, roleAwareRateLimiter('l
   try {
     const notifications = await NotificationController.getPaymentStatusNotifications(req.user.sub);
     logger.info('audit:notifications:payment_status_changes', { userId: req.user.sub, count: Array.isArray(notifications) ? notifications.length : undefined });
-    res.status(200).json({ success: true, data: notifications });
+    res.success(200, '获取支付状态变更通知成功', notifications);
   } catch (error) {
     logger.error('audit:notifications:payment_status_changes:error', { userId: req.user.sub, error: error.message });
-    res.status(500).json({ success: false, message: '获取支付状态变更通知失败', error: error.message });
+    res.error(500, '获取支付状态变更通知失败', error.message);
   }
 });
 
@@ -147,10 +147,10 @@ router.post('/subscriptions/subscribe', authenticateToken, roleAwareRateLimiter(
     const { events = [] } = req.body || {};
     logger.info('audit:websocket:subscribe', { userId: req.user.sub, events });
     // 占位：返回确认，指引客户端使用WS消息 { type: 'subscribe', events }
-    res.status(200).json({ success: true, message: '订阅请求已记录，请在WebSocket连接中发送订阅消息', data: { events } });
+    res.success(200, '订阅请求已记录，请在WebSocket连接中发送订阅消息', { events });
   } catch (error) {
     logger.error('audit:websocket:subscribe:error', { userId: req.user.sub, error: error.message });
-    res.status(500).json({ success: false, message: '订阅管理失败', error: error.message });
+    res.error(500, '订阅管理失败', error.message);
   }
 });
 
@@ -158,10 +158,10 @@ router.post('/subscriptions/unsubscribe', authenticateToken, roleAwareRateLimite
   try {
     const { events = [] } = req.body || {};
     logger.info('audit:websocket:unsubscribe', { userId: req.user.sub, events });
-    res.status(200).json({ success: true, message: '取消订阅请求已记录，请在WebSocket连接中发送取消订阅消息', data: { events } });
+    res.success(200, '取消订阅请求已记录，请在WebSocket连接中发送取消订阅消息', { events });
   } catch (error) {
     logger.error('audit:websocket:unsubscribe:error', { userId: req.user.sub, error: error.message });
-    res.status(500).json({ success: false, message: '取消订阅失败', error: error.message });
+    res.error(500, '取消订阅失败', error.message);
   }
 });
 

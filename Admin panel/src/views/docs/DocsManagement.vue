@@ -139,7 +139,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Document, DataAnalysis, Clock, ArrowLeft, Refresh, Download, Files, TrendCharts, User, View } from '@element-plus/icons-vue'
+import { Document, DataAnalysis, AlarmClock, ArrowLeft, Refresh, Download, Files, TrendCharts, User, View } from '@element-plus/icons-vue'
 import request from '@/request'
 
 const router = useRouter()

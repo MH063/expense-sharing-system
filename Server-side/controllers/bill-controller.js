@@ -61,35 +61,23 @@ class BillController {
       
       // 验证必填字段
       if (!title || !total_amount || !room_id || !due_date) {
-        return res.status(400).json({
-          success: false,
-          message: '标题、金额、房间ID和到期日期为必填项'
-        });
+        return res.error(400, '标题、金额、房间ID和到期日期为必填项');
       }
       
       // 验证金额格式
       if (isNaN(total_amount) || parseFloat(total_amount) <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: '金额必须是大于0的数字'
-        });
+        return res.error(400, '金额必须是大于0的数字');
       }
       
       // 验证分摊类型
       if (!['EQUAL', 'CUSTOM', 'PERCENTAGE'].includes(split_type)) {
-        return res.status(400).json({
-          success: false,
-          message: '分摊类型必须是 EQUAL、CUSTOM 或 PERCENTAGE'
-        });
+        return res.error(400, '分摊类型必须是 EQUAL、CUSTOM 或 PERCENTAGE');
       }
       
       // 验证日期格式
       const dueDateObj = new Date(due_date);
       if (isNaN(dueDateObj.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: '到期日期格式无效'
-        });
+        return res.error(400, '到期日期格式无效');
       }
       
       // 验证用户是否为寝室成员
@@ -99,10 +87,7 @@ class BillController {
       );
       
       if (memberCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您不是该寝室的成员'
-        });
+        return res.error(403, '您不是该寝室的成员');
       }
       
       // 验证费用记录是否属于该寝室
@@ -113,10 +98,7 @@ class BillController {
         );
         
         if (parseInt(expenseCheck.rows[0].count) !== expense_ids.length) {
-          return res.status(400).json({
-            success: false,
-            message: '部分费用记录不属于该寝室'
-          });
+          return res.error(400, '部分费用记录不属于该寝室');
         }
       }
       
@@ -130,19 +112,13 @@ class BillController {
         );
         
         if (parseInt(memberValidation.rows[0].count) !== memberIds.length) {
-          return res.status(400).json({
-            success: false,
-            message: '分摊成员包含非寝室成员'
-          });
+          return res.error(400, '分摊成员包含非寝室成员');
         }
         
         // 验证分摊金额总和是否等于账单总金额
         const splitTotal = split_details.reduce((sum, detail) => PrecisionCalculator.add(sum, parseFloat(detail.amount)), 0);
         if (Math.abs(PrecisionCalculator.subtract(splitTotal, parseFloat(total_amount))) > 0.01) {
-          return res.status(400).json({
-            success: false,
-            message: '分摊金额总和与账单总金额不匹配'
-          });
+          return res.error(400, '分摊金额总和与账单总金额不匹配');
         }
       }
       
@@ -156,19 +132,13 @@ class BillController {
         );
         
         if (parseInt(memberValidation.rows[0].count) !== memberIds.length) {
-          return res.status(400).json({
-            success: false,
-            message: '分摊成员包含非寝室成员'
-          });
+          return res.error(400, '分摊成员包含非寝室成员');
         }
         
         // 验证百分比总和是否等于100%
         const percentageTotal = split_details.reduce((sum, detail) => PrecisionCalculator.add(sum, parseFloat(detail.amount)), 0);
         if (Math.abs(PrecisionCalculator.subtract(percentageTotal, 100)) > 0.01) {
-          return res.status(400).json({
-            success: false,
-            message: '百分比总和必须等于100%'
-          });
+          return res.error(400, '百分比总和必须等于100%');
         }
       }
       
@@ -216,10 +186,7 @@ class BillController {
       
       // 验证房间是否有成员
       if (memberCount === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '该房间没有成员，无法创建账单'
-        });
+        return res.error(400, '该房间没有成员，无法创建账单');
       }
       
       // 创建账单分摊记录
@@ -336,21 +303,11 @@ class BillController {
       
       logger.info(`账单创建成功: ${bill.id}, 创建者: ${user_id}, 寝室: ${room_id}`);
       
-      res.status(201).json({
-        success: true,
-        data: {
-          bill,
-          message: '账单创建成功'
-        }
-      });
+      res.success(201, '账单创建成功', { bill });
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('创建账单失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '创建账单失败',
-        error: error.message
-      });
+      res.error(500, '创建账单失败', error.message);
     } finally {
       client.release();
     }
@@ -366,7 +323,7 @@ class BillController {
     try {
       const user_id = (req.user && (req.user.sub || req.user.id)) || null;
       if (!user_id) {
-        return res.status(401).json({ success: false, message: '未认证的用户' });
+        return res.error(401, '未认证的用户');
       }
       const { 
         room_id, 
@@ -528,25 +485,18 @@ class BillController {
         })
       );
       
-      res.status(200).json({
-        success: true,
-        data: {
-          bills: billsWithSplits,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            pages: Math.ceil(total / limit)
-          }
+      res.success(200, '获取账单列表成功', {
+        bills: billsWithSplits,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
         }
       });
     } catch (error) {
       logger.error('获取账单列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取账单列表失败',
-        error: error.message
-      });
+      res.error(500, '获取账单列表失败', error.message);
     } finally {
       client.release();
     }
@@ -573,10 +523,7 @@ class BillController {
       );
       
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看该账单'
-        });
+        return res.error(403, '您没有权限查看该账单');
       }
       
       // 获取账单基本信息
@@ -626,19 +573,10 @@ class BillController {
       const reviewsResult = await client.query(reviewsQuery, [id]);
       bill.reviews = reviewsResult.rows;
       
-      res.status(200).json({
-        success: true,
-        data: {
-          bill
-        }
-      });
+      res.success(200, '获取账单详情成功', { bill });
     } catch (error) {
       logger.error('获取账单详情失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取账单详情失败',
-        error: error.message
-      });
+      res.error(500, '获取账单详情失败', error.message);
     } finally {
       client.release();
     }
@@ -760,21 +698,11 @@ class BillController {
       
       logger.info(`账单更新成功: ${id}, 更新者: ${user_id}`);
       
-      res.status(200).json({
-        success: true,
-        data: {
-          bill: updatedBill,
-          message: '账单更新成功'
-        }
-      });
+      res.success(200, '账单更新成功', { bill: updatedBill });
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('更新账单失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '更新账单失败',
-        error: error.message
-      });
+      res.error(500, '更新账单失败', error.message);
     } finally {
       client.release();
     }
@@ -801,10 +729,7 @@ class BillController {
       );
       
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限删除该账单'
-        });
+        return res.error(403, '您没有权限删除该账单');
       }
       
       const bill = permissionCheck.rows[0];
@@ -812,18 +737,12 @@ class BillController {
       
       // 只有创建者或寝室管理员可以删除账单
       if (bill.creator_id !== user_id && memberRole !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          message: '只有创建者或寝室管理员可以删除账单'
-        });
+        return res.error(403, '只有创建者或寝室管理员可以删除账单');
       }
       
       // 只有PENDING状态的账单可以删除
       if (bill.status !== 'PENDING') {
-        return res.status(400).json({
-          success: false,
-          message: '只有待审核状态的账单可以删除'
-        });
+        return res.error(400, '只有待审核状态的账单可以删除');
       }
       
       // 开始事务
@@ -854,20 +773,11 @@ class BillController {
       
       logger.info(`账单删除成功: ${id}, 删除者: ${user_id}`);
       
-      res.status(200).json({
-        success: true,
-        data: {
-          message: '账单删除成功'
-        }
-      });
+      res.success(200, '账单删除成功');
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('删除账单失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '删除账单失败',
-        error: error.message
-      });
+      res.error(500, '删除账单失败', error.message);
     } finally {
       client.release();
     }
@@ -895,10 +805,7 @@ class BillController {
       );
       
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限审核该账单'
-        });
+        return res.error(403, '您没有权限审核该账单');
       }
       
       const bill = permissionCheck.rows[0];
@@ -906,18 +813,12 @@ class BillController {
       
       // 只有寝室管理员可以审核账单
       if (memberRole !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室管理员可以审核账单'
-        });
+        return res.error(403, '只有寝室管理员可以审核账单');
       }
       
       // 只有PENDING状态的账单可以审核
       if (bill.status !== 'PENDING') {
-        return res.status(400).json({
-          success: false,
-          message: '只有待审核状态的账单可以审核'
-        });
+        return res.error(400, '只有待审核状态的账单可以审核');
       }
       
       // 开始事务
@@ -953,20 +854,11 @@ class BillController {
       
       logger.info(`账单审核成功: ${id}, 审核者: ${user_id}, 动作: ${action}`);
       
-      res.status(200).json({
-        success: true,
-        data: {
-          message: `账单${action === 'APPROVE' ? '通过' : '拒绝'}审核`
-        }
-      });
+      res.success(200, `账单${action === 'APPROVE' ? '通过' : '拒绝'}审核`);
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('审核账单失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '审核账单失败',
-        error: error.message
-      });
+      res.error(500, '审核账单失败', error.message);
     } finally {
       client.release();
     }
@@ -993,10 +885,7 @@ class BillController {
       );
       
       if (splitCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有该账单的分摊记录'
-        });
+        return res.error(403, '您没有该账单的分摊记录');
       }
       
       const split = splitCheck.rows[0];
@@ -1004,18 +893,12 @@ class BillController {
       
       // 只有已审核通过的账单可以支付
       if (billStatus !== 'APPROVED') {
-        return res.status(400).json({
-          success: false,
-          message: '只有已审核通过的账单可以支付'
-        });
+        return res.error(400, '只有已审核通过的账单可以支付');
       }
       
       // 只有待支付状态的分摊可以确认支付
       if (split.status !== 'PENDING_PAYMENT') {
-        return res.status(400).json({
-          success: false,
-          message: '该分摊已支付或状态不正确'
-        });
+        return res.error(400, '该分摊已支付或状态不正确');
       }
       
       // 开始事务
@@ -1070,20 +953,11 @@ class BillController {
       
       logger.info(`账单支付确认成功: 账单ID ${id}, 用户ID ${user_id}`);
       
-      res.status(200).json({
-        success: true,
-        data: {
-          message: '支付确认成功'
-        }
-      });
+      res.success(200, '支付确认成功');
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('确认账单支付失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '确认账单支付失败',
-        error: error.message
-      });
+      res.error(500, '确认账单支付失败', error.message);
     } finally {
       client.release();
     }
@@ -1150,27 +1024,20 @@ class BillController {
       const trendResult = await client.query(trendQuery, params);
       const trendData = trendResult.rows;
       
-      res.status(200).json({
-        success: true,
-        data: {
-          pending: {
-            count: parseInt(pendingStats.count),
-            total_amount: PrecisionCalculator.round(parseFloat(pendingStats.total_amount), 2)
-          },
-          paid: {
-            count: parseInt(paidStats.count),
-            total_amount: PrecisionCalculator.round(parseFloat(paidStats.total_amount), 2)
-          },
-          trend: trendData
-        }
+      res.success(200, '获取用户账单统计成功', {
+        pending: {
+          count: parseInt(pendingStats.count),
+          total_amount: PrecisionCalculator.round(parseFloat(pendingStats.total_amount), 2)
+        },
+        paid: {
+          count: parseInt(paidStats.count),
+          total_amount: PrecisionCalculator.round(parseFloat(paidStats.total_amount), 2)
+        },
+        trend: trendData
       });
     } catch (error) {
       logger.error('获取用户账单统计失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取用户账单统计失败',
-        error: error.message
-      });
+      res.error(500, '获取用户账单统计失败', error.message);
     } finally {
       client.release();
     }
@@ -1184,7 +1051,7 @@ class BillController {
   async uploadReceipt(req, res) {
     try {
       if (!req.file) {
-        return res.status(400).json({ success: false, message: '未上传文件' });
+        return res.error(400, '未上传文件');
       }
     
       // 构建文件访问URL
@@ -1193,22 +1060,14 @@ class BillController {
       // 记录上传日志
       logger.info(`用户 ${req.user.id} 上传收据: ${req.file.originalname} -> ${fileUrl}`);
       
-      return res.status(200).json({
-        success: true,
-        message: '收据上传成功',
-        data: {
-          fileUrl,
-          fileName: req.file.originalname,
-          fileSize: req.file.size
-        }
+      return res.success(200, '收据上传成功', {
+        fileUrl,
+        fileName: req.file.originalname,
+        fileSize: req.file.size
       });
     } catch (error) {
       logger.error('上传收据失败:', error);
-      return res.status(500).json({
-        success: false,
-        message: '上传收据失败',
-        error: error.message
-      });
+      return res.error(500, '上传收据失败', error.message);
     }
   }
 
@@ -1234,10 +1093,7 @@ class BillController {
       );
       
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限修改该账单的分摊'
-        });
+        return res.error(403, '您没有权限修改该账单的分摊');
       }
       
       const bill = permissionCheck.rows[0];
@@ -1245,18 +1101,12 @@ class BillController {
       
       // 只有寝室管理员或账单创建者可以修改分摊
       if (memberRole !== 'admin' && bill.created_by !== user_id) {
-        return res.status(403).json({
-          success: false,
-          message: '只有寝室管理员或账单创建者可以修改分摊'
-        });
+        return res.error(403, '只有寝室管理员或账单创建者可以修改分摊');
       }
       
       // 只有PENDING或APPROVED状态的账单可以修改分摊
       if (bill.status !== 'PENDING' && bill.status !== 'APPROVED') {
-        return res.status(400).json({
-          success: false,
-          message: '只有待审核或已审核状态的账单可以修改分摊'
-        });
+        return res.error(400, '只有待审核或已审核状态的账单可以修改分摊');
       }
       
       // 获取寝室所有成员
@@ -1374,21 +1224,11 @@ class BillController {
         [id]
       );
       
-      res.status(200).json({
-        success: true,
-        data: {
-          message: '账单分摊重新计算成功',
-          splits: updatedSplitsQuery.rows
-        }
-      });
+      res.success(200, '账单分摊重新计算成功', { splits: updatedSplitsQuery.rows });
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('重新计算账单分摊失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '重新计算账单分摊失败',
-        error: error.message
-      });
+      res.error(500, '重新计算账单分摊失败', error.message);
     } finally {
       client.release();
     }
@@ -1408,10 +1248,7 @@ class BillController {
       
       // 验证用户是否有权限记录还款（还款人本人）
       if (from_user_id !== user_id) {
-        return res.status(403).json({
-          success: false,
-          message: '您只能记录自己的还款'
-        });
+        return res.error(403, '您只能记录自己的还款');
       }
       
       // 验证账单存在且已审核通过
@@ -1421,10 +1258,7 @@ class BillController {
       );
       
       if (billCheck.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '账单不存在或未审核通过'
-        });
+        return res.error(404, '账单不存在或未审核通过');
       }
       
       // 验证还款人和收款人都有该账单的分摊记录
@@ -1435,18 +1269,12 @@ class BillController {
       );
       
       if (splitsCheck.rows.length < 2) {
-        return res.status(400).json({
-          success: false,
-          message: '还款人或收款人没有该账单的分摊记录'
-        });
+        return res.error(400, '还款人或收款人没有该账单的分摊记录');
       }
       
       // 验证还款金额
       if (amount <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: '还款金额必须大于0'
-        });
+        return res.error(400, '还款金额必须大于0');
       }
       
       // 开始事务
@@ -1470,20 +1298,11 @@ class BillController {
       
       logger.info(`还款记录创建成功: 账单ID ${bill_id}, 从用户 ${from_user_id} 到用户 ${to_user_id}, 金额 ${amount}`);
       
-      res.status(200).json({
-        success: true,
-        data: {
-          message: '还款记录创建成功'
-        }
-      });
+      res.success(200, '还款记录创建成功');
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('记录还款失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '记录还款失败',
-        error: error.message
-      });
+      res.error(500, '记录还款失败', error.message);
     } finally {
       client.release();
     }
@@ -1509,10 +1328,7 @@ class BillController {
       );
       
       if (permissionCheck.rows.length === 0) {
-        return res.status(403).json({
-          success: false,
-          message: '您没有权限查看该账单的结算记录'
-        });
+        return res.error(403, '您没有权限查看该账单的结算记录');
       }
       
       // 获取结算记录
@@ -1528,19 +1344,10 @@ class BillController {
         [bill_id]
       );
       
-      res.status(200).json({
-        success: true,
-        data: {
-          settlements: settlementsQuery.rows
-        }
-      });
+      res.success(200, '获取账单结算记录成功', { settlements: settlementsQuery.rows });
     } catch (error) {
       logger.error('获取账单结算记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取账单结算记录失败',
-        error: error.message
-      });
+      res.error(500, '获取账单结算记录失败', error.message);
     } finally {
       client.release();
     }
@@ -1579,10 +1386,7 @@ class BillController {
       const roomResult = await client.query(roomQuery, params);
       
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '未找到您所在的寝室'
-        });
+        return res.error(404, '未找到您所在的寝室');
       }
       
       const room = roomResult.rows[0];
@@ -1657,42 +1461,35 @@ class BillController {
       const categoryStatsResult = await client.query(categoryStatsQuery, [targetRoomId]);
       const categoryStats = categoryStatsResult.rows;
       
-      res.status(200).json({
-        success: true,
-        data: {
-          room: {
-            id: targetRoomId,
-            name: room.room_name
-          },
-          overall: {
-            total_bills: parseInt(overallStats.total_bills),
-            total_amount: PrecisionCalculator.round(parseFloat(overallStats.total_amount), 2),
-            pending_bills: parseInt(overallStats.pending_bills),
-            approved_bills: parseInt(overallStats.approved_bills),
-            completed_bills: parseInt(overallStats.completed_bills),
-            rejected_bills: parseInt(overallStats.rejected_bills)
-          },
-          members: memberStats.map(member => ({
-            user_id: member.user_id,
-            username: member.username,
-            total_bills: parseInt(member.total_bills),
-            total_amount: PrecisionCalculator.round(parseFloat(member.total_amount), 2),
-            pending_bills: parseInt(member.pending_bills),
-            pending_amount: PrecisionCalculator.round(parseFloat(member.pending_amount), 2),
-            paid_bills: parseInt(member.paid_bills),
-            paid_amount: PrecisionCalculator.round(parseFloat(member.paid_amount), 2)
-          })),
-          trend: trendData,
-          categories: categoryStats
-        }
+      res.success(200, '获取寝室账单统计成功', {
+        room: {
+          id: targetRoomId,
+          name: room.room_name
+        },
+        overall: {
+          total_bills: parseInt(overallStats.total_bills),
+          total_amount: PrecisionCalculator.round(parseFloat(overallStats.total_amount), 2),
+          pending_bills: parseInt(overallStats.pending_bills),
+          approved_bills: parseInt(overallStats.approved_bills),
+          completed_bills: parseInt(overallStats.completed_bills),
+          rejected_bills: parseInt(overallStats.rejected_bills)
+        },
+        members: memberStats.map(member => ({
+          user_id: member.user_id,
+          username: member.username,
+          total_bills: parseInt(member.total_bills),
+          total_amount: PrecisionCalculator.round(parseFloat(member.total_amount), 2),
+          pending_bills: parseInt(member.pending_bills),
+          pending_amount: PrecisionCalculator.round(parseFloat(member.pending_amount), 2),
+          paid_bills: parseInt(member.paid_bills),
+          paid_amount: PrecisionCalculator.round(parseFloat(member.paid_amount), 2)
+        })),
+        trend: trendData,
+        categories: categoryStats
       });
     } catch (error) {
       logger.error('获取寝室账单统计失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取寝室账单统计失败',
-        error: error.message
-      });
+      res.error(500, '获取寝室账单统计失败', error.message);
     } finally {
       client.release();
     }
@@ -1714,10 +1511,7 @@ class BillController {
       const endDate = end_date ? new Date(end_date) : new Date();
       
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: '日期格式无效'
-        });
+        return res.error(400, '日期格式无效');
       }
       
       // 验证用户是否有权限查看该寝室的统计（寝室成员）
@@ -1741,10 +1535,7 @@ class BillController {
       const roomResult = await client.query(roomQuery, params);
       
       if (roomResult.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '未找到您所在的寝室'
-        });
+        return res.error(404, '未找到您所在的寝室');
       }
       
       // 获取账单统计
@@ -1817,42 +1608,35 @@ class BillController {
       const userStatsResult = await client.query(userStatsQuery, [user_id, startDate, endDate]);
       const userStats = userStatsResult.rows;
       
-      res.status(200).json({
-        success: true,
-        data: {
-          date_range: {
-            start_date: startDate.toISOString().split('T')[0],
-            end_date: endDate.toISOString().split('T')[0]
-          },
-          stats: statsData.map(stat => ({
-            period: stat.period,
-            count: parseInt(stat.count),
-            total_amount: PrecisionCalculator.round(parseFloat(stat.total_amount), 2),
-            pending_count: parseInt(stat.pending_count),
-            approved_count: parseInt(stat.approved_count),
-            completed_count: parseInt(stat.completed_count),
-            rejected_count: parseInt(stat.rejected_count)
-          })),
-          categories: categoryStats,
-          users: userStats.map(user => ({
-            user_id: user.user_id,
-            username: user.username,
-            bill_count: parseInt(user.bill_count),
-            total_amount: PrecisionCalculator.round(parseFloat(user.total_amount), 2),
-            pending_count: parseInt(user.pending_count),
-            pending_amount: PrecisionCalculator.round(parseFloat(user.pending_amount), 2),
-            paid_count: parseInt(user.paid_count),
-            paid_amount: PrecisionCalculator.round(parseFloat(user.paid_amount), 2)
-          }))
-        }
+      res.success(200, '获取时间范围内账单统计成功', {
+        date_range: {
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0]
+        },
+        stats: statsData.map(stat => ({
+          period: stat.period,
+          count: parseInt(stat.count),
+          total_amount: PrecisionCalculator.round(parseFloat(stat.total_amount), 2),
+          pending_count: parseInt(stat.pending_count),
+          approved_count: parseInt(stat.approved_count),
+          completed_count: parseInt(stat.completed_count),
+          rejected_count: parseInt(stat.rejected_count)
+        })),
+        categories: categoryStats,
+        users: userStats.map(user => ({
+          user_id: user.user_id,
+          username: user.username,
+          bill_count: parseInt(user.bill_count),
+          total_amount: PrecisionCalculator.round(parseFloat(user.total_amount), 2),
+          pending_count: parseInt(user.pending_count),
+          pending_amount: PrecisionCalculator.round(parseFloat(user.pending_amount), 2),
+          paid_count: parseInt(user.paid_count),
+          paid_amount: PrecisionCalculator.round(parseFloat(user.paid_amount), 2)
+        }))
       });
     } catch (error) {
       logger.error('获取时间范围内账单统计失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '获取时间范围内账单统计失败',
-        error: error.message
-      });
+      res.error(500, '获取时间范围内账单统计失败', error.message);
     } finally {
       client.release();
     }
@@ -1868,7 +1652,7 @@ BillController.prototype.addBillComment = async function addBillComment(req, res
     const { content } = req.body;
 
     if (!content || content.trim().length < 1) {
-      return res.status(400).json({ success: false, message: '评论内容不能为空' });
+      return res.error(400, '评论内容不能为空');
     }
 
     // 权限：需为房间成员
@@ -1877,7 +1661,7 @@ BillController.prototype.addBillComment = async function addBillComment(req, res
       [id, user_id]
     );
     if (permission.rows.length === 0) {
-      return res.status(403).json({ success: false, message: '您无权评论该账单' });
+      return res.error(403, '您无权评论该账单');
     }
 
     const insert = await client.query(
@@ -1885,10 +1669,10 @@ BillController.prototype.addBillComment = async function addBillComment(req, res
       [id, user_id, content.trim()]
     );
 
-    return res.status(201).json({ success: true, data: insert.rows[0] });
+    return res.success(201, '添加账单评论成功', insert.rows[0]);
   } catch (error) {
     logger.error('添加账单评论失败:', error);
-    return res.status(500).json({ success: false, message: '添加账单评论失败', error: error.message });
+    return res.error(500, '添加账单评论失败', error.message);
   } finally {
     client.release();
   }
@@ -1906,7 +1690,7 @@ BillController.prototype.getBillComments = async function getBillComments(req, r
       [id, user_id]
     );
     if (permission.rows.length === 0) {
-      return res.status(403).json({ success: false, message: '您无权查看该账单评论' });
+      return res.error(403, '您无权查看该账单评论');
     }
 
     const result = await client.query(
@@ -1914,10 +1698,10 @@ BillController.prototype.getBillComments = async function getBillComments(req, r
       [id]
     );
 
-    return res.status(200).json({ success: true, data: result.rows });
+    return res.success(200, '获取账单评论成功', result.rows);
   } catch (error) {
     logger.error('获取账单评论失败:', error);
-    return res.status(500).json({ success: false, message: '获取账单评论失败', error: error.message });
+    return res.error(500, '获取账单评论失败', error.message);
   } finally {
     client.release();
   }
@@ -1937,11 +1721,11 @@ BillController.prototype.createBillShare = async function createBillShare(req, r
       [id, user_id]
     );
     if (permission.rows.length === 0) {
-      return res.status(403).json({ success: false, message: '您无权分享该账单' });
+      return res.error(403, '您无权分享该账单');
     }
     const bill = permission.rows[0];
     if (bill.creator_id !== user_id && bill.member_role !== 'admin') {
-      return res.status(403).json({ success: false, message: '仅创建者或房间管理员可分享账单' });
+      return res.error(403, '仅创建者或房间管理员可分享账单');
     }
 
     const share_code = Math.random().toString(36).slice(2, 10);
@@ -1952,10 +1736,10 @@ BillController.prototype.createBillShare = async function createBillShare(req, r
       [share_code, expires_at, id]
     );
 
-    return res.status(200).json({ success: true, data: update.rows[0] });
+    return res.success(200, '创建账单分享成功', update.rows[0]);
   } catch (error) {
     logger.error('创建账单分享失败:', error);
-    return res.status(500).json({ success: false, message: '创建账单分享失败', error: error.message });
+    return res.error(500, '创建账单分享失败', error.message);
   } finally {
     client.release();
   }
@@ -1971,14 +1755,14 @@ BillController.prototype.getBillByShareCode = async function getBillByShareCode(
       [code]
     );
     if (billQuery.rows.length === 0) {
-      return res.status(404).json({ success: false, message: '分享链接无效或已过期' });
+      return res.error(404, '分享链接无效或已过期');
     }
 
     const bill = billQuery.rows[0];
-    return res.status(200).json({ success: true, data: { bill } });
+    return res.success(200, '通过分享码获取账单成功', { bill });
   } catch (error) {
     logger.error('通过分享码获取账单失败:', error);
-    return res.status(500).json({ success: false, message: '通过分享码获取账单失败', error: error.message });
+    return res.error(500, '通过分享码获取账单失败', error.message);
   } finally {
     client.release();
   }

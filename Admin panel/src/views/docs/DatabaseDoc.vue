@@ -14,7 +14,7 @@
           <el-button @click="importSQL" :icon="Upload">导入SQL</el-button>
           <el-button @click="exportSQL" :icon="Download">导出SQL</el-button>
           <el-button @click="generateERD" :icon="Share" type="primary">生成ER图</el-button>
-          <el-button @click="saveDocument" :icon="Check" type="success">保存更改</el-button>
+          <el-button @click="saveDocument" type="success">保存更改</el-button>
         </div>
       </el-header>
       
@@ -280,9 +280,9 @@
             <div v-else class="editor-container">
               <div class="editor-toolbar">
                 <el-button-group>
-                  <el-button @click="formatText('bold')" :icon="Bold" size="small" />
-                  <el-button @click="formatText('italic')" :icon="Italic" size="small" />
-                  <el-button @click="formatText('underline')" :icon="Underline" size="small" />
+                  <el-button @click="formatText('bold')" :icon="ArrowLeftBold" size="small" />
+                  <el-button @click="formatText('italic')" :icon="ArrowRightBold" size="small" />
+                  <el-button @click="formatText('underline')" :icon="EditPen" size="small" />
                 </el-button-group>
                 <el-divider direction="vertical" />
                 <el-button-group>
@@ -293,7 +293,7 @@
                 <el-divider direction="vertical" />
                 <el-button-group>
                   <el-button @click="insertList('ul')" :icon="List" size="small" />
-                  <el-button @click="insertList('ol')" :icon="OrderedList" size="small" />
+                  <el-button @click="insertList('ol')" :icon="List" size="small" />
                   <el-button @click="insertTable" :icon="Grid" size="small" />
                   <el-button @click="insertCode" :icon="DocumentCopy" size="small" />
                 </el-button-group>
@@ -395,8 +395,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   ArrowLeft, Plus, Edit, Delete, Search, Refresh, Upload, Download, 
-  Check, Share, View, Grid, Document, Connection, Link, Bold, Italic,
-  Underline, List, OrderedList, DocumentCopy, Picture, CopyDocument, Printer
+  Share, View, Grid, Document, Connection, Link, ArrowLeftBold, ArrowRightBold,
+  EditPen, List, DocumentCopy, Picture, CopyDocument, Printer
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

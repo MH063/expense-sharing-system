@@ -5,6 +5,7 @@ const winston = require('winston');
 const { TokenManager } = require('../middleware/tokenManager');
 const crypto = require('crypto');
 const { recordFailedLoginAttempt, resetFailedLoginAttempts, isAccountLocked } = require('../middleware/securityEnhancements');
+const { newResponseMiddleware } = require('../middleware/newResponseHandler');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -52,7 +53,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({ success: false, message: '用户名、密码和邮箱为必填项' });
+        return res.error(400, '用户名、密码和邮箱为必填项');
       }
       
       // 密码强度：至少8位，包含大小写、数字、特殊字符各一
@@ -66,7 +67,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({ success: false, message: '密码需包含大小写、数字、特殊字符且至少8位' });
+        return res.error(400, '密码需包含大小写、数字、特殊字符且至少8位');
       }
 
       // 检查用户名是否已存在
@@ -84,10 +85,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(409).json({
-          success: false,
-          message: '用户名已被注册'
-        });
+        return res.error(409, '用户名已被注册');
       }
 
       // 检查邮箱是否已存在
@@ -105,10 +103,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(409).json({
-          success: false,
-          message: '邮箱已被注册'
-        });
+        return res.error(409, '邮箱已被注册');
       }
 
       // 加密密码
@@ -143,11 +138,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
 
-      res.status(201).json({
-        success: true,
-        message: '用户注册成功',
-        data: user
-      });
+      res.success(201, '用户注册成功', user);
 
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -161,10 +152,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -180,10 +168,7 @@ class UserController {
       );
       
       if (userResult.rows.length === 0) {
-        return res.status(401).json({
-          success: false,
-          message: '用户名或密码错误'
-        });
+        return res.error(401, '用户名或密码错误');
       }
       
       const user = userResult.rows[0];
@@ -191,10 +176,7 @@ class UserController {
       // 验证密码
       const isPasswordValid = await bcrypt.compare(password, user.password_hash);
       if (!isPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: '用户名或密码错误'
-        });
+        return res.error(401, '用户名或密码错误');
       }
       
       // 生成JWT令牌
@@ -228,26 +210,19 @@ class UserController {
       
       logger.info(`管理员登录成功: ${user.username}`);
       
-      res.status(200).json({
-        success: true,
-        message: '管理员登录成功',
-        data: {
-          user: {
-            id: user.id,
-            username: user.username,
-            role: 'admin'
-          },
-          accessToken,
-          refreshToken
-        }
+      res.success(200, '管理员登录成功', {
+        user: {
+          id: user.id,
+          username: user.username,
+          role: 'admin'
+        },
+        accessToken,
+        refreshToken
       });
       
     } catch (error) {
       logger.error('管理员登录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -276,7 +251,7 @@ class UserController {
         });
         
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
-        return res.status(400).json({ success: false, message: '登录信息不完整' });
+        return res.error(400, '登录信息不完整');
       }
 
       // 查找用户 - 支持用户名或邮箱登录，不依赖user_roles表
@@ -294,7 +269,7 @@ class UserController {
         });
         
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
-        return res.status(401).json({ success: false, message: '登录信息不正确' });
+        return res.error(401, '登录信息不正确');
       }
 
       const user = users[0];
@@ -311,10 +286,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(423).json({
-          success: false,
-          message: '账户已被锁定，请稍后再试'
-        });
+        return res.error(423, '账户已被锁定，请稍后再试');
       }
 
       // 若启用 MFA，需要校验一次 TOTP
@@ -331,7 +303,7 @@ class UserController {
           if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
           // 记录登录失败尝试
           await recordFailedLoginAttempt(user.id);
-          return res.status(401).json({ success: false, message: '需要多因素验证码' });
+          return res.error(401, '需要多因素验证码');
         }
         const { totpVerify } = require('../utils/totp');
         const ok = totpVerify(String(mfaCode), user.mfa_secret, { window: 1 });
@@ -346,7 +318,7 @@ class UserController {
           if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
           // 记录登录失败尝试
           await recordFailedLoginAttempt(user.id);
-          return res.status(401).json({ success: false, message: '多因素验证码错误' });
+          return res.error(401, '多因素验证码错误');
         }
       }
 
@@ -364,7 +336,7 @@ class UserController {
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
         // 记录登录失败尝试
         await recordFailedLoginAttempt(user.id);
-        return res.status(401).json({ success: false, message: '登录信息不正确' });
+        return res.error(401, '登录信息不正确');
       }
 
       // 重置登录失败计数
@@ -450,14 +422,10 @@ class UserController {
         timestamp: new Date().toISOString()
       });
 
-      res.status(200).json({
-        success: true,
-        message: '登录成功',
-        data: {
-          token: accessToken,
-          refreshToken: refreshToken,
-          user: userWithoutPassword
-        }
+      res.success(200, '登录成功', {
+        token: accessToken,
+        refreshToken: refreshToken,
+        user: userWithoutPassword
       });
 
     } catch (error) {
@@ -471,10 +439,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -499,10 +464,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '刷新Token为必填项'
-        });
+        return res.error(400, '刷新Token为必填项');
       }
 
       // 使用TokenManager验证刷新Token
@@ -517,10 +479,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(401).json({
-            success: false,
-            message: '无效的刷新Token'
-          });
+          return res.error(401, '无效的刷新Token');
         }
       } catch (error) {
         logger.warn(`Token刷新失败：刷新Token验证异常 [${requestId}]`, {
@@ -529,10 +488,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(401).json({
-          success: false,
-          message: '无效的刷新Token'
-        });
+        return res.error(401, '无效的刷新Token');
       }
 
       // 查找用户
@@ -549,10 +505,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(401).json({
-          success: false,
-          message: '用户不存在'
-        });
+        return res.error(401, '用户不存在');
       }
 
       const user = users[0];
@@ -582,13 +535,9 @@ class UserController {
         timestamp: new Date().toISOString()
       });
 
-      res.status(200).json({
-        success: true,
-        message: 'Token刷新成功',
-        data: {
-          token: newAccessToken,
-          refreshToken: newRefreshToken
-        }
+      res.success(200, 'Token刷新成功', {
+        token: newAccessToken,
+        refreshToken: newRefreshToken
       });
 
     } catch (error) {
@@ -601,10 +550,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -636,10 +582,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+        return res.error(404, '用户不存在');
       }
       
       const user = userResult.rows[0];
@@ -684,11 +627,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取用户详情成功',
-        data: user
-      });
+      res.success(200, '获取用户详情成功', user);
       
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -701,10 +640,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -735,10 +671,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+        return res.error(404, '用户不存在');
       }
       
       const currentUser = userResult.rows[0];
@@ -760,10 +693,7 @@ class UserController {
               timestamp: new Date().toISOString()
             });
             
-            return res.status(409).json({
-              success: false,
-              message: '邮箱已被其他用户使用'
-            });
+            return res.error(409, '邮箱已被其他用户使用');
           }
         } catch (emailCheckError) {
           logger.error(`检查邮箱唯一性时发生错误 [${requestId}]`, {
@@ -775,10 +705,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(500).json({
-            success: false,
-            message: '检查邮箱唯一性时发生错误'
-          });
+          return res.error(500, '检查邮箱唯一性时发生错误');
         }
       }
       
@@ -811,10 +738,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '没有提供有效的更新字段'
-        });
+        return res.error(400, '没有提供有效的更新字段');
       }
       
       updateFields.push(`updated_at = NOW()`);
@@ -841,11 +765,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '用户信息更新成功',
-        data: updatedUser
-      });
+      res.success(200, '用户信息更新成功', updatedUser);
       
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -858,10 +778,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -929,10 +846,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户列表失败'
-        });
+        return res.error(500, '查询用户列表失败');
       }
       
       // 查询总数
@@ -976,17 +890,13 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取用户列表成功',
-        data: {
-          users,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: totalCount,
-            totalPages: Math.ceil(totalCount / limit)
-          }
+      res.success(200, '获取用户列表成功', {
+        users,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
         }
       });
       
@@ -1000,10 +910,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1038,10 +945,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '无效的角色值'
-        });
+        return res.error(400, '无效的角色值');
       }
       
       // 验证用户是否存在
@@ -1057,10 +961,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
         
         user = userResult.rows[0];
@@ -1073,10 +974,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       // 获取角色ID
@@ -1094,10 +992,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '角色不存在'
-          });
+          return res.error(404, '角色不存在');
         }
         
         roleId = roleResult.rows[0].id;
@@ -1112,10 +1007,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询角色信息失败'
-        });
+        return res.error(500, '查询角色信息失败');
       }
       
       // 检查用户是否已有角色
@@ -1137,10 +1029,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户现有角色失败'
-        });
+        return res.error(500, '查询用户现有角色失败');
       }
       
       // 分配或更新角色
@@ -1190,10 +1079,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '分配用户角色失败'
-        });
+        return res.error(500, '分配用户角色失败');
       }
       
       const duration = Date.now() - startTime;
@@ -1208,13 +1094,9 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '用户角色分配成功',
-        data: {
-          userId: id,
-          role: role
-        }
+      res.success(200, '用户角色分配成功', {
+        userId: id,
+        role: role
       });
       
     } catch (error) {
@@ -1230,10 +1112,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1287,10 +1166,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
         
         user = userResult.rows[0];
@@ -1303,10 +1179,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       // 获取角色ID
@@ -1324,10 +1197,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '角色不存在'
-          });
+          return res.error(404, '角色不存在');
         }
         
         roleId = roleResult.rows[0].id;
@@ -1342,10 +1212,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询角色信息失败'
-        });
+        return res.error(500, '查询角色信息失败');
       }
       
       // 检查用户是否已有角色
@@ -1367,10 +1234,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户现有角色失败'
-        });
+        return res.error(500, '查询用户现有角色失败');
       }
       
       // 更新或分配角色
@@ -1420,10 +1284,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '更新用户角色失败'
-        });
+        return res.error(500, '更新用户角色失败');
       }
       
       const duration = Date.now() - startTime;
@@ -1438,13 +1299,9 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '用户角色更新成功',
-        data: {
-          userId: id,
-          role: role
-        }
+      res.success(200, '用户角色更新成功', {
+        userId: id,
+        role: role
       });
       
     } catch (error) {
@@ -1460,10 +1317,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1500,10 +1354,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
         
         user = userResult.rows[0];
@@ -1516,10 +1367,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       // 获取用户角色
@@ -1553,10 +1401,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户角色失败'
-        });
+        return res.error(500, '查询用户角色失败');
       }
       
       const duration = Date.now() - startTime;
@@ -1570,14 +1415,10 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取用户角色成功',
-        data: {
-          userId: user.id,
-          username: user.username,
-          role: role
-        }
+      res.success(200, '获取用户角色成功', {
+        userId: user.id,
+        username: user.username,
+        role: role
       });
       
     } catch (error) {
@@ -1592,10 +1433,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1631,10 +1469,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
         
         user = userResult.rows[0];
@@ -1654,10 +1489,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       // 查询用户角色
@@ -1706,11 +1538,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取用户资料成功',
-        data: user
-      });
+      res.success(200, '获取用户资料成功', user);
       
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -1723,10 +1551,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1764,10 +1589,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
         
         user = userResult.rows[0];
@@ -1780,10 +1602,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       // 如果更新邮箱，检查邮箱是否已被其他用户使用
@@ -1803,10 +1622,7 @@ class UserController {
               timestamp: new Date().toISOString()
             });
             
-            return res.status(409).json({
-              success: false,
-              message: '邮箱已被其他用户使用'
-            });
+            return res.error(409, '邮箱已被其他用户使用');
           }
         } catch (emailCheckError) {
           logger.error(`检查邮箱唯一性时发生错误 [${requestId}]`, {
@@ -1819,10 +1635,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(500).json({
-            success: false,
-            message: '检查邮箱唯一性失败'
-          });
+          return res.error(500, '检查邮箱唯一性失败');
         }
       }
       
@@ -1854,10 +1667,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '没有提供要更新的字段'
-        });
+        return res.error(400, '没有提供要更新的字段');
       }
       
       updateFields.push(`updated_at = NOW()`);
@@ -1894,10 +1704,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '更新用户资料失败'
-        });
+        return res.error(500, '更新用户资料失败');
       }
       
       const duration = Date.now() - startTime;
@@ -1909,11 +1716,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '用户资料更新成功',
-        data: updatedUser
-      });
+      res.success(200, '用户资料更新成功', updatedUser);
       
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -1926,10 +1729,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -1960,10 +1760,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '当前密码和新密码为必填项'
-        });
+        return res.error(400, '当前密码和新密码为必填项');
       }
       
       // 验证新密码长度
@@ -1977,10 +1774,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({ 
-          success: false, 
-          message: '新密码需包含大小写、数字、特殊字符且至少8位' 
-        });
+        return res.error(400, '新密码需包含大小写、数字、特殊字符且至少8位');
       }
       
       // 查询用户
@@ -1998,10 +1792,7 @@ class UserController {
             timestamp: new Date().toISOString()
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
         
         user = userResult.rows[0];
@@ -2014,10 +1805,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       // 验证当前密码
@@ -2034,10 +1822,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '验证当前密码失败'
-        });
+        return res.error(500, '验证当前密码失败');
       }
       
       if (!isCurrentPasswordValid) {
@@ -2048,10 +1833,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '当前密码错误'
-        });
+        return res.error(400, '当前密码错误');
       }
       
       // 检查新密码是否与当前密码相同
@@ -2068,10 +1850,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '验证新密码失败'
-        });
+        return res.error(500, '验证新密码失败');
       }
       
       if (isSamePassword) {
@@ -2082,10 +1861,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '新密码不能与当前密码相同'
-        });
+        return res.error(400, '新密码不能与当前密码相同');
       }
       
       // 加密新密码
@@ -2103,10 +1879,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '加密新密码失败'
-        });
+        return res.error(500, '加密新密码失败');
       }
       
       // 更新密码
@@ -2132,10 +1905,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '更新密码失败'
-        });
+        return res.error(500, '更新密码失败');
       }
       
       const duration = Date.now() - startTime;
@@ -2147,10 +1917,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '密码修改成功'
-      });
+      res.success(200, '密码修改成功');
       
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -2163,10 +1930,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -2193,10 +1957,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '邮箱为必填项'
-        });
+        return res.error(400, '邮箱为必填项');
       }
       
       // 查找用户
@@ -2217,10 +1978,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       // 无论用户是否存在都返回成功，避免邮箱枚举攻击
@@ -2231,10 +1989,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(200).json({
-          success: true,
-          message: '如果该邮箱已注册，您将收到密码重置邮件'
-        });
+        return res.success(200, '如果该邮箱已注册，您将收到密码重置邮件');
       }
       
       // 生成重置令牌
@@ -2269,10 +2024,7 @@ class UserController {
           timestamp: new Date().toISOString()
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '生成重置令牌失败'
-        });
+        return res.error(500, '生成重置令牌失败');
       }
       
       // 这里应该发送邮件，暂时只记录日志
@@ -2297,10 +2049,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(200).json({
-        success: true,
-        message: '如果该邮箱已注册，您将收到密码重置邮件'
-      });
+      res.success(200, '如果该邮箱已注册，您将收到密码重置邮件');
       
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -2313,10 +2062,7 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -2346,10 +2092,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '重置令牌和新密码为必填项'
-        });
+        return res.error(400, '重置令牌和新密码为必填项');
       }
       
       // 验证新密码强度
@@ -2361,10 +2104,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '新密码需包含大小写、数字、特殊字符且至少8位'
-        });
+        return res.error(400, '新密码需包含大小写、数字、特殊字符且至少8位');
       }
       
       logger.info(`[Request:${requestId}] 验证密码重置令牌`, {
@@ -2388,10 +2128,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '重置令牌无效或已过期'
-        });
+        return res.error(400, '重置令牌无效或已过期');
       }
       
       const { user_id, username } = tokenResult.rows[0];
@@ -2424,10 +2161,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '密码加密失败，请重试'
-        });
+        return res.error(500, '密码加密失败，请重试');
       }
       
       // 开始事务
@@ -2457,10 +2191,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        res.status(200).json({
-          success: true,
-          message: '密码重置成功'
-        });
+        res.success(200, '密码重置成功');
         
       } catch (transactionError) {
         await client.query('ROLLBACK');
@@ -2474,10 +2205,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '密码重置失败，请重试'
-        });
+        return res.error(500, '密码重置失败，请重试');
       } finally {
         client.release();
       }
@@ -2490,10 +2218,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -2517,18 +2242,11 @@ class UserController {
       
       logger.info(`获取用户设置成功: 用户ID ${userId}`);
       
-      res.status(200).json({
-        success: true,
-        message: '获取用户设置成功',
-        data: settings
-      });
+      res.success(200, '获取用户设置成功', settings);
       
     } catch (error) {
       logger.error('获取用户设置失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -2541,10 +2259,7 @@ class UserController {
       
       // 验证设置对象
       if (!settings || typeof settings !== 'object') {
-        return res.status(400).json({
-          success: false,
-          message: '设置对象为必填项'
-        });
+        return res.error(400, '设置对象为必填项');
       }
       
       // 开始事务
@@ -2569,11 +2284,7 @@ class UserController {
         
         logger.info(`用户设置更新成功: 用户ID ${userId}`);
         
-        res.status(200).json({
-          success: true,
-          message: '用户设置更新成功',
-          data: settings
-        });
+        res.success(200, '用户设置更新成功', settings);
         
       } catch (error) {
         await client.query('ROLLBACK');
@@ -2584,10 +2295,7 @@ class UserController {
       
     } catch (error) {
       logger.error('更新用户设置失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -2628,10 +2336,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询用户信息失败`, {
@@ -2644,10 +2349,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       const user = userResult.rows[0];
@@ -2667,10 +2369,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '角色不存在'
-          });
+          return res.error(404, '角色不存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询角色信息失败`, {
@@ -2684,10 +2383,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询角色信息失败'
-        });
+        return res.error(500, '查询角色信息失败');
       }
       
       const role = roleResult.rows[0];
@@ -2711,10 +2407,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户未拥有该角色'
-          });
+          return res.error(404, '用户未拥有该角色');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询用户角色关系失败`, {
@@ -2729,10 +2422,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户角色关系失败'
-        });
+        return res.error(500, '查询用户角色关系失败');
       }
       
       // 移除用户角色
@@ -2752,14 +2442,10 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        res.status(200).json({
-          success: true,
-          message: '用户角色移除成功',
-          data: {
-            userId: id,
-            roleId: roleId,
-            roleName: role.name
-          }
+        res.success(200, '用户角色移除成功', {
+          userId: id,
+          roleId: roleId,
+          roleName: role.name
         });
       } catch (deleteError) {
         logger.error(`[Request:${requestId}] 移除用户角色失败`, {
@@ -2774,10 +2460,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        res.status(500).json({
-          success: false,
-          message: '移除用户角色失败'
-        });
+        res.error(500, '移除用户角色失败');
       }
       
     } catch (error) {
@@ -2791,10 +2474,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -2843,10 +2523,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户角色失败'
-        });
+        return res.error(500, '查询用户角色失败');
       }
       
       const roles = rolesResult.rows;
@@ -2858,11 +2535,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取当前用户角色成功',
-        data: roles
-      });
+      res.success(200, '获取当前用户角色成功', roles);
       
     } catch (error) {
       logger.error(`[Request:${requestId}] 获取当前用户角色处理失败`, {
@@ -2873,10 +2546,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -2926,10 +2596,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户权限失败'
-        });
+        return res.error(500, '查询用户权限失败');
       }
       
       const permissions = permissionsResult.rows;
@@ -2941,11 +2608,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取当前用户权限成功',
-        data: permissions
-      });
+      res.success(200, '获取当前用户权限成功', permissions);
       
     } catch (error) {
       logger.error(`[Request:${requestId}] 获取当前用户权限处理失败`, {
@@ -2956,10 +2619,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -3008,10 +2668,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户会话失败'
-        });
+        return res.error(500, '查询用户会话失败');
       }
       
       const sessions = sessionsResult.rows;
@@ -3023,11 +2680,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取当前用户会话列表成功',
-        data: sessions
-      });
+      res.success(200, '获取当前用户会话列表成功', sessions);
       
     } catch (error) {
       logger.error(`[Request:${requestId}] 获取当前用户会话列表处理失败`, {
@@ -3038,10 +2691,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -3082,10 +2732,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '会话不存在或已失效'
-          });
+          return res.error(404, '会话不存在或已失效');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询用户会话失败`, {
@@ -3097,10 +2744,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户会话失败'
-        });
+        return res.error(500, '查询用户会话失败');
       }
       
       // 终止会话
@@ -3117,12 +2761,8 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        res.status(200).json({
-          success: true,
-          message: '会话终止成功',
-          data: {
-            sessionId: sessionId
-          }
+        res.success(200, '会话终止成功', {
+          sessionId: sessionId
         });
       } catch (updateError) {
         logger.error(`[Request:${requestId}] 终止用户会话失败`, {
@@ -3134,10 +2774,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        res.status(500).json({
-          success: false,
-          message: '终止用户会话失败'
-        });
+        res.error(500, '终止用户会话失败');
       }
       
     } catch (error) {
@@ -3150,10 +2787,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -3191,10 +2825,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询用户信息失败`, {
@@ -3206,10 +2837,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       const user = userResult.rows[0];
@@ -3244,10 +2872,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户会话失败'
-        });
+        return res.error(500, '查询用户会话失败');
       }
       
       const sessions = sessionsResult.rows;
@@ -3261,14 +2886,10 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取用户会话列表成功',
-        data: {
-          userId: id,
-          username: user.username,
-          sessions: sessions
-        }
+      res.success(200, '获取用户会话列表成功', {
+        userId: id,
+        username: user.username,
+        sessions: sessions
       });
       
     } catch (error) {
@@ -3281,10 +2902,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -3324,10 +2942,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询用户信息失败`, {
@@ -3340,10 +2955,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       const user = userResult.rows[0];
@@ -3366,10 +2978,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '会话不存在或已失效'
-          });
+          return res.error(404, '会话不存在或已失效');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询用户会话失败`, {
@@ -3383,10 +2992,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户会话失败'
-        });
+        return res.error(500, '查询用户会话失败');
       }
       
       // 终止会话
@@ -3416,20 +3022,13 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '终止用户会话失败'
-        });
+        return res.error(500, '终止用户会话失败');
       }
       
-      res.status(200).json({
-        success: true,
-        message: '会话终止成功',
-        data: {
-          userId: id,
-          username: user.username,
-          sessionId: sessionId
-        }
+      res.success(200, '会话终止成功', {
+        userId: id,
+        username: user.username,
+        sessionId: sessionId
       });
       
     } catch (error) {
@@ -3443,10 +3042,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -3499,10 +3095,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户通知渠道失败'
-        });
+        return res.error(500, '查询用户通知渠道失败');
       }
       
       const channels = channelsResult.rows;
@@ -3515,11 +3108,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(200).json({
-        success: true,
-        message: '获取当前用户通知渠道成功',
-        data: channels
-      });
+      res.success(200, '获取当前用户通知渠道成功', channels);
       
     } catch (error) {
       logger.error(`[Request:${requestId}] 获取当前用户通知渠道处理失败`, {
@@ -3531,10 +3120,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -3573,10 +3159,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '渠道名称和类型为必填项'
-        });
+        return res.error(400, '渠道名称和类型为必填项');
       }
       
       // 验证渠道类型
@@ -3592,10 +3175,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '无效的渠道类型'
-        });
+        return res.error(400, '无效的渠道类型');
       }
       
       // 检查渠道名称是否已存在
@@ -3617,10 +3197,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(409).json({
-            success: false,
-            message: '渠道名称已存在'
-          });
+          return res.error(409, '渠道名称已存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 检查通知渠道名称是否存在失败`, {
@@ -3634,10 +3211,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '检查通知渠道名称失败'
-        });
+        return res.error(500, '检查通知渠道名称失败');
       }
       
       // 创建通知渠道
@@ -3671,10 +3245,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '创建通知渠道失败'
-        });
+        return res.error(500, '创建通知渠道失败');
       }
       
       const channel = result.rows[0];
@@ -3689,11 +3260,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(201).json({
-        success: true,
-        message: '添加通知渠道成功',
-        data: channel
-      });
+      res.success(201, '添加通知渠道成功', channel);
       
     } catch (error) {
       logger.error(`[Request:${requestId}] 添加通知渠道处理失败`, {
@@ -3707,10 +3274,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -3758,10 +3322,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '通知渠道不存在'
-          });
+          return res.error(404, '通知渠道不存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询通知渠道失败`, {
@@ -3774,10 +3335,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询通知渠道失败'
-        });
+        return res.error(500, '查询通知渠道失败');
       }
       
       const originalChannel = channelResult.rows[0];
@@ -3798,10 +3356,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(400).json({
-            success: false,
-            message: '无效的渠道类型'
-          });
+          return res.error(400, '无效的渠道类型');
         }
       }
       
@@ -3826,10 +3381,7 @@ class UserController {
               processingTime: Date.now() - startTime
             });
             
-            return res.status(409).json({
-              success: false,
-              message: '渠道名称已存在'
-            });
+            return res.error(409, '渠道名称已存在');
           }
         } catch (queryError) {
           logger.error(`[Request:${requestId}] 检查通知渠道名称是否存在失败`, {
@@ -3844,10 +3396,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(500).json({
-            success: false,
-            message: '检查通知渠道名称失败'
-          });
+          return res.error(500, '检查通知渠道名称失败');
         }
       }
       
@@ -3885,10 +3434,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '没有提供要更新的字段'
-        });
+        return res.error(400, '没有提供要更新的字段');
       }
       
       updateFields.push(`updated_at = NOW()`);
@@ -3928,10 +3474,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '更新通知渠道失败'
-        });
+        return res.error(500, '更新通知渠道失败');
       }
       
       const updatedChannel = result.rows[0];
@@ -3946,11 +3489,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(200).json({
-        success: true,
-        message: '更新通知渠道成功',
-        data: updatedChannel
-      });
+      res.success(200, '更新通知渠道成功', updatedChannel);
       
     } catch (error) {
       logger.error(`[Request:${requestId}] 更新通知渠道处理失败`, {
@@ -3966,10 +3505,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -4013,10 +3549,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '通知渠道不存在'
-          });
+          return res.error(404, '通知渠道不存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询通知渠道失败`, {
@@ -4029,10 +3562,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询通知渠道失败'
-        });
+        return res.error(500, '查询通知渠道失败');
       }
       
       const channel = channelResult.rows[0];
@@ -4064,10 +3594,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '删除通知渠道失败'
-        });
+        return res.error(500, '删除通知渠道失败');
       }
       
       logger.info(`[Request:${requestId}] 删除通知渠道成功`, {
@@ -4079,13 +3606,9 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(200).json({
-        success: true,
-        message: '删除通知渠道成功',
-        data: {
-          channelId: channelId,
-          channelName: channel.name
-        }
+      res.success(200, '删除通知渠道成功', {
+        channelId: channelId,
+        channelName: channel.name
       });
       
     } catch (error) {
@@ -4099,10 +3622,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -4140,10 +3660,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(404).json({
-            success: false,
-            message: '用户不存在'
-          });
+          return res.error(404, '用户不存在');
         }
       } catch (queryError) {
         logger.error(`[Request:${requestId}] 查询用户信息失败`, {
@@ -4155,10 +3672,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户信息失败'
-        });
+        return res.error(500, '查询用户信息失败');
       }
       
       const user = userResult.rows[0];
@@ -4194,14 +3708,10 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        res.status(200).json({
-          success: true,
-          message: '获取用户通知渠道成功',
-          data: {
-            userId: id,
-            username: user.username,
-            channels: channels
-          }
+        res.success(200, '获取用户通知渠道成功', {
+          userId: id,
+          username: user.username,
+          channels: channels
         });
         
       } catch (queryError) {
@@ -4215,10 +3725,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询用户通知渠道失败'
-        });
+        return res.error(500, '查询用户通知渠道失败');
       }
       
     } catch (error) {
@@ -4231,10 +3738,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 
@@ -4333,10 +3837,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '查询通知渠道失败'
-        });
+        return res.error(500, '查询通知渠道失败');
       }
       
       const channel = channelResult.rows[0];
@@ -4355,10 +3856,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(400).json({
-            success: false,
-            message: '无效的渠道类型'
-          });
+          return res.error(400, '无效的渠道类型');
         }
       }
       
@@ -4380,10 +3878,7 @@ class UserController {
               processingTime: Date.now() - startTime
             });
             
-            return res.status(409).json({
-              success: false,
-              message: '渠道名称已存在'
-            });
+            return res.error(409, '渠道名称已存在');
           }
         } catch (queryError) {
           logger.error(`[Request:${requestId}] 检查通知渠道名称是否存在失败`, {
@@ -4397,10 +3892,7 @@ class UserController {
             processingTime: Date.now() - startTime
           });
           
-          return res.status(500).json({
-            success: false,
-            message: '检查通知渠道名称是否存在失败'
-          });
+          return res.error(500, '检查通知渠道名称是否存在失败');
         }
       }
       
@@ -4438,10 +3930,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(400).json({
-          success: false,
-          message: '没有提供要更新的字段'
-        });
+        return res.error(400, '没有提供要更新的字段');
       }
       
       updateFields.push(`updated_at = NOW()`);
@@ -4479,14 +3968,10 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        res.status(200).json({
-          success: true,
-          message: '更新用户通知渠道成功',
-          data: {
-            userId: id,
-            username: user.username,
-            channel: updatedChannel
-          }
+        res.success(200, '更新用户通知渠道成功', {
+          userId: id,
+          username: user.username,
+          channel: updatedChannel
         });
         
       } catch (updateError) {
@@ -4502,10 +3987,7 @@ class UserController {
           processingTime: Date.now() - startTime
         });
         
-        return res.status(500).json({
-          success: false,
-          message: '更新通知渠道失败'
-        });
+        return res.error(500, '更新通知渠道失败');
       }
       
     } catch (error) {
@@ -4519,10 +4001,7 @@ class UserController {
         processingTime: Date.now() - startTime
       });
       
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      res.error(500, '服务器内部错误');
     }
   }
 }

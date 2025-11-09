@@ -38,6 +38,7 @@ import Settings from '@/views/Settings.vue'
 import ActivitiesList from '@/views/activities/ActivitiesList.vue'
 import Forbidden from '@/views/Forbidden.vue'
 import PermissionTest from '@/views/admin/PermissionTest.vue'
+
 import { createAuthGuard } from './guards'
 import { createPermissionGuard } from './permissionGuard'
 import { PERMISSIONS, ROLES } from '@/utils/permissions'

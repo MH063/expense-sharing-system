@@ -12,22 +12,19 @@ function authenticateToken(req, res, next) {
   console.log('认证中间件 - 提取的令牌:', token ? token.substring(0, 20) + '...' : 'null');
 
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: '访问令牌缺失'
-    });
+    return res.unauthorized('访问令牌缺失');
   }
 
   try {
     const { TokenManager } = require('./tokenManager');
     const decoded = TokenManager.verifyAccessToken(token);
     if (!decoded) {
-      return res.status(401).json({ success: false, message: '访问令牌无效或已过期' });
+      return res.unauthorized('访问令牌无效或已过期');
     }
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ success: false, message: '访问令牌无效或已过期' });
+    return res.unauthorized('访问令牌无效或已过期');
   }
 }
 
@@ -43,10 +40,7 @@ function checkRole(allowedRoles) {
       const userRole = await TokenManager.getUserRole(req.user.sub);
 
       if (!allowedRoles.includes(userRole)) {
-        return res.status(403).json({
-          success: false,
-          message: '权限不足'
-        });
+        return res.forbidden('权限不足');
       }
 
       // 更新req.user中的角色信息
@@ -54,10 +48,7 @@ function checkRole(allowedRoles) {
       next();
     } catch (error) {
       console.error('角色验证失败:', error);
-      return res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error(500, '服务器内部错误');
     }
   };
 }
@@ -79,10 +70,7 @@ function checkPermission(requiredPermissions) {
       );
 
       if (!hasAllPermissions) {
-        return res.status(403).json({
-          success: false,
-          message: '权限不足'
-        });
+        return res.forbidden('权限不足');
       }
 
       // 更新req.user中的权限信息
@@ -90,10 +78,7 @@ function checkPermission(requiredPermissions) {
       next();
     } catch (error) {
       console.error('权限验证失败:', error);
-      return res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error(500, '服务器内部错误');
     }
   };
 }

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const permissionController = require('../controllers/permission-controller');
-const { auth, authorize } = require('../middleware/auth');
+const { authenticateToken, checkRole } = require('../middleware/auth-middleware');
 
 /**
  * 权限管理路由
@@ -9,39 +9,39 @@ const { auth, authorize } = require('../middleware/auth');
  */
 
 // 获取权限列表 - 需要管理员权限
-router.get('/', auth, authorize('admin', 'permissions:read'), permissionController.getPermissions);
+router.get('/', authenticateToken, checkRole(['admin']), permissionController.getPermissions);
 
 // 获取权限详情 - 需要管理员权限
-router.get('/:id', auth, authorize('admin', 'permissions:read'), permissionController.getPermissionById);
+router.get('/:id', authenticateToken, checkRole(['admin']), permissionController.getPermissionById);
 
 // 创建权限 - 需要超级管理员权限
-router.post('/', auth, authorize('super_admin', 'permissions:create'), permissionController.createPermission);
+router.post('/', authenticateToken, checkRole(['super_admin']), permissionController.createPermission);
 
 // 更新权限 - 需要超级管理员权限
-router.put('/:id', auth, authorize('super_admin', 'permissions:update'), permissionController.updatePermission);
+router.put('/:id', authenticateToken, checkRole(['super_admin']), permissionController.updatePermission);
 
 // 删除权限 - 需要超级管理员权限
-router.delete('/:id', auth, authorize('super_admin', 'permissions:delete'), permissionController.deletePermission);
+router.delete('/:id', authenticateToken, checkRole(['super_admin']), permissionController.deletePermission);
 
 // 批量更新权限状态 - 需要超级管理员权限
-router.patch('/batch-status', auth, authorize('super_admin', 'permissions:update'), permissionController.batchUpdatePermissionStatus);
+router.patch('/batch-status', authenticateToken, checkRole(['super_admin']), permissionController.batchUpdatePermissionStatus);
 
 // 获取角色权限映射 - 需要管理员权限
-router.get('/role-mapping', auth, authorize('admin', 'permissions:read'), permissionController.getRolePermissionMapping);
+router.get('/role-mapping', authenticateToken, checkRole(['admin']), permissionController.getRolePermissionMapping);
 
 // 更新角色权限映射 - 需要超级管理员权限
-router.put('/role-mapping/:roleId', auth, authorize('super_admin', 'permissions:update'), permissionController.updateRolePermissionMapping);
+router.put('/role-mapping/:roleId', authenticateToken, checkRole(['super_admin']), permissionController.updateRolePermissionMapping);
 
 // 获取用户权限 - 需要管理员权限或查看自己
-router.get('/user/:userId', auth, permissionController.getUserPermissions);
+router.get('/user/:userId', authenticateToken, permissionController.getUserPermissions);
 
 // 分配权限给用户 - 需要管理员权限
-router.post('/user/:userId/assign', auth, authorize('admin', 'permissions:update'), permissionController.assignPermissionsToUser);
+router.post('/user/:userId/assign', authenticateToken, checkRole(['admin']), permissionController.assignPermissionsToUser);
 
 // 移除用户权限 - 需要管理员权限
-router.delete('/user/:userId/revoke', auth, authorize('admin', 'permissions:update'), permissionController.revokePermissionsFromUser);
+router.delete('/user/:userId/revoke', authenticateToken, checkRole(['admin']), permissionController.revokePermissionsFromUser);
 
 // 获取权限使用统计 - 需要管理员权限
-router.get('/stats/usage', auth, authorize('admin', 'permissions:read'), permissionController.getPermissionUsageStats);
+router.get('/stats/usage', authenticateToken, checkRole(['admin']), permissionController.getPermissionUsageStats);
 
 module.exports = router;

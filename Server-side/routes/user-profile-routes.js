@@ -6,9 +6,9 @@
 const express = require('express');
 const router = express.Router();
 const userProfileController = require('../controllers/user-profile-controller');
-const { authenticateToken } = require('../middleware/auth');
-const { checkRole } = require('../middleware/role-based-access');
-const roleAwareRateLimiter = require('../middleware/role-aware-rate-limiter');
+const { authenticateToken } = require('../middleware/auth-middleware');
+const checkRole = require('../middleware/role-middleware');
+const { roleAwareRateLimiter } = require('../middleware/rateLimiter');
 
 // 获取当前用户资料
 router.get('/profile', authenticateToken, userProfileController.getUserProfile);

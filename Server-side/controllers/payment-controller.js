@@ -647,6 +647,439 @@ class PaymentController {
       client.release();
     }
   }
+
+  /**
+   * 获取支付记录列表（管理员）
+   */
+  getPayments = async (req, res) => {
+    const startTime = Date.now();
+    const requestId = `admin-payments-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await this.pool.connect();
+    
+    try {
+      const { 
+        page = 1, 
+        limit = 20, 
+        status, 
+        method, 
+        user_id, 
+        bill_id, 
+        start_date, 
+        end_date 
+      } = req.query;
+      
+      const offset = (page - 1) * limit;
+      
+      logger.info(`[${requestId}] 开始获取支付记录列表`, {
+        requestId,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        status,
+        method,
+        user_id,
+        bill_id,
+        start_date,
+        end_date
+      });
+
+      // 构建查询条件
+      let whereClause = 'WHERE 1=1';
+      let queryParams = [];
+      let paramIndex = 1;
+
+      if (status) {
+        whereClause += ` AND p.status = $${paramIndex}`;
+        queryParams.push(status);
+        paramIndex++;
+      }
+
+      if (method) {
+        whereClause += ` AND p.method = $${paramIndex}`;
+        queryParams.push(method);
+        paramIndex++;
+      }
+
+      if (user_id) {
+        whereClause += ` AND p.user_id = $${paramIndex}`;
+        queryParams.push(user_id);
+        paramIndex++;
+      }
+
+      if (bill_id) {
+        whereClause += ` AND p.bill_id = $${paramIndex}`;
+        queryParams.push(bill_id);
+        paramIndex++;
+      }
+
+      if (start_date) {
+        whereClause += ` AND p.payment_date >= $${paramIndex}`;
+        queryParams.push(start_date);
+        paramIndex++;
+      }
+
+      if (end_date) {
+        whereClause += ` AND p.payment_date <= $${paramIndex}`;
+        queryParams.push(end_date);
+        paramIndex++;
+      }
+
+      // 获取支付记录
+      const paymentsQuery = `
+        SELECT p.*, 
+               u.username as user_name,
+               b.title as bill_title,
+               r.name as room_name
+        FROM payments p
+        JOIN users u ON p.user_id = u.id
+        JOIN bills b ON p.bill_id = b.id
+        JOIN rooms r ON b.room_id = r.id
+        ${whereClause}
+        ORDER BY p.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+
+      queryParams.push(limit, offset);
+      
+      const paymentsResult = await client.query(paymentsQuery, queryParams);
+
+      // 获取总数
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM payments p
+        ${whereClause}
+      `;
+      
+      const countResult = await client.query(countQuery, queryParams.slice(0, -2));
+      const total = parseInt(countResult.rows[0].total);
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取支付记录列表成功`, {
+        requestId,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        count: paymentsResult.rows.length,
+        status,
+        method,
+        user_id,
+        bill_id,
+        duration
+      });
+
+      res.success(200, '获取支付记录列表成功', {
+        payments: paymentsResult.rows,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      });
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取支付记录列表失败`, {
+        requestId,
+        page: req.query.page,
+        limit: req.query.limit,
+        status: req.query.status,
+        method: req.query.method,
+        user_id: req.query.user_id,
+        bill_id: req.query.bill_id,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '获取支付记录列表失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 获取支付详情（管理员）
+   */
+  getPaymentById = async (req, res) => {
+    const client = await this.pool.connect();
+    try {
+      const { id } = req.params;
+      const result = await client.query(
+        `SELECT p.*, 
+                u.username as user_name,
+                b.title as bill_title,
+                r.name as room_name
+         FROM payments p
+         JOIN users u ON p.user_id = u.id
+         JOIN bills b ON p.bill_id = b.id
+         JOIN rooms r ON b.room_id = r.id
+         WHERE p.id = $1`,
+        [id]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.error(404, '支付记录不存在');
+      }
+      
+      res.success(200, '获取支付详情成功', { payment: result.rows[0] });
+    } catch (error) {
+      logger.error('获取支付详情失败:', error);
+      res.error(500, '获取支付详情失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 创建支付记录（管理员）
+   */
+  createPayment = async (req, res) => {
+    const client = await this.pool.connect();
+    try {
+      const { user_id, bill_id, amount, method, payment_date, notes, receipt_url } = req.body;
+      
+      await client.query('BEGIN');
+      
+      const result = await client.query(
+        `INSERT INTO payments (user_id, bill_id, amount, payment_method, payment_time, status, notes, receipt_url)
+         VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, $7)
+         RETURNING *`,
+        [user_id, bill_id, amount, method, payment_date, notes, receipt_url]
+      );
+      
+      await client.query('COMMIT');
+      res.success(201, '创建支付记录成功', { payment: result.rows[0] });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('创建支付记录失败:', error);
+      res.error(500, '创建支付记录失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 更新支付记录（管理员）
+   */
+  updatePayment = async (req, res) => {
+    const client = await this.pool.connect();
+    try {
+      const { id } = req.params;
+      const { amount, method, payment_date, notes, receipt_url } = req.body;
+      
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+      
+      if (amount !== undefined) {
+        updates.push(`amount = $${paramIndex++}`);
+        values.push(amount);
+      }
+      if (method !== undefined) {
+        updates.push(`payment_method = $${paramIndex++}`);
+        values.push(method);
+      }
+      if (payment_date !== undefined) {
+        updates.push(`payment_time = $${paramIndex++}`);
+        values.push(payment_date);
+      }
+      if (notes !== undefined) {
+        updates.push(`notes = $${paramIndex++}`);
+        values.push(notes);
+      }
+      if (receipt_url !== undefined) {
+        updates.push(`receipt_url = $${paramIndex++}`);
+        values.push(receipt_url);
+      }
+      
+      if (updates.length === 0) {
+        return res.error(400, '没有可更新的字段');
+      }
+      
+      values.push(id);
+      const result = await client.query(
+        `UPDATE payments SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex} RETURNING *`,
+        values
+      );
+      
+      if (result.rows.length === 0) {
+        return res.error(404, '支付记录不存在');
+      }
+      
+      res.success(200, '更新支付记录成功', { payment: result.rows[0] });
+    } catch (error) {
+      logger.error('更新支付记录失败:', error);
+      res.error(500, '更新支付记录失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 删除支付记录（管理员）
+   */
+  deletePayment = async (req, res) => {
+    const client = await this.pool.connect();
+    try {
+      const { id } = req.params;
+      
+      await client.query('BEGIN');
+      
+      const result = await client.query('DELETE FROM payments WHERE id = $1 RETURNING *', [id]);
+      
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.error(404, '支付记录不存在');
+      }
+      
+      await client.query('COMMIT');
+      res.success(200, '删除支付记录成功');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('删除支付记录失败:', error);
+      res.error(500, '删除支付记录失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 取消支付（管理员）
+   */
+  cancelPayment = async (req, res) => {
+    const client = await this.pool.connect();
+    try {
+      const { id } = req.params;
+      const { cancellation_reason } = req.body;
+      
+      await client.query('BEGIN');
+      
+      const result = await client.query(
+        `UPDATE payments SET status = 'cancelled', notes = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+        [cancellation_reason, id]
+      );
+      
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.error(404, '支付记录不存在');
+      }
+      
+      await client.query('COMMIT');
+      res.success(200, '取消支付成功', { payment: result.rows[0] });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('取消支付失败:', error);
+      res.error(500, '取消支付失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 获取支付统计（管理员）
+   */
+  getPaymentStatistics = async (req, res) => {
+    const client = await this.pool.connect();
+    try {
+      const { start_date, end_date, room_id, method } = req.query;
+      
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+      let paramIndex = 1;
+      
+      if (start_date) {
+        whereClause += ` AND p.payment_time >= $${paramIndex++}`;
+        params.push(start_date);
+      }
+      if (end_date) {
+        whereClause += ` AND p.payment_time <= $${paramIndex++}`;
+        params.push(end_date);
+      }
+      if (room_id) {
+        whereClause += ` AND b.room_id = $${paramIndex++}`;
+        params.push(room_id);
+      }
+      if (method) {
+        whereClause += ` AND p.payment_method = $${paramIndex++}`;
+        params.push(method);
+      }
+      
+      const result = await client.query(
+        `SELECT 
+           COUNT(*) as total_count,
+           SUM(amount) as total_amount,
+           AVG(amount) as avg_amount,
+           MIN(amount) as min_amount,
+           MAX(amount) as max_amount
+         FROM payments p
+         JOIN bills b ON p.bill_id = b.id
+         ${whereClause}`,
+        params
+      );
+      
+      res.success(200, '获取支付统计成功', { statistics: result.rows[0] });
+    } catch (error) {
+      logger.error('获取支付统计失败:', error);
+      res.error(500, '获取支付统计失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 获取支付方式列表（管理员）
+   */
+  getPaymentMethods = async (req, res) => {
+    try {
+      const methods = [
+        { value: 'cash', label: '现金' },
+        { value: 'wechat', label: '微信支付' },
+        { value: 'alipay', label: '支付宝' },
+        { value: 'bank_transfer', label: '银行转账' },
+        { value: 'credit_card', label: '信用卡' }
+      ];
+      res.success(200, '获取支付方式列表成功', { methods });
+    } catch (error) {
+      logger.error('获取支付方式列表失败:', error);
+      res.error(500, '获取支付方式列表失败', error.message);
+    }
+  }
+
+  /**
+   * 导出支付记录（管理员）
+   */
+  exportPayments = async (req, res) => {
+    res.error(501, '导出功能尚未实现');
+  }
+
+  /**
+   * 批量创建支付记录（管理员）
+   */
+  createBatchPayments = async (req, res) => {
+    res.error(501, '批量创建功能尚未实现');
+  }
+
+  /**
+   * 获取支付对账单（管理员）
+   */
+  getPaymentReconciliation = async (req, res) => {
+    res.error(501, '对账单功能尚未实现');
+  }
+
+  /**
+   * 获取支付退款记录（管理员）
+   */
+  getPaymentRefunds = async (req, res) => {
+    res.error(501, '退款记录功能尚未实现');
+  }
+
+  /**
+   * 创建支付退款（管理员）
+   */
+  createPaymentRefund = async (req, res) => {
+    res.error(501, '创建退款功能尚未实现');
+  }
 }
 
 module.exports = new PaymentController();

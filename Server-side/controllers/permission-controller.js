@@ -1,6 +1,6 @@
 const { Permission, Role, User, UserPermission, RolePermission, sequelize } = require('../models');
 const { Op } = require('sequelize');
-const logger = require('../utils/logger');
+const { logger } = require('../config/logger');
 
 /**
  * 权限管理控制器

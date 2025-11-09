@@ -17,10 +17,10 @@ const {
   PasswordResetConfigTemplate,
   sequelize
 } = require('../models');
-const { sendEmail } = require('../utils/email-service');
+const { sendEmail } = require('../utils/notification-service');
 const { validatePassword } = require('../utils/password-validator');
 const { Op } = require('sequelize');
-const logger = require('../utils/logger');
+const logger = require('../config/logger').logger;
 
 class PasswordResetController {
   /**
@@ -971,16 +971,22 @@ class PasswordResetController {
         order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']]
       });
       
-      // 获取操作类型统计
-      const actionStats = await PasswordResetLog.findAll({
-        attributes: [
-          'action',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-        ],
-        where: {
-          ...dateRange
-        },
-        group: ['action']
+      // 获取统计结果
+      const formattedStats = dailyStats.map(stat => ({
+        date: stat.createdAt,
+        count: parseInt(stat.count),
+        avgDuration: parseFloat(stat.avgDuration)
+      }));
+
+      return res.json({
+        success: true,
+        data: {
+          totalRequests,
+          successfulResets,
+          failedResets,
+          successRate: totalRequests > 0 ? (successfulResets / totalRequests * 100).toFixed(2) : 0,
+          dailyStats: formattedStats
+        }
       });
       
       res.status(200).json({
@@ -1460,6 +1466,36 @@ class PasswordResetController {
     }
   }
   
+  /**
+   * 获取密码重置统计
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  async getPasswordResetStats(req, res) {
+    try {
+      const dailyStats = await PasswordResetStats.findAll({
+        order: [['createdAt', 'DESC']]
+      });
+      
+      // 获取统计结果
+      const formattedStats = dailyStats.map(stat => ({
+        date: stat.createdAt,
+        count: parseInt(stat.count),
+        avgDuration: parseFloat(stat.avgDuration)
+      }));
+
+      return res.json({
+        success: true,
+        data: formattedStats
+      });
+    } catch (error) {
+      logger.error('获取密码重置统计失败:', error);
+      return res.status(500).json({
+        success: false,
+        message: '服务器内部错误'
+      });
+    }
+  }
   /**
    * 更新密码重置模板
    * @param {Object} req - 请求对象
@@ -2239,16 +2275,95 @@ class PasswordResetController {
         order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']]
       });
       
-      // 获取操作类型统计
-      const actionStats = await PasswordResetLog.findAll({
+      // 获取统计结果
+      const formattedStats = dailyStats.map(stat => ({
+        date: stat.createdAt,
+        count: parseInt(stat.count),
+        avgDuration: parseFloat(stat.avgDuration)
+      }));
+
+      return res.json({
+        success: true,
+        data: {
+          totalRequests,
+          successfulResets,
+          failedResets,
+          successRate: totalRequests > 0 ? (successfulResets / totalRequests * 100).toFixed(2) : 0,
+          dailyStats: formattedStats
+        }
+      });
+    } catch (error) {
+      logger.error('获取密码重置报告失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取密码重置报告失败，请稍后再试'
+      });
+    }
+  }
+  
+  /**
+   * 生成密码重置报告
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  async generatePasswordResetReport(req, res) {
+    try {
+      const { startDate, endDate, format = 'pdf' } = req.body;
+      
+      // 构建日期范围
+      const dateRange = {};
+      if (startDate && endDate) {
+        dateRange.createdAt = {
+          [Op.between]: [new Date(startDate), new Date(endDate)]
+        };
+      }
+      
+      // 获取密码重置统计
+      const totalRequests = await PasswordResetToken.count({ where: dateRange });
+      const successfulResets = await PasswordResetLog.count({
+        where: {
+          action: 'reset',
+          status: 'success',
+          ...dateRange
+        }
+      });
+      const failedResets = await PasswordResetLog.count({
+        where: {
+          action: 'reset',
+          status: 'failed',
+          ...dateRange
+        }
+      });
+      
+      // 获取每日统计
+      const dailyStats = await PasswordResetLog.findAll({
         attributes: [
-          'action',
+          [sequelize.fn('DATE', sequelize.col('createdAt')), 'date'],
           [sequelize.fn('COUNT', sequelize.col('id')), 'count']
         ],
         where: {
           ...dateRange
         },
-        group: ['action']
+        group: [sequelize.fn('DATE', sequelize.col('createdAt'))],
+        order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']]
+      });
+      
+      // 获取统计结果
+      const formattedStats = dailyStats.map(stat => ({
+        date: stat.createdAt,
+        count: parseInt(stat.count),
+        avgDuration: parseFloat(stat.avgDuration)
+      }));
+
+      return res.json({
+        success: true,
+        data: {
+          totalRequests,
+          successfulResets,
+          failedResets,
+          successRate: totalRequests > 0 ? (successfulResets / totalRequests * 100).toFixed(2) : 0,
+          dailyStats: formattedStats
+        }
       });
       
       // 获取状态统计
@@ -2363,72 +2478,28 @@ class PasswordResetController {
         order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']]
       });
       
-      // 获取操作类型统计
-      const actionStats = await PasswordResetLog.findAll({
-        attributes: [
-          'action',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-        ],
-        where: {
-          ...dateRange
-        },
-        group: ['action']
-      });
-      
-      // 获取状态统计
-      const statusStats = await PasswordResetLog.findAll({
-        attributes: [
-          'status',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count']
-        ],
-        where: {
-          ...dateRange
-        },
-        group: ['status']
-      });
-      
-      // 创建报告任务
-      const reportTask = await PasswordResetTask.create({
-        type: 'password_reset_report',
-        status: 'processing',
-        parameters: JSON.stringify({
-          startDate,
-          endDate,
-          format,
+      // 获取统计结果
+      const formattedStats = dailyStats.map(stat => ({
+        date: stat.createdAt,
+        count: parseInt(stat.count),
+        avgDuration: parseFloat(stat.avgDuration)
+      }));
+
+      return res.json({
+        success: true,
+        data: {
           totalRequests,
           successfulResets,
           failedResets,
-          dailyStats,
-          actionStats,
-          statusStats
-        }),
-        createdBy: req.user.sub
-      });
-      
-      // 记录审计日志
-      await PasswordResetAuditLog.create({
-        userId: req.user.sub,
-        action: 'generate_report',
-        details: JSON.stringify({ taskId: reportTask.id, startDate, endDate, format }),
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-      
-      logger.info(`密码重置报告生成任务已创建，任务ID: ${reportTask.id}，操作者ID: ${req.user.sub}`);
-      
-      res.status(200).json({
-        success: true,
-        message: '密码重置报告生成任务已创建',
-        data: {
-          taskId: reportTask.id,
-          status: reportTask.status
+          successRate: totalRequests > 0 ? (successfulResets / totalRequests * 100).toFixed(2) : 0,
+          dailyStats: formattedStats
         }
       });
     } catch (error) {
-      logger.error('生成密码重置报告失败:', error);
+      logger.error('获取密码重置统计失败:', error);
       res.status(500).json({
         success: false,
-        message: '生成密码重置报告失败，请稍后再试'
+        message: '获取密码重置统计失败，请稍后再试'
       });
     }
   }
@@ -2463,4 +2534,24 @@ class PasswordResetController {
         order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']]
       });
       
-      // 获取
+      // 获取统计结果
+      const formattedStats = requestTrends.map(trend => ({
+        date: trend.date,
+        count: parseInt(trend.count)
+      }));
+
+      return res.json({
+        success: true,
+        data: formattedStats
+      });
+    } catch (error) {
+      logger.error('获取密码重置分析数据失败:', error);
+      return res.status(500).json({
+        success: false,
+        message: '服务器内部错误'
+      });
+    }
+  }
+}
+
+module.exports = new PasswordResetController();

@@ -1,6 +1,6 @@
 const { Activity, Room, User, ActivityParticipant } = require('../models');
 const { Op } = require('sequelize');
-const logger = require('../utils/logger');
+const { logger } = require('../config/logger');
 
 /**
  * 获取活动列表

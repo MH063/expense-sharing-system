@@ -4,8 +4,9 @@
  */
 
 const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
-const config = require('../config/config');
+const logger = require('../config/logger');
+const { getEnvironmentConfig } = require('../config/environment');
+const config = getEnvironmentConfig();
 const { 
   User, 
   UserProfile, 

@@ -6,7 +6,8 @@
 const express = require('express');
 const router = express.Router();
 const cacheController = require('../controllers/cache-management-controller');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth-middleware');
+const { checkRole } = require('../middleware/permission-middleware');
 const { roleAwareRateLimiter } = require('../middleware/rateLimiter');
 
 /**
@@ -17,7 +18,7 @@ const { roleAwareRateLimiter } = require('../middleware/rateLimiter');
 router.get(
   '/stats',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(100, 60), // 限制请求频率：每分钟最多100次
   cacheController.getCacheStats
 );
@@ -30,7 +31,7 @@ router.get(
 router.get(
   '/keys',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(50, 60), // 限制请求频率：每分钟最多50次
   cacheController.getAllCacheKeys
 );
@@ -43,7 +44,7 @@ router.get(
 router.get(
   '/key/:key',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(100, 60), // 限制请求频率：每分钟最多100次
   cacheController.getCacheValue
 );
@@ -56,7 +57,7 @@ router.get(
 router.post(
   '/key',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(50, 60), // 限制请求频率：每分钟最多50次
   cacheController.setCacheValue
 );
@@ -69,7 +70,7 @@ router.post(
 router.delete(
   '/key/:key',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(50, 60), // 限制请求频率：每分钟最多50次
   cacheController.deleteCacheKey
 );
@@ -82,7 +83,7 @@ router.delete(
 router.post(
   '/clear',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(10, 60), // 限制请求频率：每分钟最多10次
   cacheController.clearCache
 );
@@ -95,7 +96,7 @@ router.post(
 router.post(
   '/clear-pattern',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(20, 60), // 限制请求频率：每分钟最多20次
   cacheController.clearCacheByPattern
 );
@@ -108,7 +109,7 @@ router.post(
 router.get(
   '/memory',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(50, 60), // 限制请求频率：每分钟最多50次
   cacheController.getMemoryUsage
 );
@@ -121,7 +122,7 @@ router.get(
 router.post(
   '/warmup',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(5, 60), // 限制请求频率：每分钟最多5次
   cacheController.warmupCache
 );
@@ -134,7 +135,7 @@ router.post(
 router.get(
   '/config',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(50, 60), // 限制请求频率：每分钟最多50次
   cacheController.getCacheConfig
 );
@@ -147,7 +148,7 @@ router.get(
 router.put(
   '/config',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(10, 60), // 限制请求频率：每分钟最多10次
   cacheController.updateCacheConfig
 );
@@ -160,7 +161,7 @@ router.put(
 router.get(
   '/info',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(50, 60), // 限制请求频率：每分钟最多50次
   cacheController.getCacheInfo
 );
@@ -173,7 +174,7 @@ router.get(
 router.post(
   '/backup',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(5, 60), // 限制请求频率：每分钟最多5次
   cacheController.backupCache
 );
@@ -186,7 +187,7 @@ router.post(
 router.post(
   '/restore',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(5, 60), // 限制请求频率：每分钟最多5次
   cacheController.restoreCache
 );
@@ -199,7 +200,7 @@ router.post(
 router.get(
   '/slow-logs',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(20, 60), // 限制请求频率：每分钟最多20次
   cacheController.getSlowLogs
 );
@@ -212,7 +213,7 @@ router.get(
 router.delete(
   '/slow-logs',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(5, 60), // 限制请求频率：每分钟最多5次
   cacheController.clearSlowLogs
 );
@@ -225,7 +226,7 @@ router.delete(
 router.get(
   '/health',
   authenticateToken,
-  requireRole('admin'),
+  checkRole(['admin']),
   roleAwareRateLimiter(100, 60), // 限制请求频率：每分钟最多100次
   cacheController.checkCacheHealth
 );

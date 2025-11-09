@@ -4,7 +4,7 @@
  */
 
 const { DataTypes } = require('sequelize');
-const { sequelize } = require('./index');
+const sequelize = require('../config/database');
 
 /**
  * 缓存统计模型

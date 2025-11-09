@@ -2,7 +2,7 @@
  * 第三方账号管理模型
  */
 const { DataTypes } = require('sequelize');
-const { sequelize } = require('.');
+const sequelize = require('../config/database');
 
 // 第三方平台模型
 const ThirdPartyPlatform = sequelize.define('ThirdPartyPlatform', {
@@ -170,9 +170,9 @@ const ThirdPartyAccountLog = sequelize.define('ThirdPartyAccountLog', {
 });
 
 // 模型关联定义
-function defineThirdPartyAccountAssociations() {
+function defineThirdPartyAccountAssociations(models) {
   // 第三方账号关联用户
-  ThirdPartyAccount.belongsTo(require('./index').User, {
+  ThirdPartyAccount.belongsTo(models.User, {
     foreignKey: 'userId',
     as: 'user'
   });
@@ -202,7 +202,7 @@ function defineThirdPartyAccountAssociations() {
   });
   
   // 日志记录人关联用户
-  ThirdPartyAccountLog.belongsTo(require('./index').User, {
+  ThirdPartyAccountLog.belongsTo(models.User, {
     foreignKey: 'createdBy',
     as: 'creator'
   });

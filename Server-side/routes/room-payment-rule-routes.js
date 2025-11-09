@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const roomPaymentRuleController = require('../controllers/room-payment-rule-controller');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticateToken, checkRole } = require('../middleware/auth-middleware');
+
+// 创建authenticate和authorize函数的别名
+const authenticate = authenticateToken;
+const authorize = checkRole;
 
 // 获取所有房间支付规则
 router.get('/', authenticate, roomPaymentRuleController.getAllRoomPaymentRules);

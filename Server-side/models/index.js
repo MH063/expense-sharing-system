@@ -10,6 +10,7 @@ const path = require('path');
 const env = process.env.NODE_ENV || 'development';
 require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
 
+const { pool } = require('../config/db');
 const sequelize = require('../config/database');
 
 // 导入数据导出模型
@@ -614,35 +615,91 @@ const Activity = require('./activity')(sequelize);
 // 导入活动参与者模型
 const ActivityParticipant = require('./activity-participant')(sequelize);
 
+// 导入角色模型
+const Role = sequelize.define('Role', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  roleName: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    unique: true,
+    field: 'role_name'
+  },
+  roleLevel: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    unique: true,
+    field: 'role_level'
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active'
+  },
+  createdAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
+    field: 'created_at'
+  },
+  updatedAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
+    field: 'updated_at'
+  }
+}, {
+  tableName: 'roles',
+  timestamps: true,
+  indexes: [
+    {
+      fields: ['role_name']
+    },
+    {
+      fields: ['role_level']
+    },
+    {
+      fields: ['is_active']
+    }
+  ]
+});
+
 // 导入权限模型
 const Permission = require('./permission')(sequelize);
 
 // 导入角色权限关联模型
-const RolePermission = require('./role-permission')(sequelize);
+const RolePermission = require('./role-permission')(sequelize, DataTypes);
 
 // 导入用户权限关联模型
-const UserPermission = require('./user-permission')(sequelize);
+const UserPermission = require('./user-permission')(sequelize, DataTypes);
 
 // 导入系统信息模型
-const SystemInfo = require('./system-info')(sequelize);
+const SystemInfo = require('./system-info')(sequelize, DataTypes);
 
 // 导入公告模型
-const Announcement = require('./announcement')(sequelize);
+const Announcement = require('./announcement')(sequelize, DataTypes);
 
 // 导入帮助文档模型
-const HelpDocument = require('./help-document')(sequelize);
+const HelpDocument = require('./help-document')(sequelize, DataTypes);
 
 // 导入反馈模型
-const Feedback = require('./feedback')(sequelize);
+const Feedback = require('./feedback')(sequelize, DataTypes);
 
 // 导入常用链接模型
-const CommonLink = require('./common-link')(sequelize);
+const CommonLink = require('./common-link')(sequelize, DataTypes);
 
 // 导入上传文件模型
-const UploadFile = require('./upload-file')(sequelize);
+const UploadFile = require('./upload-file')(sequelize, DataTypes);
 
 // 导入导入历史模型
-const ImportHistory = require('./import-history')(sequelize);
+const ImportHistory = require('./import-history')(sequelize, DataTypes);
 
 // 文档管理相关模型
 const {
@@ -655,7 +712,7 @@ const {
   DocsFavorite,
   DocsRead,
   DocsAttachment
-} = require('./docs');
+} = require('./docs')(sequelize);
 
 // 管理员会话管理相关模型
 const {
@@ -663,7 +720,7 @@ const {
   SessionActivityLog,
   SessionAnomaly,
   SessionRiskAssessment
-} = require('./adminSession');
+} = require('./adminSession')(sequelize, DataTypes);
 
 // 管理员权限变更历史相关模型
 const {
@@ -671,8 +728,9 @@ const {
   PermissionChangeTemplate,
   PermissionAutomationRule,
   PermissionNotificationSettings,
-  PermissionChangeBackup
-} = require('./adminPermissionHistory');
+  PermissionChangeBackup,
+  associate: adminPermissionHistoryAssociate
+} = require('./adminPermissionHistory')(sequelize, DataTypes);
 
 // 管理员操作限制相关模型
 const {
@@ -681,7 +739,7 @@ const {
   AdminOperationRestrictionStats,
   AdminOperationRestrictionException,
   AdminOperationRestrictionConfig
-} = require('./adminOperationRestrictionModels');
+} = require('./adminOperationRestrictionModels')(sequelize, DataTypes);
 
 // 定义支付转移模型
 const PaymentTransfer = sequelize.define('PaymentTransfer', {
@@ -802,9 +860,9 @@ ImportHistory.associate({ User });
 
 // 文档管理模型关联
 Docs.associate({ User, DocsCategory, DocsTag, DocsComment, DocsVersion, DocsLike, DocsFavorite, DocsRead, DocsAttachment });
-DocsCategory.associate({ Docs });
+DocsCategory.associate({ Docs, DocsCategory });
 DocsTag.associate({ Docs });
-DocsComment.associate({ Docs, User });
+DocsComment.associate({ Docs, User, DocsComment });
 DocsVersion.associate({ Docs, User });
 DocsLike.associate({ Docs, User });
 DocsFavorite.associate({ Docs, User });
@@ -814,14 +872,11 @@ DocsAttachment.associate({ Docs, User });
 // 管理员会话管理模型关联
 AdminSession.associate({ User, SessionActivityLog, SessionAnomaly, SessionRiskAssessment });
 SessionActivityLog.associate({ AdminSession });
-SessionAnomaly.associate({ AdminSession });
+SessionAnomaly.associate({ AdminSession, User });
 SessionRiskAssessment.associate({ AdminSession });
 
 // 管理员权限变更历史模型关联
-AdminPermissionHistory.associate({ User, Permission });
-PermissionChangeTemplate.associate({ User });
-PermissionAutomationRule.associate({ User });
-PermissionChangeBackup.associate({ User });
+adminPermissionHistoryAssociate({ User, Permission, AdminPermissionHistory, PermissionChangeTemplate, PermissionAutomationRule, PermissionChangeBackup });
 
 // 管理员操作限制模型关联
 AdminOperationRestriction.associate({ User, AdminOperationRestrictionLog, AdminOperationRestrictionStats, AdminOperationRestrictionException });
@@ -886,6 +941,9 @@ PaymentTransfer.belongsTo(Payment, { foreignKey: 'toPaymentId', as: 'toPayment' 
 User.hasMany(PaymentTransfer, { foreignKey: 'createdBy', as: 'createdPaymentTransfers' });
 PaymentTransfer.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
+const Notification = require('./notification-model');
+
+// 定义模型关联关系
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
@@ -945,6 +1003,7 @@ module.exports = {
   Activity,
   ActivityParticipant,
   Permission,
+  Role,
   RolePermission,
   UserPermission,
   SystemInfo,

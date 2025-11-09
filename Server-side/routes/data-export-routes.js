@@ -7,8 +7,9 @@ const express = require('express');
 const router = express.Router();
 const { body, query, param } = require('express-validator');
 const dataExportController = require('../controllers/data-export-controller');
-const { authenticateToken, requireRole } = require('../middleware/auth');
-const { roleAwareRateLimiter } = require('../middleware/rate-limiter');
+const { authenticateToken } = require('../middleware/auth-middleware');
+const { checkRole } = require('../middleware/permission-middleware');
+const { roleAwareRateLimiter } = require('../middleware/rateLimiter');
 
 /**
  * @route GET /api/data-export/bills
@@ -18,7 +19,7 @@ const { roleAwareRateLimiter } = require('../middleware/rate-limiter');
 router.get(
   '/bills',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(100, 15 * 60), // 15分钟内最多100次请求
   [
     query('startDate').optional().isISO8601().withMessage('开始日期格式不正确'),
@@ -37,7 +38,7 @@ router.get(
 router.get(
   '/expenses',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(100, 15 * 60), // 15分钟内最多100次请求
   [
     query('startDate').optional().isISO8601().withMessage('开始日期格式不正确'),
@@ -56,7 +57,7 @@ router.get(
 router.get(
   '/payments',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(100, 15 * 60), // 15分钟内最多100次请求
   [
     query('startDate').optional().isISO8601().withMessage('开始日期格式不正确'),
@@ -75,7 +76,7 @@ router.get(
 router.get(
   '/activities',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(100, 15 * 60), // 15分钟内最多100次请求
   [
     query('startDate').optional().isISO8601().withMessage('开始日期格式不正确'),
@@ -94,7 +95,7 @@ router.get(
 router.get(
   '/room-summary/:roomId',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(50, 15 * 60), // 15分钟内最多50次请求
   [
     param('roomId').isInt().withMessage('房间ID必须是整数'),
@@ -113,7 +114,7 @@ router.get(
 router.get(
   '/user-summary',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(50, 15 * 60), // 15分钟内最多50次请求
   [
     query('startDate').optional().isISO8601().withMessage('开始日期格式不正确'),
@@ -131,7 +132,7 @@ router.get(
 router.post(
   '/custom',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(20, 15 * 60), // 15分钟内最多20次请求
   [
     body('query').notEmpty().withMessage('查询条件不能为空'),
@@ -149,7 +150,7 @@ router.post(
 router.get(
   '/templates',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(100, 15 * 60), // 15分钟内最多100次请求
   dataExportController.getExportTemplates
 );
@@ -162,7 +163,7 @@ router.get(
 router.post(
   '/templates',
   authenticateToken,
-  requireRole(['admin']),
+  checkRole(['admin']),
   roleAwareRateLimiter(20, 15 * 60), // 15分钟内最多20次请求
   [
     body('name').notEmpty().withMessage('模板名称不能为空'),
@@ -181,7 +182,7 @@ router.post(
 router.put(
   '/templates/:templateId',
   authenticateToken,
-  requireRole(['admin']),
+  checkRole(['admin']),
   roleAwareRateLimiter(20, 15 * 60), // 15分钟内最多20次请求
   [
     param('templateId').isInt().withMessage('模板ID必须是整数'),
@@ -201,7 +202,7 @@ router.put(
 router.delete(
   '/templates/:templateId',
   authenticateToken,
-  requireRole(['admin']),
+  checkRole(['admin']),
   roleAwareRateLimiter(20, 15 * 60), // 15分钟内最多20次请求
   [
     param('templateId').isInt().withMessage('模板ID必须是整数')
@@ -217,7 +218,7 @@ router.delete(
 router.get(
   '/history',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(100, 15 * 60), // 15分钟内最多100次请求
   [
     query('page').optional().isInt({ min: 1 }).withMessage('页码必须是正整数'),
@@ -234,7 +235,7 @@ router.get(
 router.get(
   '/history/:exportId',
   authenticateToken,
-  requireRole(['user', 'admin']),
+  checkRole(['user', 'admin']),
   roleAwareRateLimiter(100, 15 * 60), // 15分钟内最多100次请求
   [
     param('exportId').isInt().withMessage('导出记录ID必须是整数')

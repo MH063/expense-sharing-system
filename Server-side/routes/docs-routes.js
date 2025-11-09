@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const docsController = require('../controllers/docs-controller');
-const { authenticateToken, authorize } = require('../middleware/tokenManager');
+const { authenticateToken } = require('../middleware/tokenManager');
+const { checkPermission } = require('../middleware/permission-middleware');
 const { upload } = require('../middleware/upload');
 
 // 文档管理相关路由
@@ -15,21 +16,21 @@ router.get('/:id', authenticateToken, docsController.getDocsDetail);
 // 创建文档
 router.post('/', 
   authenticateToken, 
-  authorize('docs:create'), 
+  checkPermission('docs:create'), 
   docsController.createDocs
 );
 
 // 更新文档
 router.put('/:id', 
   authenticateToken, 
-  authorize('docs:update'), 
+  checkPermission('docs:update'), 
   docsController.updateDocs
 );
 
 // 删除文档
 router.delete('/:id', 
   authenticateToken, 
-  authorize('docs:delete'), 
+  checkPermission('docs:delete'), 
   docsController.deleteDocs
 );
 
@@ -42,7 +43,7 @@ router.get('/tags', authenticateToken, docsController.getDocsTags);
 // 上传文档附件
 router.post('/upload', 
   authenticateToken, 
-  authorize('docs:upload'), 
+  checkPermission('docs:upload'), 
   upload.single('file'), 
   docsController.uploadDocsAttachment
 );
@@ -53,7 +54,7 @@ router.get('/:id/versions', authenticateToken, docsController.getDocsVersionHist
 // 恢复文档版本
 router.post('/:id/versions/:versionId/restore', 
   authenticateToken, 
-  authorize('docs:restore'), 
+  checkPermission('docs:restore'), 
   docsController.restoreDocsVersion
 );
 
@@ -63,7 +64,7 @@ router.get('/:id/comments', authenticateToken, docsController.getDocsComments);
 // 添加文档评论
 router.post('/:id/comments', 
   authenticateToken, 
-  authorize('docs:comment'), 
+  checkPermission('docs:comment'), 
   docsController.addDocsComment
 );
 
@@ -97,14 +98,14 @@ router.get('/search', authenticateToken, docsController.searchDocs);
 // 导出文档
 router.get('/:id/export', 
   authenticateToken, 
-  authorize('docs:export'), 
+  checkPermission('docs:export'), 
   docsController.exportDocs
 );
 
 // 批量操作文档
 router.post('/batch', 
   authenticateToken, 
-  authorize('docs:batch'), 
+  checkPermission('docs:batch'), 
   docsController.batchDocsOperation
 );
 

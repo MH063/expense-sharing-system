@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const specialPaymentRuleController = require('../controllers/special-payment-rule-controller');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticateToken, checkRole } = require('../middleware/auth-middleware');
 const { body, param, query } = require('express-validator');
+
+// 创建authenticate和authorize函数的别名
+const authenticate = authenticateToken;
+const authorize = checkRole;
 
 // 获取特殊支付规则列表
 router.get('/', 

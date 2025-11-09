@@ -543,7 +543,7 @@ module.exports = (sequelize) => {
       through: 'docs_tags_relations',
       foreignKey: 'docsId',
       otherKey: 'tagId',
-      as: 'tags'
+      as: 'docTags'
     });
 
     // 文档与评论
@@ -579,7 +579,7 @@ module.exports = (sequelize) => {
     // 文档与附件
     Docs.hasMany(models.DocsAttachment, {
       foreignKey: 'docsId',
-      as: 'attachments'
+      as: 'docAttachments'
     });
   };
 

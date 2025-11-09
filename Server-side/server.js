@@ -158,6 +158,16 @@ const userRoutes = require('./routes/user-routes');
 const roomRoutes = require('./routes/room-routes');
 const expenseRoutes = require('./routes/expense-routes');
 const adminLeaveRecordRoutes = require('./routes/admin-leave-record-routes');
+// 管理员费用审核路由
+const adminExpenseRoutes = require('./routes/admin-expense-routes');
+// 管理员支付管理路由
+const adminPaymentRoutes = require('./routes/admin-payment-routes');
+// 管理员通知管理路由
+const adminNotificationRoutes = require('./routes/admin-notification-routes');
+// 管理员邀请码管理路由
+const adminInviteRoutes = require('./routes/admin-invite-routes');
+// 管理员数据分析路由
+const adminAnalyticsRoutes = require('./routes/admin-analytics-routes');
 const expenseTypeRoutes = require('./routes/expense-type-routes');
 const billRoutes = require('./routes/bill-routes');
 const statsRoutes = require('./routes/stats-routes');
@@ -365,6 +375,11 @@ app.use('/api/cache-test', cacheTestRoutes);
 app.use('/api/cache', cacheRoutes);
 app.use('/api/brute-force-monitor', bruteForceMonitorRoutes);
 app.use('/api/admin/leave-records', adminLeaveRecordRoutes);
+app.use('/api/admin/expenses', adminExpenseRoutes);
+app.use('/api/admin/payments', adminPaymentRoutes);
+app.use('/api/admin/notifications', adminNotificationRoutes);
+app.use('/api/admin/invites', adminInviteRoutes);
+app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api/other', otherRoutes);
 app.use('/api/docs', docsRoutes);
 app.use('/api/admin/sessions', adminSessionRoutes);

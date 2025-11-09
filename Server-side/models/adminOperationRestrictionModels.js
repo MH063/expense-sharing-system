@@ -1,13 +1,15 @@
-const AdminOperationRestriction = require('./adminOperationRestriction');
-const AdminOperationRestrictionLog = require('./adminOperationRestrictionLog');
-const AdminOperationRestrictionStats = require('./adminOperationRestrictionStats');
-const AdminOperationRestrictionException = require('./adminOperationRestrictionException');
-const AdminOperationRestrictionConfig = require('./adminOperationRestrictionConfig');
+module.exports = (sequelize, DataTypes) => {
+  const AdminOperationRestriction = require('./adminOperationRestriction')(sequelize, DataTypes);
+  const AdminOperationRestrictionLog = require('./adminOperationRestrictionLog')(sequelize, DataTypes);
+  const AdminOperationRestrictionStats = require('./adminOperationRestrictionStats')(sequelize, DataTypes);
+  const AdminOperationRestrictionException = require('./adminOperationRestrictionException')(sequelize, DataTypes);
+  const AdminOperationRestrictionConfig = require('./adminOperationRestrictionConfig')(sequelize, DataTypes);
 
-module.exports = {
-  AdminOperationRestriction,
-  AdminOperationRestrictionLog,
-  AdminOperationRestrictionStats,
-  AdminOperationRestrictionException,
-  AdminOperationRestrictionConfig
+  return {
+    AdminOperationRestriction,
+    AdminOperationRestrictionLog,
+    AdminOperationRestrictionStats,
+    AdminOperationRestrictionException,
+    AdminOperationRestrictionConfig
+  };
 };

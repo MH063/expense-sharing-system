@@ -2468,6 +2468,187 @@ class ExpenseController {
     }
   }
 
+  // 审核费用
+  async reviewExpense(req, res) {
+    const startTime = Date.now();
+    const requestId = `review-expense-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await pool.connect();
+    
+    try {
+      const { id } = req.params;
+      const { status, review_notes } = req.body;
+      const reviewerId = req.user.sub; // 从认证中间件获取审核人ID
+      
+      logger.info(`[${requestId}] 开始审核费用`, {
+        requestId,
+        reviewerId,
+        expenseId: id,
+        status,
+        review_notes
+      });
+
+      // 验证费用是否存在
+      const expenseResult = await client.query(
+        'SELECT * FROM expenses WHERE id = $1',
+        [id]
+      );
+
+      if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 审核费用失败: 费用不存在`, {
+          requestId,
+          expenseId: id,
+          reviewerId
+        });
+        
+        return res.error(404, '费用不存在');
+      }
+
+      const expense = expenseResult.rows[0];
+
+      // 验证费用状态是否为待审核
+      if (expense.status !== 'pending') {
+        logger.warn(`[${requestId}] 审核费用失败: 费用状态不是待审核`, {
+          requestId,
+          expenseId: id,
+          currentStatus: expense.status
+        });
+        
+        return res.error(400, '只能审核待审核状态的费用');
+      }
+
+      // 验证审核状态值
+      if (!['approved', 'rejected'].includes(status)) {
+        logger.warn(`[${requestId}] 审核费用失败: 无效的审核状态`, {
+          requestId,
+          expenseId: id,
+          status
+        });
+        
+        return res.error(400, '审核状态必须是approved或rejected');
+      }
+
+      // 开始事务
+      await client.query('BEGIN');
+
+      // 更新费用状态和审核信息
+      const updateResult = await client.query(
+        `UPDATE expenses 
+         SET status = $1, reviewer_id = $2, review_notes = $3, review_date = NOW(), updated_at = NOW()
+         WHERE id = $4
+         RETURNING id, title, amount, status, reviewer_id, review_notes, review_date`,
+        [status, reviewerId, review_notes, id]
+      );
+
+      const updatedExpense = updateResult.rows[0];
+
+      // 如果审核通过，创建分摊记录
+      if (status === 'approved') {
+        // 获取费用分摊信息
+        const splitDetails = await client.query(
+          'SELECT * FROM expense_split_details WHERE expense_id = $1',
+          [id]
+        );
+
+        if (splitDetails.rows.length > 0) {
+          // 创建分摊记录
+          for (const detail of splitDetails.rows) {
+            await client.query(
+              `INSERT INTO expense_splits 
+               (expense_id, user_id, amount, split_type, created_at, updated_at) 
+               VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+              [id, detail.user_id, detail.amount, detail.split_type]
+            );
+          }
+
+          logger.info(`[${requestId}] 创建费用分摊记录成功`, {
+            requestId,
+            expenseId: id,
+            splitCount: splitDetails.rows.length
+          });
+        }
+      }
+
+      await client.query('COMMIT');
+      
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 费用审核成功`, {
+        requestId,
+        reviewerId,
+        expenseId: updatedExpense.id,
+        title: updatedExpense.title,
+        amount: updatedExpense.amount,
+        status: updatedExpense.status,
+        review_notes: updatedExpense.review_notes,
+        duration
+      });
+
+      res.success(200, '费用审核成功', updatedExpense);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 费用审核失败`, {
+        requestId,
+        reviewerId: req.user.sub,
+        expenseId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  // 获取费用类型列表
+  async getExpenseTypes(req, res) {
+    const startTime = Date.now();
+    const requestId = `get-expense-types-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      logger.info(`[${requestId}] 开始获取费用类型列表`, {
+        requestId
+      });
+
+      // 从数据库获取费用类型
+      const result = await pool.query(
+        `SELECT DISTINCT category 
+         FROM expenses 
+         WHERE category IS NOT NULL 
+         ORDER BY category ASC`
+      );
+
+      const expenseTypes = result.rows.map(row => row.category);
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用类型列表成功`, {
+        requestId,
+        count: expenseTypes.length,
+        duration
+      });
+
+      res.success(200, '获取费用类型列表成功', expenseTypes);
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用类型列表失败`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
   // 获取寝室成员列表
   async getRoomMembers(req, res) {
     const startTime = Date.now();

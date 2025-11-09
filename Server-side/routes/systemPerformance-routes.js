@@ -6,11 +6,12 @@
 const express = require('express');
 const router = express.Router();
 const systemPerformanceController = require('../controllers/systemPerformanceController');
-const { authenticateAdmin, authorizeAdmin } = require('../middleware/adminAuth');
+const { authenticateToken } = require('../middleware/auth-middleware');
+const { checkRole, checkPermission } = require('../middleware/permission-middleware');
 
 // 应用管理员认证和授权中间件
-router.use(authenticateAdmin);
-router.use(authorizeAdmin('system_performance', 'read'));
+router.use(authenticateToken);
+router.use(checkRole(['admin']));
 
 /**
  * 系统性能概览
@@ -71,7 +72,7 @@ router.get('/alerts/:alertId', systemPerformanceController.getPerformanceAlertDe
  * PUT /api/admin/system-performance/alerts/:alertId/acknowledge
  */
 router.put('/alerts/:alertId/acknowledge', 
-  authorizeAdmin('system_performance', 'update'),
+  checkRole(['admin']),
   systemPerformanceController.acknowledgePerformanceAlert
 );
 
@@ -80,7 +81,7 @@ router.put('/alerts/:alertId/acknowledge',
  * PUT /api/admin/system-performance/alerts/:alertId/resolve
  */
 router.put('/alerts/:alertId/resolve', 
-  authorizeAdmin('system_performance', 'update'),
+  checkRole(['admin']),
   systemPerformanceController.resolvePerformanceAlert
 );
 
@@ -95,7 +96,7 @@ router.get('/reports', systemPerformanceController.getPerformanceReports);
  * POST /api/admin/system-performance/reports
  */
 router.post('/reports', 
-  authorizeAdmin('system_performance', 'create'),
+  checkRole(['admin']),
   systemPerformanceController.generatePerformanceReport
 );
 
@@ -116,7 +117,7 @@ router.get('/config', systemPerformanceController.getPerformanceConfig);
  * PUT /api/admin/system-performance/config
  */
 router.put('/config', 
-  authorizeAdmin('system_performance', 'update'),
+  checkRole(['admin']),
   systemPerformanceController.updatePerformanceConfig
 );
 
@@ -137,7 +138,7 @@ router.get('/baselines', systemPerformanceController.getPerformanceBaselines);
  * POST /api/admin/system-performance/baselines
  */
 router.post('/baselines', 
-  authorizeAdmin('system_performance', 'create'),
+  checkRole(['admin']),
   systemPerformanceController.createPerformanceBaseline
 );
 
@@ -146,7 +147,7 @@ router.post('/baselines',
  * DELETE /api/admin/system-performance/baselines/:baselineId
  */
 router.delete('/baselines/:baselineId', 
-  authorizeAdmin('system_performance', 'delete'),
+  checkRole(['admin']),
   systemPerformanceController.deletePerformanceBaseline
 );
 
@@ -155,7 +156,7 @@ router.delete('/baselines/:baselineId',
  * POST /api/admin/system-performance/export
  */
 router.post('/export', 
-  authorizeAdmin('system_performance', 'export'),
+  checkRole(['admin']),
   systemPerformanceController.exportPerformanceData
 );
 
@@ -176,7 +177,7 @@ router.get('/optimization', systemPerformanceController.getPerformanceOptimizati
  * POST /api/admin/system-performance/optimization/:suggestionId/apply
  */
 router.post('/optimization/:suggestionId/apply', 
-  authorizeAdmin('system_performance', 'update'),
+  checkRole(['admin']),
   systemPerformanceController.applyPerformanceOptimization
 );
 

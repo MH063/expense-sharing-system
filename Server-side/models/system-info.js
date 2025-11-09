@@ -51,5 +51,14 @@ module.exports = (sequelize, DataTypes) => {
     ]
   });
 
+  /**
+   * 定义模型关联关系
+   * @param {Object} models - 所有模型对象
+   */
+  SystemInfo.associate = (models) => {
+    // 系统信息与用户的关联（如果有需要的话）
+    // 这里可以添加关联关系
+  };
+
   return SystemInfo;
 };

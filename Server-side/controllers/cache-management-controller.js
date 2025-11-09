@@ -4,8 +4,7 @@
  */
 
 const { validationResult } = require('express-validator');
-const logger = require('../utils/logger');
-const config = require('../config/config');
+const logger = require('../config/logger');
 const cacheService = require('../services/cache-service');
 const { promisify } = require('util');
 const fs = require('fs').promises;

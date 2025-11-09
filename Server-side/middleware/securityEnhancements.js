@@ -234,13 +234,14 @@ async function updateDatabaseSchema() {
   }
 }
 
-// 在模块加载时更新数据库结构
-updateDatabaseSchema().catch(console.error);
+// 导出updateDatabaseSchema函数，但不在模块加载时立即执行
+// updateDatabaseSchema函数将在服务器启动时由server.js调用
 
 module.exports = {
   recordFailedLoginAttempt,
   resetFailedLoginAttempts,
   isAccountLocked,
   accountLockCheck,
-  sensitiveOperationMFA
+  sensitiveOperationMFA,
+  updateDatabaseSchema  // 导出函数以便在服务器启动时调用
 };

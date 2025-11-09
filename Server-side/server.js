@@ -4,6 +4,15 @@ console.log('===== 开始加载server.js =====');
 process.stdout.setEncoding('utf8');
 process.stderr.setEncoding('utf8');
 
+// 处理命令行参数
+const args = process.argv.slice(2);
+const logLevelIndex = args.findIndex(arg => arg === '--log-level');
+if (logLevelIndex !== -1 && args[logLevelIndex + 1]) {
+  // 设置日志级别环境变量，优先级高于配置文件
+  process.env.LOG_LEVEL = args[logLevelIndex + 1];
+  console.log(`从命令行参数设置日志级别: ${process.env.LOG_LEVEL}`);
+}
+
 // 添加全局错误处理器，以便捕获模块加载阶段的错误
 process.on('uncaughtException', (error) => {
   console.error('未捕获的异常:', error);
@@ -242,6 +251,32 @@ app.use(httpLogger);
 // 增强的审计日志中间件（记录所有API请求）
 app.use(enhancedAuditLogger);
 
+// 根路径处理 - 必须在静态文件中间件之前
+app.get('/', (req, res) => {
+  try {
+    logger.info('处理根路径请求', { ip: req.ip, userAgent: req.get('User-Agent') });
+    // 直接返回public目录下的index.html文件
+    const indexPath = path.join(__dirname, 'public', 'index.html');
+    logger.info('检查首页文件路径:', indexPath);
+    if (fs.existsSync(indexPath)) {
+      logger.info('首页文件存在，正在发送文件');
+      res.sendFile(indexPath);
+    } else {
+      logger.error('首页文件不存在');
+      res.status(404).json({
+        success: false,
+        message: '首页文件不存在'
+      });
+    }
+  } catch (error) {
+    logger.error('根路径处理失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+});
+
 // 静态文件服务 - 用于部署前端应用与上传文件
 app.use(express.static('public'));
 // 暴露 /uploads 目录供收据访问（确保与 multer 配置一致）
@@ -447,6 +482,22 @@ async function startServer() {
       } else {
         logger.error('无法连接到数据库，服务器启动失败');
         process.exit(1);
+      }
+    }
+    
+    // 如果数据库连接成功，更新数据库表结构
+    if (dbConnected) {
+      try {
+        console.log('正在更新数据库表结构...');
+        const { updateDatabaseSchema } = require('./middleware/securityEnhancements');
+        await updateDatabaseSchema();
+        console.log('数据库表结构更新完成');
+      } catch (error) {
+        console.error('数据库表结构更新失败:', error);
+        // 在开发环境中继续启动，生产环境中退出
+        if (config.nodeEnv !== 'development') {
+          throw error;
+        }
       }
     }
     

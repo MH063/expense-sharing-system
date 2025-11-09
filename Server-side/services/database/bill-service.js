@@ -148,6 +148,65 @@ class BillService extends BaseService {
   }
 
   /**
+   * 获取最近的账单列表
+   * @param {number} limit - 返回的账单数量限制
+   * @returns {Promise<Array>} 最近账单列表
+   */
+  async getRecentBills(limit = 10) {
+    const cacheKey = `recent:bills:${limit}`;
+    
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      const sql = `
+        SELECT 
+          b.id,
+          b.room_id,
+          b.title,
+          b.amount,
+          b.status,
+          b.created_at,
+          u.username as creator_name,
+          r.name as room_name
+        FROM bills b
+        LEFT JOIN users u ON b.created_by = u.id
+        LEFT JOIN rooms r ON b.room_id = r.id
+        ORDER BY b.created_at DESC
+        LIMIT $1
+      `;
+      
+      const result = await this.query(sql, [limit]);
+      return result.rows;
+    }, enhancedCacheService.getDefaultTTL('bill'), ['bill']); // 使用账单类型的默认TTL并添加标签
+  }
+
+  /**
+   * 获取账单详情（通过ID）
+   * @param {string} billId - 账单ID
+   * @returns {Promise<Object>} 账单详情
+   */
+  async getBillById(billId) {
+    const cacheKey = `bill:id:${billId}`;
+    
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      const sql = `
+        SELECT 
+          b.*,
+          u.username as creator_name,
+          u.avatar as creator_avatar,
+          r.name as room_name
+        FROM bills b
+        LEFT JOIN users u ON b.created_by = u.id
+        LEFT JOIN rooms r ON b.room_id = r.id
+        WHERE b.id = $1
+      `;
+      
+      const result = await this.query(sql, [billId]);
+      return result.rows.length > 0 ? result.rows[0] : null;
+    }, enhancedCacheService.getDefaultTTL('bill'), ['bill']); // 使用账单类型的默认TTL并添加标签
+  }
+
+  /**
    * 获取账单详情（包含支付记录）
    * @param {string} billId - 账单ID
    * @returns {Promise<Object>} 账单详情

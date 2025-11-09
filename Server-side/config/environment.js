@@ -5,17 +5,17 @@
 
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
 
 // 加载环境特定的配置文件
 function loadEnvironmentConfig() {
   const env = process.env.NODE_ENV || 'development';
   
   // 按优先级加载环境变量文件
+  // 注意：加载顺序很重要，后加载的文件不会覆盖已存在的环境变量
   const envFiles = [
-    path.resolve(__dirname, '..', '.env'),           // 本地环境变量（包含真实密码）
-    path.resolve(__dirname, '..', `.env.${env}`),     // 环境特定配置
-    path.resolve(__dirname, '..', '.env.development') // 开发环境默认配置
+    path.resolve(__dirname, '..', '.env.development'), // 开发环境默认配置（最先加载）
+    path.resolve(__dirname, '..', `.env.${env}`),       // 环境特定配置
+    path.resolve(__dirname, '..', '.env')               // 本地环境变量（最后加载，具有最高优先级）
   ];
 
   // 按优先级加载环境变量文件
@@ -23,7 +23,9 @@ function loadEnvironmentConfig() {
     try {
       if (fs.existsSync(envPath)) {
         console.log(`加载环境变量文件: ${envPath}`);
-        require('dotenv').config({ path: envPath, override: true });
+        // 本地.env文件使用override=true，其他文件使用override=false
+        const isLocalEnv = envPath.endsWith('.env') && !envPath.endsWith('.env.development') && !envPath.includes('.env.');
+        require('dotenv').config({ path: envPath, override: isLocalEnv });
       }
     } catch (error) {
       console.warn(`警告: 加载环境变量文件失败: ${envPath}`, error.message);

@@ -50,7 +50,7 @@ npm install pg winston
 - `DB_HOST` - 数据库主机地址（默认：localhost）
 - `DB_PORT` - 数据库端口号（默认：5432）
 - `DB_USER` - 数据库用户名（默认：postgres）
-- `DB_PASSWORD` - 数据库密码（默认：123456789）
+- `DB_PASSWORD` - 数据库密码（默认：************）
 - `DB_NAME` - 数据库名称（默认：expense_dev）
 
 ## 使用方法

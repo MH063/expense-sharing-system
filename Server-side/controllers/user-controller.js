@@ -163,9 +163,13 @@ class UserController {
     try {
       const { username, password } = req.body;
       
-      // 查询管理员用户信息 - 修改为查询admin_users表
+      // 查询管理员用户信息 - 从users表查询具有管理员角色的用户
       const userResult = await pool.query(
-        'SELECT id, username, password_hash FROM admin_users WHERE username = $1',
+        `SELECT u.id, u.username, u.password_hash 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.username = $1 AND r.name = '系统管理员'`,
         [username]
       );
       
@@ -207,15 +211,14 @@ class UserController {
       
       const refreshToken = TokenManager.generateRefreshToken(user.id.toString());
       
-      // 更新最后登录时间 - 如果admin_users表有updated_at字段
+      // 更新最后登录时间
       try {
         await pool.query(
-          'UPDATE admin_users SET updated_at = NOW() WHERE id = $1',
+          'UPDATE users SET updated_at = NOW() WHERE id = $1',
           [user.id]
         );
       } catch (error) {
-        // 如果updated_at字段不存在，忽略错误
-        logger.warn('无法更新admin_users表的updated_at字段:', error.message);
+        logger.warn('无法更新users表的updated_at字段:', error.message);
       }
       
       logger.info(`管理员登录成功: ${user.username}`);
@@ -4022,6 +4025,2874 @@ class UserController {
         error: error.message,
         stack: error.stack,
         processingTime: Date.now() - startTime
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取用户个人信息
+  async getProfile(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      
+      logger.info(`开始获取用户个人信息 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 查询用户基本信息
+      const userResult = await pool.query(
+        `SELECT u.id, u.username, u.email, u.avatar_url, u.phone, u.status, 
+                u.email_verified, u.last_login_at, u.login_count, u.created_at,
+                up.full_name, up.nickname, up.gender, up.birth_date, up.location, up.bio,
+                us.language, us.timezone, us.currency, us.notification_email, us.notification_push, us.privacy_level
+         FROM users u
+         LEFT JOIN user_profiles up ON u.id = up.user_id
+         LEFT JOIN user_settings us ON u.id = us.user_id
+         WHERE u.id = $1`,
+        [userId]
+      );
+      
+      if (userResult.rows.length === 0) {
+        logger.warn(`获取用户个人信息失败：用户不存在 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(404, '用户不存在');
+      }
+      
+      const user = userResult.rows[0];
+      
+      // 查询用户角色
+      const roleResult = await pool.query(
+        `SELECT r.name as role 
+         FROM user_roles ur 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE ur.user_id = $1`,
+        [userId]
+      );
+      
+      if (roleResult.rows.length > 0) {
+        user.role = roleResult.rows[0].role;
+      } else {
+        user.role = 'user';
+      }
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取用户个人信息成功 [${requestId}]`, {
+        requestId,
+        userId,
+        username: user.username,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取用户个人信息成功', user);
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取用户个人信息失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 更新用户个人信息
+  async updateProfile(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { 
+        avatar_url, phone, full_name, nickname, gender, birth_date, 
+        location, bio, language, timezone, currency, 
+        notification_email, notification_push, privacy_level 
+      } = req.body;
+      
+      logger.info(`开始更新用户个人信息 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 开始事务
+      const client = await pool.connect();
+      
+      try {
+        await client.query('BEGIN');
+        
+        // 更新用户基本信息
+        if (avatar_url !== undefined || phone !== undefined) {
+          const updateFields = [];
+          const updateValues = [];
+          let paramIndex = 1;
+          
+          if (avatar_url !== undefined) {
+            updateFields.push(`avatar_url = $${paramIndex++}`);
+            updateValues.push(avatar_url);
+          }
+          
+          if (phone !== undefined) {
+            updateFields.push(`phone = $${paramIndex++}`);
+            updateValues.push(phone);
+          }
+          
+          updateFields.push(`updated_at = NOW()`);
+          updateValues.push(userId);
+          
+          await client.query(
+            `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
+            updateValues
+          );
+        }
+        
+        // 更新用户档案信息
+        if (full_name !== undefined || nickname !== undefined || gender !== undefined || 
+            birth_date !== undefined || location !== undefined || bio !== undefined) {
+          
+          // 检查用户档案是否存在
+          const profileResult = await client.query(
+            'SELECT user_id FROM user_profiles WHERE user_id = $1',
+            [userId]
+          );
+          
+          if (profileResult.rows.length > 0) {
+            // 更新现有档案
+            const updateFields = [];
+            const updateValues = [];
+            let paramIndex = 1;
+            
+            if (full_name !== undefined) {
+              updateFields.push(`full_name = $${paramIndex++}`);
+              updateValues.push(full_name);
+            }
+            
+            if (nickname !== undefined) {
+              updateFields.push(`nickname = $${paramIndex++}`);
+              updateValues.push(nickname);
+            }
+            
+            if (gender !== undefined) {
+              updateFields.push(`gender = $${paramIndex++}`);
+              updateValues.push(gender);
+            }
+            
+            if (birth_date !== undefined) {
+              updateFields.push(`birth_date = $${paramIndex++}`);
+              updateValues.push(birth_date);
+            }
+            
+            if (location !== undefined) {
+              updateFields.push(`location = $${paramIndex++}`);
+              updateValues.push(location);
+            }
+            
+            if (bio !== undefined) {
+              updateFields.push(`bio = $${paramIndex++}`);
+              updateValues.push(bio);
+            }
+            
+            updateFields.push(`updated_at = NOW()`);
+            updateValues.push(userId);
+            
+            await client.query(
+              `UPDATE user_profiles SET ${updateFields.join(', ')} WHERE user_id = $${paramIndex}`,
+              updateValues
+            );
+          } else {
+            // 创建新档案
+            await client.query(
+              `INSERT INTO user_profiles (user_id, full_name, nickname, gender, birth_date, location, bio, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+              [userId, full_name || null, nickname || null, gender || null, 
+               birth_date || null, location || null, bio || null]
+            );
+          }
+        }
+        
+        // 更新用户设置
+        if (language !== undefined || timezone !== undefined || currency !== undefined || 
+            notification_email !== undefined || notification_push !== undefined || privacy_level !== undefined) {
+          
+          // 检查用户设置是否存在
+          const settingsResult = await client.query(
+            'SELECT user_id FROM user_settings WHERE user_id = $1',
+            [userId]
+          );
+          
+          if (settingsResult.rows.length > 0) {
+            // 更新现有设置
+            const updateFields = [];
+            const updateValues = [];
+            let paramIndex = 1;
+            
+            if (language !== undefined) {
+              updateFields.push(`language = $${paramIndex++}`);
+              updateValues.push(language);
+            }
+            
+            if (timezone !== undefined) {
+              updateFields.push(`timezone = $${paramIndex++}`);
+              updateValues.push(timezone);
+            }
+            
+            if (currency !== undefined) {
+              updateFields.push(`currency = $${paramIndex++}`);
+              updateValues.push(currency);
+            }
+            
+            if (notification_email !== undefined) {
+              updateFields.push(`notification_email = $${paramIndex++}`);
+              updateValues.push(notification_email);
+            }
+            
+            if (notification_push !== undefined) {
+              updateFields.push(`notification_push = $${paramIndex++}`);
+              updateValues.push(notification_push);
+            }
+            
+            if (privacy_level !== undefined) {
+              updateFields.push(`privacy_level = $${paramIndex++}`);
+              updateValues.push(privacy_level);
+            }
+            
+            updateFields.push(`updated_at = NOW()`);
+            updateValues.push(userId);
+            
+            await client.query(
+              `UPDATE user_settings SET ${updateFields.join(', ')} WHERE user_id = $${paramIndex}`,
+              updateValues
+            );
+          } else {
+            // 创建新设置
+            await client.query(
+              `INSERT INTO user_settings (user_id, language, timezone, currency, notification_email, notification_push, privacy_level, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+              [userId, language || null, timezone || null, currency || null, 
+               notification_email !== undefined ? notification_email : true,
+               notification_push !== undefined ? notification_push : true,
+               privacy_level || 'public']
+            );
+          }
+        }
+        
+        await client.query('COMMIT');
+        
+        // 获取更新后的用户信息
+        const updatedUserResult = await pool.query(
+          `SELECT u.id, u.username, u.email, u.avatar_url, u.phone, u.status, 
+                  u.email_verified, u.last_login_at, u.login_count, u.created_at,
+                  up.full_name, up.nickname, up.gender, up.birth_date, up.location, up.bio,
+                  us.language, us.timezone, us.currency, us.notification_email, us.notification_push, us.privacy_level
+           FROM users u
+           LEFT JOIN user_profiles up ON u.id = up.user_id
+           LEFT JOIN user_settings us ON u.id = us.user_id
+           WHERE u.id = $1`,
+          [userId]
+        );
+        
+        const updatedUser = updatedUserResult.rows[0];
+        
+        // 查询用户角色
+        const roleResult = await pool.query(
+          `SELECT r.name as role 
+           FROM user_roles ur 
+           JOIN roles r ON ur.role_id = r.id 
+           WHERE ur.user_id = $1`,
+          [userId]
+        );
+        
+        if (roleResult.rows.length > 0) {
+          updatedUser.role = roleResult.rows[0].role;
+        } else {
+          updatedUser.role = 'user';
+        }
+        
+        const duration = Date.now() - startTime;
+        logger.info(`更新用户个人信息成功 [${requestId}]`, {
+          requestId,
+          userId,
+          username: updatedUser.username,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.success(200, '更新用户个人信息成功', updatedUser);
+        
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`更新用户个人信息失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 修改密码
+  async changePassword(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { currentPassword, newPassword } = req.body;
+      
+      logger.info(`开始处理修改密码请求 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证必填字段
+      if (!currentPassword || !newPassword) {
+        logger.warn(`修改密码失败：缺少必填字段 [${requestId}]`, {
+          requestId,
+          userId,
+          hasCurrentPassword: !!currentPassword,
+          hasNewPassword: !!newPassword,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '当前密码和新密码为必填项');
+      }
+      
+      // 密码强度：至少8位，包含大小写、数字、特殊字符各一
+      const strongPwd = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
+      if (!strongPwd.test(newPassword)) {
+        logger.warn(`修改密码失败：新密码强度不足 [${requestId}]`, {
+          requestId,
+          userId,
+          passwordLength: newPassword.length,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '新密码需包含大小写、数字、特殊字符且至少8位');
+      }
+      
+      // 查询用户当前密码
+      const userResult = await pool.query(
+        'SELECT password_hash FROM users WHERE id = $1',
+        [userId]
+      );
+      
+      if (userResult.rows.length === 0) {
+        logger.warn(`修改密码失败：用户不存在 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(404, '用户不存在');
+      }
+      
+      const user = userResult.rows[0];
+      
+      // 验证当前密码
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!isCurrentPasswordValid) {
+        logger.warn(`修改密码失败：当前密码错误 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(401, '当前密码错误');
+      }
+      
+      // 加密新密码
+      const saltRounds = 10;
+      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+      
+      // 更新密码
+      await pool.query(
+        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        [hashedNewPassword, userId]
+      );
+      
+      const duration = Date.now() - startTime;
+      logger.info(`修改密码成功 [${requestId}]`, {
+        requestId,
+        userId,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '修改密码成功');
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`修改密码失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 验证重置密码验证码
+  async verifyResetCode(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { email, code } = req.body;
+      
+      logger.info(`开始处理验证重置密码验证码请求 [${requestId}]`, {
+        requestId,
+        email,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证必填字段
+      if (!email || !code) {
+        logger.warn(`验证重置密码验证码失败：缺少必填字段 [${requestId}]`, {
+          requestId,
+          email: email || '未提供',
+          hasCode: !!code,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '邮箱和验证码为必填项');
+      }
+      
+      // 查询用户
+      const userResult = await pool.query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
+      
+      if (userResult.rows.length === 0) {
+        logger.warn(`验证重置密码验证码失败：用户不存在 [${requestId}]`, {
+          requestId,
+          email,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(404, '用户不存在');
+      }
+      
+      const user = userResult.rows[0];
+      
+      // 查询密码重置令牌
+      const tokenResult = await pool.query(
+        'SELECT * FROM password_reset_tokens WHERE user_id = $1 AND token = $2 AND expires_at > NOW() AND used_at IS NULL',
+        [user.id, code]
+      );
+      
+      if (tokenResult.rows.length === 0) {
+        logger.warn(`验证重置密码验证码失败：无效的验证码 [${requestId}]`, {
+          requestId,
+          userId: user.id,
+          email,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(401, '验证码无效或已过期');
+      }
+      
+      const duration = Date.now() - startTime;
+      logger.info(`验证重置密码验证码成功 [${requestId}]`, {
+        requestId,
+        userId: user.id,
+        email,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '验证码验证成功', {
+        userId: user.id,
+        email: email
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`验证重置密码验证码失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取用户会话列表
+  async getSessions(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      
+      logger.info(`开始获取用户会话列表 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 查询用户会话
+      const sessionsResult = await pool.query(
+        `SELECT id, device_name, device_type, ip_address, user_agent, 
+                is_active, last_activity_at, created_at, expires_at
+         FROM user_sessions
+         WHERE user_id = $1
+         ORDER BY last_activity_at DESC`,
+        [userId]
+      );
+      
+      const sessions = sessionsResult.rows;
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取用户会话列表成功 [${requestId}]`, {
+        requestId,
+        userId,
+        sessionCount: sessions.length,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取用户会话列表成功', sessions);
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取用户会话列表失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 删除指定会话
+  async deleteSession(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { sessionId } = req.params;
+      
+      logger.info(`开始删除用户会话 [${requestId}]`, {
+        requestId,
+        userId,
+        sessionId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证会话是否属于当前用户
+      const sessionResult = await pool.query(
+        'SELECT id FROM user_sessions WHERE id = $1 AND user_id = $2',
+        [sessionId, userId]
+      );
+      
+      if (sessionResult.rows.length === 0) {
+        logger.warn(`删除用户会话失败：会话不存在或不属于当前用户 [${requestId}]`, {
+          requestId,
+          userId,
+          sessionId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(404, '会话不存在');
+      }
+      
+      // 删除会话
+      await pool.query(
+        'DELETE FROM user_sessions WHERE id = $1',
+        [sessionId]
+      );
+      
+      const duration = Date.now() - startTime;
+      logger.info(`删除用户会话成功 [${requestId}]`, {
+        requestId,
+        userId,
+        sessionId,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '删除会话成功');
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`删除用户会话失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        sessionId: req.params.sessionId,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 删除所有会话
+  async deleteAllSessions(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      
+      logger.info(`开始删除用户所有会话 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 删除用户所有会话
+      const result = await pool.query(
+        'DELETE FROM user_sessions WHERE user_id = $1 RETURNING id',
+        [userId]
+      );
+      
+      const deletedCount = result.rows.length;
+      
+      const duration = Date.now() - startTime;
+      logger.info(`删除用户所有会话成功 [${requestId}]`, {
+        requestId,
+        userId,
+        deletedCount,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '删除所有会话成功', {
+        deletedCount: deletedCount
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`删除用户所有会话失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 绑定第三方账号
+  async bindThirdParty(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { provider, providerId, accessToken, refreshToken, email, name } = req.body;
+      
+      logger.info(`开始绑定第三方账号 [${requestId}]`, {
+        requestId,
+        userId,
+        provider,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证必填字段
+      if (!provider || !providerId) {
+        logger.warn(`绑定第三方账号失败：缺少必填字段 [${requestId}]`, {
+          requestId,
+          userId,
+          provider: provider || '未提供',
+          hasProviderId: !!providerId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '第三方平台和平台ID为必填项');
+      }
+      
+      // 检查是否已经绑定过该第三方账号
+      const existingBindingResult = await pool.query(
+        'SELECT id FROM user_third_party_auths WHERE user_id = $1 AND provider = $2',
+        [userId, provider]
+      );
+      
+      if (existingBindingResult.rows.length > 0) {
+        logger.warn(`绑定第三方账号失败：已绑定过该平台 [${requestId}]`, {
+          requestId,
+          userId,
+          provider,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(409, '已绑定过该第三方平台');
+      }
+      
+      // 检查该第三方账号是否已被其他用户绑定
+      const otherUserBindingResult = await pool.query(
+        'SELECT user_id FROM user_third_party_auths WHERE provider = $1 AND provider_id = $2',
+        [provider, providerId]
+      );
+      
+      if (otherUserBindingResult.rows.length > 0) {
+        logger.warn(`绑定第三方账号失败：该账号已被其他用户绑定 [${requestId}]`, {
+          requestId,
+          userId,
+          provider,
+          providerId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(409, '该第三方账号已被其他用户绑定');
+      }
+      
+      // 创建绑定记录
+      await pool.query(
+        `INSERT INTO user_third_party_auths 
+         (user_id, provider, provider_id, access_token, refresh_token, email, name, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+         RETURNING id, provider, provider_id, email, name, created_at`,
+        [userId, provider, providerId, accessToken, refreshToken, email, name]
+      );
+      
+      const duration = Date.now() - startTime;
+      logger.info(`绑定第三方账号成功 [${requestId}]`, {
+        requestId,
+        userId,
+        provider,
+        providerId,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(201, '绑定第三方账号成功');
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`绑定第三方账号失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 解绑第三方账号
+  async unbindThirdParty(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { id } = req.params;
+      
+      logger.info(`开始解绑第三方账号 [${requestId}]`, {
+        requestId,
+        userId,
+        thirdPartyId: id,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证第三方账号是否属于当前用户
+      const bindingResult = await pool.query(
+        'SELECT id, provider FROM user_third_party_auths WHERE id = $1 AND user_id = $2',
+        [id, userId]
+      );
+      
+      if (bindingResult.rows.length === 0) {
+        logger.warn(`解绑第三方账号失败：账号不存在或不属于当前用户 [${requestId}]`, {
+          requestId,
+          userId,
+          thirdPartyId: id,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(404, '第三方账号不存在');
+      }
+      
+      const binding = bindingResult.rows[0];
+      
+      // 删除绑定记录
+      await pool.query(
+        'DELETE FROM user_third_party_auths WHERE id = $1',
+        [id]
+      );
+      
+      const duration = Date.now() - startTime;
+      logger.info(`解绑第三方账号成功 [${requestId}]`, {
+        requestId,
+        userId,
+        thirdPartyId: id,
+        provider: binding.provider,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '解绑第三方账号成功');
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`解绑第三方账号失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        thirdPartyId: req.params.id,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取第三方账号列表
+  async getThirdPartyAccounts(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      
+      logger.info(`开始获取第三方账号列表 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 查询用户绑定的第三方账号
+      const accountsResult = await pool.query(
+        `SELECT id, provider, provider_id, email, name, created_at, updated_at
+         FROM user_third_party_auths
+         WHERE user_id = $1
+         ORDER BY created_at DESC`,
+        [userId]
+      );
+      
+      const accounts = accountsResult.rows;
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取第三方账号列表成功 [${requestId}]`, {
+        requestId,
+        userId,
+        accountCount: accounts.length,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取第三方账号列表成功', accounts);
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取第三方账号列表失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 管理员登出
+  async adminLogout(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const username = req.user.username;
+      
+      logger.info(`开始处理管理员登出请求 [${requestId}]`, {
+        requestId,
+        userId,
+        username,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否为管理员
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name = '系统管理员'`,
+        [userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`管理员登出失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId,
+          username,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      // 将令牌加入黑名单
+      const token = req.headers.authorization?.split(' ')[1];
+      if (token) {
+        // 使用TokenManager将令牌加入黑名单
+        const tokenManager = new TokenManager();
+        await tokenManager.addToBlacklist(token);
+        
+        logger.info(`令牌已加入黑名单 [${requestId}]`, {
+          requestId,
+          userId,
+          username,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      const duration = Date.now() - startTime;
+      logger.info(`管理员登出成功 [${requestId}]`, {
+        requestId,
+        userId,
+        username,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '管理员登出成功');
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`管理员登出失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 刷新令牌
+  async refreshToken(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { refreshToken } = req.body;
+      
+      logger.info(`开始处理刷新令牌请求 [${requestId}]`, {
+        requestId,
+        hasRefreshToken: !!refreshToken,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证刷新令牌是否存在
+      if (!refreshToken) {
+        logger.warn(`刷新令牌失败：缺少刷新令牌 [${requestId}]`, {
+          requestId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '刷新令牌为必填项');
+      }
+      
+      // 验证刷新令牌是否有效
+      const tokenManager = new TokenManager();
+      let decoded;
+      
+      try {
+        decoded = await tokenManager.verifyRefreshToken(refreshToken);
+      } catch (error) {
+        logger.warn(`刷新令牌失败：令牌无效或已过期 [${requestId}]`, {
+          requestId,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(401, '刷新令牌无效或已过期');
+      }
+      
+      // 验证用户是否为管理员
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name = '系统管理员'`,
+        [decoded.userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`刷新令牌失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId: decoded.userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      // 生成新的访问令牌和刷新令牌
+      const newAccessToken = await tokenManager.generateAccessToken({
+        userId: decoded.userId,
+        username: adminResult.rows[0].username,
+        role: 'admin'
+      });
+      
+      const newRefreshToken = await tokenManager.generateRefreshToken({
+        userId: decoded.userId,
+        username: adminResult.rows[0].username,
+        role: 'admin'
+      });
+      
+      // 将旧的刷新令牌加入黑名单
+      await tokenManager.addToBlacklist(refreshToken);
+      
+      const duration = Date.now() - startTime;
+      logger.info(`刷新令牌成功 [${requestId}]`, {
+        requestId,
+        userId: decoded.userId,
+        username: adminResult.rows[0].username,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '刷新令牌成功', {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`刷新令牌失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取当前登录管理员信息
+  async getCurrentAdminInfo(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      
+      logger.info(`开始获取当前管理员信息 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否为管理员并获取详细信息
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username, u.email, u.avatar, u.created_at, u.updated_at, u.last_login,
+         r.name as role_name
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+        [userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`获取管理员信息失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      const admin = adminResult.rows[0];
+      
+      // 获取管理员权限
+      const permissionResult = await pool.query(
+        `SELECT p.code, p.name, p.description
+         FROM role_permissions rp 
+         JOIN permissions p ON rp.permission_id = p.id 
+         JOIN roles r ON rp.role_id = r.id 
+         WHERE r.name = $1`,
+        [admin.role_name]
+      );
+      
+      const permissions = permissionResult.rows;
+      
+      // 获取管理员操作统计
+      const statsResult = await pool.query(
+        `SELECT 
+           COUNT(CASE WHEN action_type = 'CREATE' THEN 1 END) as create_count,
+           COUNT(CASE WHEN action_type = 'UPDATE' THEN 1 END) as update_count,
+           COUNT(CASE WHEN action_type = 'DELETE' THEN 1 END) as delete_count,
+           COUNT(CASE WHEN action_type = 'VIEW' THEN 1 END) as view_count
+         FROM admin_operation_logs 
+         WHERE admin_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+        [userId]
+      );
+      
+      const stats = statsResult.rows[0];
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取管理员信息成功 [${requestId}]`, {
+        requestId,
+        userId,
+        username: admin.username,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取管理员信息成功', {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        avatar: admin.avatar,
+        role: admin.role_name,
+        permissions: permissions,
+        stats: {
+          createCount: parseInt(stats.create_count) || 0,
+          updateCount: parseInt(stats.update_count) || 0,
+          deleteCount: parseInt(stats.delete_count) || 0,
+          viewCount: parseInt(stats.view_count) || 0
+        },
+        createdAt: admin.created_at,
+        updatedAt: admin.updated_at,
+        lastLogin: admin.last_login
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取管理员信息失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 修改管理员密码
+  async changeAdminPassword(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+      
+      logger.info(`开始修改管理员密码 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证输入参数
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        logger.warn(`修改密码失败：缺少必填字段 [${requestId}]`, {
+          requestId,
+          userId,
+          hasCurrentPassword: !!currentPassword,
+          hasNewPassword: !!newPassword,
+          hasConfirmPassword: !!confirmPassword,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '请提供当前密码、新密码和确认密码');
+      }
+      
+      if (newPassword !== confirmPassword) {
+        logger.warn(`修改密码失败：新密码与确认密码不匹配 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '新密码与确认密码不匹配');
+      }
+      
+      // 验证密码强度
+      if (newPassword.length < 8) {
+        return res.error(400, '新密码长度至少为8位');
+      }
+      
+      // 验证用户是否为管理员
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username, u.password_hash 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+        [userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`修改密码失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      const admin = adminResult.rows[0];
+      
+      // 验证当前密码
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password_hash);
+      
+      if (!isCurrentPasswordValid) {
+        logger.warn(`修改密码失败：当前密码不正确 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '当前密码不正确');
+      }
+      
+      // 加密新密码
+      const saltRounds = 12;
+      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+      
+      // 更新密码
+      await pool.query(
+        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        [hashedNewPassword, userId]
+      );
+      
+      // 记录操作日志
+      await pool.query(
+        `INSERT INTO admin_operation_logs (admin_id, action_type, resource_type, description, ip_address, user_agent)
+         VALUES ($1, 'UPDATE', 'PASSWORD', $2, $3, $4)`,
+        [userId, '修改管理员密码', req.ip, req.get('User-Agent')]
+      );
+      
+      const duration = Date.now() - startTime;
+      logger.info(`修改管理员密码成功 [${requestId}]`, {
+        requestId,
+        userId,
+        username: admin.username,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '密码修改成功');
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`修改管理员密码失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取管理员操作日志
+  async getAdminOperationLogs(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { page = 1, limit = 20, startDate, endDate, actionType, resourceType } = req.query;
+      
+      logger.info(`开始获取管理员操作日志 [${requestId}]`, {
+        requestId,
+        userId,
+        page,
+        limit,
+        startDate,
+        endDate,
+        actionType,
+        resourceType,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否为管理员
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+        [userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`获取操作日志失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      // 构建查询条件
+      let whereConditions = [];
+      let queryParams = [];
+      let paramIndex = 1;
+      
+      if (startDate) {
+        whereConditions.push(`created_at >= $${paramIndex}`);
+        queryParams.push(startDate);
+        paramIndex++;
+      }
+      
+      if (endDate) {
+        whereConditions.push(`created_at <= $${paramIndex}`);
+        queryParams.push(endDate);
+        paramIndex++;
+      }
+      
+      if (actionType) {
+        whereConditions.push(`action_type = $${paramIndex}`);
+        queryParams.push(actionType);
+        paramIndex++;
+      }
+      
+      if (resourceType) {
+        whereConditions.push(`resource_type = $${paramIndex}`);
+        queryParams.push(resourceType);
+        paramIndex++;
+      }
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
+      // 获取总数
+      const countQuery = `SELECT COUNT(*) as total FROM admin_operation_logs ${whereClause}`;
+      const countResult = await pool.query(countQuery, queryParams);
+      const total = parseInt(countResult.rows[0].total);
+      
+      // 计算偏移量
+      const offset = (page - 1) * limit;
+      
+      // 获取分页数据
+      const dataQuery = `
+        SELECT 
+          aol.id,
+          aol.admin_id,
+          u.username as admin_name,
+          aol.action_type,
+          aol.resource_type,
+          aol.resource_id,
+          aol.description,
+          aol.ip_address,
+          aol.user_agent,
+          aol.created_at
+        FROM admin_operation_logs aol
+        JOIN users u ON aol.admin_id = u.id
+        ${whereClause}
+        ORDER BY aol.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      
+      queryParams.push(limit, offset);
+      const dataResult = await pool.query(dataQuery, queryParams);
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取管理员操作日志成功 [${requestId}]`, {
+        requestId,
+        userId,
+        total,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取操作日志成功', {
+        logs: dataResult.rows,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取管理员操作日志失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取管理员权限列表
+  async getAdminPermissions(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      
+      logger.info(`开始获取管理员权限列表 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否为管理员
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+        [userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`获取权限列表失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      // 获取所有权限
+      const permissionResult = await pool.query(
+        `SELECT p.id, p.code, p.name, p.description, p.category, p.created_at
+         FROM permissions p
+         ORDER BY p.category, p.name`
+      );
+      
+      // 按类别分组权限
+      const permissionsByCategory = {};
+      permissionResult.rows.forEach(permission => {
+        if (!permissionsByCategory[permission.category]) {
+          permissionsByCategory[permission.category] = [];
+        }
+        permissionsByCategory[permission.category].push({
+          id: permission.id,
+          code: permission.code,
+          name: permission.name,
+          description: permission.description,
+          createdAt: permission.created_at
+        });
+      });
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取管理员权限列表成功 [${requestId}]`, {
+        requestId,
+        userId,
+        totalPermissions: permissionResult.rows.length,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取权限列表成功', {
+        permissions: permissionsByCategory
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取管理员权限列表失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取管理员会话信息
+  async getAdminSessions(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      
+      logger.info(`开始获取管理员会话信息 [${requestId}]`, {
+        requestId,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否为管理员
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+        [userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`获取会话信息失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      // 获取管理员会话信息
+      const sessionResult = await pool.query(
+        `SELECT 
+           s.id,
+           s.session_token,
+           s.ip_address,
+           s.user_agent,
+           s.is_active,
+           s.created_at,
+           s.expires_at,
+           s.last_activity
+         FROM admin_sessions s
+         WHERE s.admin_id = $1
+         ORDER BY s.created_at DESC`,
+        [userId]
+      );
+      
+      // 获取当前会话信息
+      const currentToken = req.headers.authorization?.split(' ')[1];
+      const currentSession = sessionResult.rows.find(session => session.session_token === currentToken);
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取管理员会话信息成功 [${requestId}]`, {
+        requestId,
+        userId,
+        totalSessions: sessionResult.rows.length,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取会话信息成功', {
+        sessions: sessionResult.rows.map(session => ({
+          id: session.id,
+          ipAddress: session.ip_address,
+          userAgent: session.user_agent,
+          isActive: session.is_active,
+          createdAt: session.created_at,
+          expiresAt: session.expires_at,
+          lastActivity: session.last_activity,
+          isCurrent: session.session_token === currentToken
+        })),
+        currentSession: currentSession ? {
+          id: currentSession.id,
+          ipAddress: currentSession.ip_address,
+          userAgent: currentSession.user_agent,
+          createdAt: currentSession.created_at,
+          expiresAt: currentSession.expires_at,
+          lastActivity: currentSession.last_activity
+        } : null
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取管理员会话信息失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 验证管理员权限
+  async verifyAdminPermission(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const { permission } = req.body;
+      
+      logger.info(`开始验证管理员权限 [${requestId}]`, {
+        requestId,
+        userId,
+        permission,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证输入参数
+      if (!permission) {
+        logger.warn(`验证权限失败：缺少权限参数 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '权限参数为必填项');
+      }
+      
+      // 验证用户是否为管理员
+      const adminResult = await pool.query(
+        `SELECT u.id, u.username, r.name as role_name
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+        [userId]
+      );
+      
+      if (adminResult.rows.length === 0) {
+        logger.warn(`验证权限失败：用户不是管理员 [${requestId}]`, {
+          requestId,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(403, '无权限访问');
+      }
+      
+      const admin = adminResult.rows[0];
+      
+      // 检查权限
+      const permissionResult = await pool.query(
+        `SELECT p.code, p.name
+         FROM role_permissions rp 
+         JOIN permissions p ON rp.permission_id = p.id 
+         JOIN roles r ON rp.role_id = r.id 
+         WHERE r.name = $1 AND p.code = $2`,
+        [admin.role_name, permission]
+      );
+      
+      const hasPermission = permissionResult.rows.length > 0;
+      
+      const duration = Date.now() - startTime;
+      logger.info(`验证管理员权限完成 [${requestId}]`, {
+        requestId,
+        userId,
+        username: admin.username,
+        permission,
+        hasPermission,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '权限验证完成', {
+        hasPermission,
+        permission: hasPermission ? permissionResult.rows[0] : null,
+        role: admin.role_name
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`验证管理员权限失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取用户详情 - 管理员专用
+  async getUserById(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { id } = req.params;
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始获取用户详情 [${requestId}]`, {
+        requestId,
+        userId: id,
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否存在
+      let user;
+      try {
+        const userResult = await pool.query(
+          `SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.is_active, 
+                  u.created_at, u.updated_at, u.mfa_enabled, u.last_login,
+                  r.name as role
+           FROM users u
+           LEFT JOIN user_roles ur ON u.id = ur.user_id
+           LEFT JOIN roles r ON ur.role_id = r.id
+           WHERE u.id = $1`,
+          [id]
+        );
+        
+        if (userResult.rows.length === 0) {
+          logger.warn(`获取用户详情失败：用户不存在 [${requestId}]`, {
+            requestId,
+            userId: id,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(404, '用户不存在');
+        }
+        
+        user = userResult.rows[0];
+      } catch (userError) {
+        logger.error(`查询用户信息时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: userError.message,
+          stack: userError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '查询用户信息失败');
+      }
+      
+      // 获取用户权限
+      let permissions = [];
+      try {
+        const permissionResult = await pool.query(
+          `SELECT p.id, p.name, p.code, p.description
+           FROM role_permissions rp
+           JOIN permissions p ON rp.permission_id = p.id
+           JOIN user_roles ur ON rp.role_id = ur.role_id
+           WHERE ur.user_id = $1`,
+          [id]
+        );
+        
+        permissions = permissionResult.rows;
+      } catch (permissionError) {
+        logger.warn(`获取用户权限时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: permissionError.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      const duration = Date.now() - startTime;
+      logger.info(`获取用户详情成功 [${requestId}]`, {
+        requestId,
+        userId: id,
+        username: user.username,
+        operatorId,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.success(200, '获取用户详情成功', {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          displayName: user.display_name,
+          avatarUrl: user.avatar_url,
+          isActive: user.is_active,
+          role: user.role,
+          mfaEnabled: user.mfa_enabled,
+          lastLogin: user.last_login,
+          createdAt: user.created_at,
+          updatedAt: user.updated_at
+        },
+        permissions
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取用户详情失败 [${requestId}]`, {
+        requestId,
+        userId: req.params.id,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 创建用户 - 管理员专用
+  async createUser(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { username, password, email, displayName, role } = req.body;
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始创建用户 [${requestId}]`, {
+        requestId,
+        username,
+        email,
+        displayName: displayName || '未提供',
+        role: role || 'user',
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 检查用户名是否已存在
+      const existingUserResult = await pool.query(
+        'SELECT id FROM users WHERE username = $1',
+        [username]
+      );
+      const existingUser = existingUserResult.rows;
+
+      if (existingUser.length > 0) {
+        logger.warn(`创建用户失败：用户名已存在 [${requestId}]`, {
+          requestId,
+          username,
+          email,
+          operatorId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(409, '用户名已被注册');
+      }
+
+      // 检查邮箱是否已存在
+      const existingEmailResult = await pool.query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
+      const existingEmail = existingEmailResult.rows;
+
+      if (existingEmail.length > 0) {
+        logger.warn(`创建用户失败：邮箱已存在 [${requestId}]`, {
+          requestId,
+          username,
+          email,
+          operatorId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(409, '邮箱已被注册');
+      }
+
+      // 加密密码
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+      // 开始事务
+      const client = await pool.connect();
+      
+      try {
+        await client.query('BEGIN');
+        
+        // 插入用户记录并返回ID
+        const result = await client.query(
+          `INSERT INTO users (username, password_hash, email, display_name, created_at, updated_at) 
+           VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id`,
+          [username, hashedPassword, email, displayName || username]
+        );
+
+        const userId = result.rows[0].id;
+        
+        // 如果指定了角色，分配角色
+        if (role && role !== 'user') {
+          // 获取角色ID
+          const roleResult = await client.query(
+            'SELECT id FROM roles WHERE name = $1',
+            [role]
+          );
+          
+          if (roleResult.rows.length > 0) {
+            const roleId = roleResult.rows[0].id;
+            
+            // 分配角色
+            await client.query(
+              'INSERT INTO user_roles (user_id, role_id, assigned_by) VALUES ($1, $2, $3)',
+              [userId, roleId, operatorId]
+            );
+            
+            logger.info(`用户角色分配成功 [${requestId}]`, {
+              requestId,
+              userId,
+              role,
+              operatorId,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+        
+        await client.query('COMMIT');
+        
+        // 获取创建的用户记录
+        const userRowsResult = await pool.query(
+          'SELECT id, username, email, display_name, is_active, created_at FROM users WHERE id = $1',
+          [userId]
+        );
+        const userRows = userRowsResult.rows;
+        const user = userRows[0];
+        
+        const duration = Date.now() - startTime;
+        logger.info(`创建用户成功 [${requestId}]`, {
+          requestId,
+          userId: user.id,
+          username,
+          email,
+          role: role || 'user',
+          operatorId,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+
+        res.success(201, '用户创建成功', {
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            displayName: user.display_name,
+            isActive: user.is_active,
+            role: role || 'user',
+            createdAt: user.created_at
+          }
+        });
+        
+      } catch (transactionError) {
+        await client.query('ROLLBACK');
+        throw transactionError;
+      } finally {
+        client.release();
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`创建用户失败 [${requestId}]`, {
+        requestId,
+        username: req.body.username,
+        email: req.body.email,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 更新用户信息 - 管理员专用
+  async updateUser(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { id } = req.params;
+      const { username, email, displayName } = req.body;
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始更新用户信息 [${requestId}]`, {
+        requestId,
+        userId: id,
+        updates: { username, email, displayName },
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否存在
+      let user;
+      try {
+        const userResult = await pool.query(
+          'SELECT id, username, email, display_name FROM users WHERE id = $1',
+          [id]
+        );
+        
+        if (userResult.rows.length === 0) {
+          logger.warn(`更新用户信息失败：用户不存在 [${requestId}]`, {
+            requestId,
+            userId: id,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(404, '用户不存在');
+        }
+        
+        user = userResult.rows[0];
+      } catch (userError) {
+        logger.error(`查询用户信息时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: userError.message,
+          stack: userError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '查询用户信息失败');
+      }
+      
+      // 检查用户名是否已被其他用户使用
+      if (username && username !== user.username) {
+        try {
+          const existingUserResult = await pool.query(
+            'SELECT id FROM users WHERE username = $1 AND id != $2',
+            [username, id]
+          );
+          
+          if (existingUserResult.rows.length > 0) {
+            logger.warn(`更新用户信息失败：用户名已被使用 [${requestId}]`, {
+              requestId,
+              userId: id,
+              newUsername: username,
+              operatorId,
+              timestamp: new Date().toISOString()
+            });
+            
+            return res.error(409, '用户名已被使用');
+          }
+        } catch (usernameError) {
+          logger.error(`检查用户名唯一性时发生错误 [${requestId}]`, {
+            requestId,
+            userId: id,
+            newUsername: username,
+            error: usernameError.message,
+            stack: usernameError.stack,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(500, '检查用户名唯一性失败');
+        }
+      }
+      
+      // 检查邮箱是否已被其他用户使用
+      if (email && email !== user.email) {
+        try {
+          const existingEmailResult = await pool.query(
+            'SELECT id FROM users WHERE email = $1 AND id != $2',
+            [email, id]
+          );
+          
+          if (existingEmailResult.rows.length > 0) {
+            logger.warn(`更新用户信息失败：邮箱已被使用 [${requestId}]`, {
+              requestId,
+              userId: id,
+              newEmail: email,
+              operatorId,
+              timestamp: new Date().toISOString()
+            });
+            
+            return res.error(409, '邮箱已被使用');
+          }
+        } catch (emailError) {
+          logger.error(`检查邮箱唯一性时发生错误 [${requestId}]`, {
+            requestId,
+            userId: id,
+            newEmail: email,
+            error: emailError.message,
+            stack: emailError.stack,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(500, '检查邮箱唯一性失败');
+        }
+      }
+      
+      // 构建更新查询
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
+      
+      if (username !== undefined) {
+        updateFields.push(`username = $${paramIndex++}`);
+        updateValues.push(username);
+      }
+      
+      if (email !== undefined) {
+        updateFields.push(`email = $${paramIndex++}`);
+        updateValues.push(email);
+      }
+      
+      if (displayName !== undefined) {
+        updateFields.push(`display_name = $${paramIndex++}`);
+        updateValues.push(displayName);
+      }
+      
+      // 如果没有要更新的字段
+      if (updateFields.length === 0) {
+        logger.warn(`更新用户信息失败：没有提供要更新的字段 [${requestId}]`, {
+          requestId,
+          userId: id,
+          operatorId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '没有提供要更新的字段');
+      }
+      
+      // 添加更新时间和用户ID
+      updateFields.push(`updated_at = NOW()`);
+      updateValues.push(id);
+      
+      // 执行更新
+      try {
+        const updateQuery = `
+          UPDATE users 
+          SET ${updateFields.join(', ')} 
+          WHERE id = $${paramIndex}
+          RETURNING id, username, email, display_name, is_active, updated_at
+        `;
+        
+        const updateResult = await pool.query(updateQuery, updateValues);
+        const updatedUser = updateResult.rows[0];
+        
+        const duration = Date.now() - startTime;
+        logger.info(`更新用户信息成功 [${requestId}]`, {
+          requestId,
+          userId: id,
+          updatedFields: Object.keys({ username, email, displayName }).filter(key => req.body[key] !== undefined),
+          operatorId,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.success(200, '用户信息更新成功', {
+          user: {
+            id: updatedUser.id,
+            username: updatedUser.username,
+            email: updatedUser.email,
+            displayName: updatedUser.display_name,
+            isActive: updatedUser.is_active,
+            updatedAt: updatedUser.updated_at
+          }
+        });
+        
+      } catch (updateError) {
+        logger.error(`更新用户信息时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: updateError.message,
+          stack: updateError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '更新用户信息失败');
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`更新用户信息失败 [${requestId}]`, {
+        requestId,
+        userId: req.params.id,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 更新用户状态 - 管理员专用
+  async updateUserStatus(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始更新用户状态 [${requestId}]`, {
+        requestId,
+        userId: id,
+        status,
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否存在
+      let user;
+      try {
+        const userResult = await pool.query(
+          'SELECT id, username, is_active FROM users WHERE id = $1',
+          [id]
+        );
+        
+        if (userResult.rows.length === 0) {
+          logger.warn(`更新用户状态失败：用户不存在 [${requestId}]`, {
+            requestId,
+            userId: id,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(404, '用户不存在');
+        }
+        
+        user = userResult.rows[0];
+      } catch (userError) {
+        logger.error(`查询用户信息时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: userError.message,
+          stack: userError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '查询用户信息失败');
+      }
+      
+      // 检查状态是否已经是目标状态
+      const isActive = status === 'active';
+      if (user.is_active === isActive) {
+        logger.warn(`更新用户状态失败：状态已经是目标状态 [${requestId}]`, {
+          requestId,
+          userId: id,
+          currentStatus: user.is_active ? 'active' : 'inactive',
+          targetStatus: status,
+          operatorId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, `用户状态已经是${status}`);
+      }
+      
+      // 更新用户状态
+      try {
+        const updateResult = await pool.query(
+          'UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2 RETURNING id, username, is_active, updated_at',
+          [isActive, id]
+        );
+        
+        const updatedUser = updateResult.rows[0];
+        
+        const duration = Date.now() - startTime;
+        logger.info(`更新用户状态成功 [${requestId}]`, {
+          requestId,
+          userId: id,
+          username: updatedUser.username,
+          previousStatus: user.is_active ? 'active' : 'inactive',
+          newStatus: status,
+          operatorId,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.success(200, '用户状态更新成功', {
+          user: {
+            id: updatedUser.id,
+            username: updatedUser.username,
+            isActive: updatedUser.is_active,
+            updatedAt: updatedUser.updated_at
+          }
+        });
+        
+      } catch (updateError) {
+        logger.error(`更新用户状态时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: updateError.message,
+          stack: updateError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '更新用户状态失败');
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`更新用户状态失败 [${requestId}]`, {
+        requestId,
+        userId: req.params.id,
+        status: req.body.status,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 重置用户密码 - 管理员专用
+  async resetUserPassword(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始重置用户密码 [${requestId}]`, {
+        requestId,
+        userId: id,
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否存在
+      let user;
+      try {
+        const userResult = await pool.query(
+          'SELECT id, username FROM users WHERE id = $1',
+          [id]
+        );
+        
+        if (userResult.rows.length === 0) {
+          logger.warn(`重置用户密码失败：用户不存在 [${requestId}]`, {
+            requestId,
+            userId: id,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(404, '用户不存在');
+        }
+        
+        user = userResult.rows[0];
+      } catch (userError) {
+        logger.error(`查询用户信息时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: userError.message,
+          stack: userError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '查询用户信息失败');
+      }
+      
+      // 加密新密码
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+      
+      // 更新密码
+      try {
+        const updateResult = await pool.query(
+          'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id, username, updated_at',
+          [hashedPassword, id]
+        );
+        
+        const updatedUser = updateResult.rows[0];
+        
+        const duration = Date.now() - startTime;
+        logger.info(`重置用户密码成功 [${requestId}]`, {
+          requestId,
+          userId: id,
+          username: updatedUser.username,
+          operatorId,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.success(200, '用户密码重置成功', {
+          user: {
+            id: updatedUser.id,
+            username: updatedUser.username,
+            updatedAt: updatedUser.updated_at
+          }
+        });
+        
+      } catch (updateError) {
+        logger.error(`重置用户密码时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: updateError.message,
+          stack: updateError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '重置用户密码失败');
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`重置用户密码失败 [${requestId}]`, {
+        requestId,
+        userId: req.params.id,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 删除用户 - 管理员专用
+  async deleteUser(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { id } = req.params;
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始删除用户 [${requestId}]`, {
+        requestId,
+        userId: id,
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否存在
+      let user;
+      try {
+        const userResult = await pool.query(
+          'SELECT id, username FROM users WHERE id = $1',
+          [id]
+        );
+        
+        if (userResult.rows.length === 0) {
+          logger.warn(`删除用户失败：用户不存在 [${requestId}]`, {
+            requestId,
+            userId: id,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(404, '用户不存在');
+        }
+        
+        user = userResult.rows[0];
+      } catch (userError) {
+        logger.error(`查询用户信息时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: userError.message,
+          stack: userError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '查询用户信息失败');
+      }
+      
+      // 检查是否有关联数据
+      try {
+        // 检查账单
+        const billResult = await pool.query(
+          'SELECT COUNT(*) as count FROM bills WHERE user_id = $1',
+          [id]
+        );
+        
+        // 检查支付记录
+        const paymentResult = await pool.query(
+          'SELECT COUNT(*) as count FROM payments WHERE user_id = $1',
+          [id]
+        );
+        
+        // 检查房间关联
+        const roomResult = await pool.query(
+          'SELECT COUNT(*) as count FROM room_members WHERE user_id = $1',
+          [id]
+        );
+        
+        const billCount = parseInt(billResult.rows[0].count);
+        const paymentCount = parseInt(paymentResult.rows[0].count);
+        const roomCount = parseInt(roomResult.rows[0].count);
+        
+        if (billCount > 0 || paymentCount > 0 || roomCount > 0) {
+          logger.warn(`删除用户失败：用户有关联数据 [${requestId}]`, {
+            requestId,
+            userId: id,
+            username: user.username,
+            billCount,
+            paymentCount,
+            roomCount,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(400, '无法删除用户：用户有关联数据，请先处理关联数据');
+        }
+      } catch (checkError) {
+        logger.error(`检查用户关联数据时发生错误 [${requestId}]`, {
+          requestId,
+          userId: id,
+          error: checkError.message,
+          stack: checkError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '检查用户关联数据失败');
+      }
+      
+      // 开始事务删除用户
+      const client = await pool.connect();
+      
+      try {
+        await client.query('BEGIN');
+        
+        // 删除用户角色关联
+        await client.query('DELETE FROM user_roles WHERE user_id = $1', [id]);
+        
+        // 删除用户
+        await client.query('DELETE FROM users WHERE id = $1', [id]);
+        
+        await client.query('COMMIT');
+        
+        const duration = Date.now() - startTime;
+        logger.info(`删除用户成功 [${requestId}]`, {
+          requestId,
+          userId: id,
+          username: user.username,
+          operatorId,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.success(200, '用户删除成功', {
+          user: {
+            id: user.id,
+            username: user.username
+          }
+        });
+        
+      } catch (transactionError) {
+        await client.query('ROLLBACK');
+        throw transactionError;
+      } finally {
+        client.release();
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`删除用户失败 [${requestId}]`, {
+        requestId,
+        userId: req.params.id,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 批量更新用户状态 - 管理员专用
+  async batchUpdateUserStatus(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { userIds, status } = req.body;
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始批量更新用户状态 [${requestId}]`, {
+        requestId,
+        userIds,
+        status,
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 验证用户是否存在
+      try {
+        const userResult = await pool.query(
+          'SELECT id, username, is_active FROM users WHERE id = ANY($1)',
+          [userIds]
+        );
+        
+        if (userResult.rows.length === 0) {
+          logger.warn(`批量更新用户状态失败：没有找到用户 [${requestId}]`, {
+            requestId,
+            userIds,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(404, '没有找到用户');
+        }
+        
+        if (userResult.rows.length !== userIds.length) {
+          logger.warn(`批量更新用户状态失败：部分用户不存在 [${requestId}]`, {
+            requestId,
+            requestedIds: userIds,
+            foundIds: userResult.rows.map(u => u.id),
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(404, '部分用户不存在');
+        }
+        
+        // 检查是否所有用户状态都需要更新
+        const isActive = status === 'active';
+        const usersNeedingUpdate = userResult.rows.filter(user => user.is_active !== isActive);
+        
+        if (usersNeedingUpdate.length === 0) {
+          logger.warn(`批量更新用户状态失败：所有用户状态已经是目标状态 [${requestId}]`, {
+            requestId,
+            userIds,
+            status,
+            operatorId,
+            timestamp: new Date().toISOString()
+          });
+          
+          return res.error(400, `所有用户状态已经是${status}`);
+        }
+        
+        // 更新用户状态
+        const updateResult = await pool.query(
+          'UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = ANY($2) RETURNING id, username, is_active, updated_at',
+          [isActive, usersNeedingUpdate.map(user => user.id)]
+        );
+        
+        const updatedUsers = updateResult.rows;
+        
+        const duration = Date.now() - startTime;
+        logger.info(`批量更新用户状态成功 [${requestId}]`, {
+          requestId,
+          updatedCount: updatedUsers.length,
+          status,
+          operatorId,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.success(200, '用户状态批量更新成功', {
+          users: updatedUsers.map(user => ({
+            id: user.id,
+            username: user.username,
+            isActive: user.is_active,
+            updatedAt: user.updated_at
+          })),
+          updatedCount: updatedUsers.length
+        });
+        
+      } catch (updateError) {
+        logger.error(`批量更新用户状态时发生错误 [${requestId}]`, {
+          requestId,
+          userIds,
+          error: updateError.message,
+          stack: updateError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '批量更新用户状态失败');
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`批量更新用户状态失败 [${requestId}]`, {
+        requestId,
+        userIds: req.body.userIds,
+        status: req.body.status,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取用户统计信息 - 管理员专用
+  async getUserStatistics(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const operatorId = req.user?.sub; // 操作人ID
+      
+      logger.info(`开始获取用户统计信息 [${requestId}]`, {
+        requestId,
+        operatorId,
+        timestamp: new Date().toISOString()
+      });
+      
+      let statistics = {};
+      
+      try {
+        // 获取用户总数
+        const totalUsersResult = await pool.query('SELECT COUNT(*) as count FROM users');
+        statistics.totalUsers = parseInt(totalUsersResult.rows[0].count);
+        
+        // 获取活跃用户数
+        const activeUsersResult = await pool.query('SELECT COUNT(*) as count FROM users WHERE is_active = true');
+        statistics.activeUsers = parseInt(activeUsersResult.rows[0].count);
+        
+        // 获取非活跃用户数
+        statistics.inactiveUsers = statistics.totalUsers - statistics.activeUsers;
+        
+        // 获取各角色用户数
+        const roleStatsResult = await pool.query(
+          `SELECT r.name as role, COUNT(*) as count
+           FROM roles r
+           LEFT JOIN user_roles ur ON r.id = ur.role_id
+           GROUP BY r.id, r.name
+           ORDER BY count DESC`
+        );
+        statistics.roleDistribution = roleStatsResult.rows;
+        
+        // 获取最近30天注册用户数
+        const recentUsersResult = await pool.query(
+          `SELECT COUNT(*) as count FROM users WHERE created_at >= NOW() - INTERVAL '30 days'`
+        );
+        statistics.recentRegistrations = parseInt(recentUsersResult.rows[0].count);
+        
+        // 获取最近30天活跃用户数
+        const recentActiveUsersResult = await pool.query(
+          `SELECT COUNT(*) as count FROM users WHERE last_login >= NOW() - INTERVAL '30 days'`
+        );
+        statistics.recentActiveUsers = parseInt(recentActiveUsersResult.rows[0].count);
+        
+        // 获取按月注册用户统计（最近12个月）
+        const monthlyRegistrationsResult = await pool.query(
+          `SELECT 
+             DATE_TRUNC('month', created_at) as month,
+             COUNT(*) as count
+           FROM users 
+           WHERE created_at >= NOW() - INTERVAL '12 months'
+           GROUP BY DATE_TRUNC('month', created_at)
+           ORDER BY month ASC`
+        );
+        statistics.monthlyRegistrations = monthlyRegistrationsResult.rows;
+        
+        const duration = Date.now() - startTime;
+        logger.info(`获取用户统计信息成功 [${requestId}]`, {
+          requestId,
+          operatorId,
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.success(200, '获取用户统计信息成功', statistics);
+        
+      } catch (statsError) {
+        logger.error(`获取用户统计信息时发生错误 [${requestId}]`, {
+          requestId,
+          error: statsError.message,
+          stack: statsError.stack,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(500, '获取用户统计信息失败');
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`获取用户统计信息失败 [${requestId}]`, {
+        requestId,
+        operatorId: req.user?.sub,
+        error: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
       });
       
       res.error(500, '服务器内部错误');

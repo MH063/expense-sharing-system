@@ -12,19 +12,28 @@ function authenticateToken(req, res, next) {
   console.log('认证中间件 - 提取的令牌:', token ? token.substring(0, 20) + '...' : 'null');
 
   if (!token) {
-    return res.unauthorized('访问令牌缺失');
+    return res.status(401).json({
+      success: false,
+      message: '访问令牌缺失'
+    });
   }
 
   try {
     const { TokenManager } = require('./tokenManager');
     const decoded = TokenManager.verifyAccessToken(token);
     if (!decoded) {
-      return res.unauthorized('访问令牌无效或已过期');
+      return res.status(401).json({
+        success: false,
+        message: '访问令牌无效或已过期'
+      });
     }
     req.user = decoded;
     next();
   } catch (err) {
-    return res.unauthorized('访问令牌无效或已过期');
+    return res.status(401).json({
+      success: false,
+      message: '访问令牌无效或已过期'
+    });
   }
 }
 
@@ -35,7 +44,10 @@ async function isAdmin(req, res, next) {
   try {
     // 检查用户是否已认证
     if (!req.user) {
-      return res.unauthorized('用户未认证');
+      return res.status(401).json({
+        success: false,
+        message: '用户未认证'
+      });
     }
 
     // 从数据库获取用户角色
@@ -44,7 +56,10 @@ async function isAdmin(req, res, next) {
 
     // 检查用户是否为管理员
     if (userRole !== 'admin') {
-      return res.forbidden('需要管理员权限');
+      return res.status(403).json({
+        success: false,
+        message: '需要管理员权限'
+      });
     }
 
     // 更新req.user中的角色信息
@@ -52,7 +67,10 @@ async function isAdmin(req, res, next) {
     next();
   } catch (error) {
     console.error('管理员权限验证失败:', error);
-    return res.error(500, '服务器内部错误');
+    return res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
   }
 }
 
@@ -68,7 +86,10 @@ function checkRole(allowedRoles) {
       const userRole = await TokenManager.getUserRole(req.user.sub);
 
       if (!allowedRoles.includes(userRole)) {
-        return res.forbidden('权限不足');
+        return res.status(403).json({
+          success: false,
+          message: '权限不足'
+        });
       }
 
       // 更新req.user中的角色信息
@@ -76,7 +97,10 @@ function checkRole(allowedRoles) {
       next();
     } catch (error) {
       console.error('角色验证失败:', error);
-      return res.error(500, '服务器内部错误');
+      return res.status(500).json({
+        success: false,
+        message: '服务器内部错误'
+      });
     }
   };
 }
@@ -98,7 +122,10 @@ function checkPermission(requiredPermissions) {
       );
 
       if (!hasAllPermissions) {
-        return res.forbidden('权限不足');
+        return res.status(403).json({
+          success: false,
+          message: '权限不足'
+        });
       }
 
       // 更新req.user中的权限信息
@@ -106,7 +133,10 @@ function checkPermission(requiredPermissions) {
       next();
     } catch (error) {
       console.error('权限验证失败:', error);
-      return res.error(500, '服务器内部错误');
+      return res.status(500).json({
+        success: false,
+        message: '服务器内部错误'
+      });
     }
   };
 }

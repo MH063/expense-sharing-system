@@ -1,4 +1,4 @@
-const { body, param } = require('express-validator');
+const { body, param, query } = require('express-validator');
 const { validationResult } = require('express-validator');
 const { pool } = require('../config/db');
 
@@ -156,7 +156,424 @@ const adminValidationRules = {
       .exists({ checkFalsy: true }).withMessage('password 为必填项')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/)
       .withMessage('password 需包含大小写、数字、特殊字符且至少 8 位')
-  ]
+  ],
+  updateUserRole: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('用户ID为必填项')
+      .isInt({ min: 1 }).withMessage('用户ID必须是正整数'),
+    body('role')
+      .exists({ checkFalsy: true }).withMessage('角色为必填项')
+      .isString().withMessage('角色必须是字符串')
+      .isIn(['system_admin', 'admin', '寝室长', 'payer', 'user']).withMessage('角色值无效')
+  ],
+  
+  // 获取用户详情验证规则
+  getUserById: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('用户ID为必填项')
+      .isInt({ min: 1 }).withMessage('用户ID必须是正整数')
+  ],
+  
+  // 创建用户验证规则
+  createUser: [
+    body('username')
+      .notEmpty().withMessage('用户名不能为空')
+      .isLength({ min: 3, max: 50 }).withMessage('用户名长度必须在3-50个字符之间')
+      .matches(/^[a-zA-Z0-9_]+$/).withMessage('用户名只能包含字母、数字和下划线'),
+    body('password')
+      .notEmpty().withMessage('密码不能为空')
+      .isLength({ min: 8 }).withMessage('密码长度至少8位')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/)
+      .withMessage('密码需包含大小写、数字、特殊字符'),
+    body('email')
+      .notEmpty().withMessage('邮箱不能为空')
+      .isEmail().withMessage('邮箱格式不正确')
+      .normalizeEmail(),
+    body('displayName')
+      .optional()
+      .isLength({ max: 100 }).withMessage('显示名称不能超过100个字符'),
+    body('role')
+      .optional()
+      .isIn(['system_admin', 'admin', '寝室长', 'payer', 'user']).withMessage('角色值无效')
+  ],
+  
+  // 更新用户验证规则
+  updateUser: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('用户ID为必填项')
+      .isInt({ min: 1 }).withMessage('用户ID必须是正整数'),
+    body('username')
+      .optional()
+      .isLength({ min: 3, max: 50 }).withMessage('用户名长度必须在3-50个字符之间')
+      .matches(/^[a-zA-Z0-9_]+$/).withMessage('用户名只能包含字母、数字和下划线'),
+    body('email')
+      .optional()
+      .isEmail().withMessage('邮箱格式不正确')
+      .normalizeEmail(),
+    body('displayName')
+      .optional()
+      .isLength({ max: 100 }).withMessage('显示名称不能超过100个字符')
+  ],
+  
+  // 更新用户状态验证规则
+  updateUserStatus: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('用户ID为必填项')
+      .isInt({ min: 1 }).withMessage('用户ID必须是正整数'),
+    body('status')
+      .exists({ checkFalsy: true }).withMessage('状态为必填项')
+      .isIn(['active', 'inactive']).withMessage('状态值无效')
+  ],
+  
+  // 重置用户密码验证规则
+  resetUserPassword: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('用户ID为必填项')
+      .isInt({ min: 1 }).withMessage('用户ID必须是正整数'),
+    body('newPassword')
+      .notEmpty().withMessage('新密码不能为空')
+      .isLength({ min: 8 }).withMessage('密码长度至少8位')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/)
+      .withMessage('密码需包含大小写、数字、特殊字符')
+  ],
+  
+  // 删除用户验证规则
+  deleteUser: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('用户ID为必填项')
+      .isInt({ min: 1 }).withMessage('用户ID必须是正整数')
+  ],
+  
+  // 批量更新用户状态验证规则
+  batchUpdateUserStatus: [
+    body('userIds')
+      .isArray({ min: 1 }).withMessage('用户ID列表不能为空')
+      .custom((value) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          throw new Error('用户ID列表不能为空');
+        }
+        for (const id of value) {
+          if (!Number.isInteger(id) || id <= 0) {
+            throw new Error('所有用户ID必须是正整数');
+          }
+        }
+        return true;
+      }),
+    body('status')
+      .exists({ checkFalsy: true }).withMessage('状态为必填项')
+      .isIn(['active', 'inactive']).withMessage('状态值无效')
+  ],
+  
+  // 账单管理相关验证规则
+  
+  // 获取账单列表验证规则
+  getBills: [
+    query('page')
+      .optional()
+      .isInt({ min: 1 }).withMessage('页码必须是正整数'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 }).withMessage('每页数量必须是1-100之间的整数'),
+    query('roomId')
+      .optional()
+      .isInt({ min: 1 }).withMessage('房间ID必须是正整数'),
+    query('status')
+      .optional()
+      .isIn(['pending', 'confirmed', 'paid', 'cancelled']).withMessage('状态值无效'),
+    query('category')
+      .optional()
+      .isString().withMessage('分类必须是字符串'),
+    query('dateFrom')
+      .optional()
+      .isISO8601().withMessage('开始日期格式不正确'),
+    query('dateTo')
+      .optional()
+      .isISO8601().withMessage('结束日期格式不正确')
+  ],
+  
+  // 获取账单详情验证规则
+  getBillById: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数')
+  ],
+  
+  // 创建账单验证规则
+  createBill: [
+    body('roomId')
+      .exists({ checkFalsy: true }).withMessage('房间ID为必填项')
+      .isInt({ min: 1 }).withMessage('房间ID必须是正整数'),
+    body('title')
+      .exists({ checkFalsy: true }).withMessage('账单标题为必填项')
+      .isString().withMessage('账单标题必须是字符串')
+      .isLength({ min: 1, max: 200 }).withMessage('账单标题长度必须在1-200个字符之间'),
+    body('amount')
+      .exists({ checkFalsy: true }).withMessage('金额为必填项')
+      .isFloat({ min: 0 }).withMessage('金额必须是非负数'),
+    body('category')
+      .exists({ checkFalsy: true }).withMessage('分类为必填项')
+      .isString().withMessage('分类必须是字符串')
+      .isLength({ min: 1, max: 50 }).withMessage('分类长度必须在1-50个字符之间'),
+    body('date')
+      .exists({ checkFalsy: true }).withMessage('日期为必填项')
+      .isISO8601().withMessage('日期格式不正确'),
+    body('description')
+      .optional()
+      .isString().withMessage('描述必须是字符串')
+      .isLength({ max: 500 }).withMessage('描述不能超过500个字符'),
+    body('splitType')
+      .optional()
+      .isIn(['EQUAL', 'CUSTOM', 'PERCENTAGE']).withMessage('分摊类型无效'),
+    body('splitDetails')
+      .optional()
+      .isArray().withMessage('分摊详情必须是数组'),
+    body('paidBy')
+      .optional()
+      .isInt({ min: 1 }).withMessage('支付者ID必须是正整数')
+  ],
+  
+  // 更新账单验证规则
+  updateBill: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数'),
+    body('title')
+      .optional()
+      .isString().withMessage('账单标题必须是字符串')
+      .isLength({ min: 1, max: 200 }).withMessage('账单标题长度必须在1-200个字符之间'),
+    body('amount')
+      .optional()
+      .isFloat({ min: 0 }).withMessage('金额必须是非负数'),
+    body('category')
+      .optional()
+      .isString().withMessage('分类必须是字符串')
+      .isLength({ min: 1, max: 50 }).withMessage('分类长度必须在1-50个字符之间'),
+    body('date')
+      .optional()
+      .isISO8601().withMessage('日期格式不正确'),
+    body('description')
+      .optional()
+      .isString().withMessage('描述必须是字符串')
+      .isLength({ max: 500 }).withMessage('描述不能超过500个字符'),
+    body('status')
+      .optional()
+      .isIn(['pending', 'confirmed', 'paid', 'cancelled']).withMessage('状态值无效')
+  ],
+  
+  // 删除账单验证规则
+  deleteBill: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数')
+  ],
+  
+  // 更新账单状态验证规则
+  updateBillStatus: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数'),
+    body('status')
+      .exists({ checkFalsy: true }).withMessage('状态为必填项')
+      .isIn(['pending', 'confirmed', 'paid', 'cancelled']).withMessage('状态值无效')
+  ],
+  
+  // 获取账单评论验证规则
+  getBillComments: [
+    param('billId')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数'),
+    query('page')
+      .optional()
+      .isInt({ min: 1 }).withMessage('页码必须是正整数'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 }).withMessage('每页数量必须是1-100之间的整数')
+  ],
+  
+  // 添加账单评论验证规则
+  addBillComment: [
+    param('billId')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数'),
+    body('content')
+      .exists({ checkFalsy: true }).withMessage('评论内容为必填项')
+      .isString().withMessage('评论内容必须是字符串')
+      .isLength({ min: 1, max: 500 }).withMessage('评论内容长度必须在1-500个字符之间')
+  ],
+  
+  // 更新账单评论验证规则
+  updateBillComment: [
+    param('commentId')
+      .exists({ checkFalsy: true }).withMessage('评论ID为必填项')
+      .isInt({ min: 1 }).withMessage('评论ID必须是正整数'),
+    body('content')
+      .exists({ checkFalsy: true }).withMessage('评论内容为必填项')
+      .isString().withMessage('评论内容必须是字符串')
+      .isLength({ min: 1, max: 500 }).withMessage('评论内容长度必须在1-500个字符之间')
+  ],
+  
+  // 删除账单评论验证规则
+  deleteBillComment: [
+    param('commentId')
+      .exists({ checkFalsy: true }).withMessage('评论ID为必填项')
+      .isInt({ min: 1 }).withMessage('评论ID必须是正整数')
+  ],
+  
+  // 更新账单分摊验证规则
+  updateBillSplit: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数'),
+    body('splitType')
+      .exists({ checkFalsy: true }).withMessage('分摊类型为必填项')
+      .isIn(['EQUAL', 'CUSTOM', 'PERCENTAGE']).withMessage('分摊类型无效'),
+    body('splitDetails')
+      .exists({ checkFalsy: true }).withMessage('分摊详情为必填项')
+      .isArray().withMessage('分摊详情必须是数组')
+  ],
+  
+  // 获取账单统计验证规则
+  getBillStatistics: [
+    query('roomId')
+      .optional()
+      .isInt({ min: 1 }).withMessage('房间ID必须是正整数'),
+    query('userId')
+      .optional()
+      .isInt({ min: 1 }).withMessage('用户ID必须是正整数'),
+    query('period')
+      .optional()
+      .isIn(['week', 'month', 'quarter', 'year']).withMessage('周期值无效'),
+    query('dateFrom')
+      .optional()
+      .isISO8601().withMessage('开始日期格式不正确'),
+    query('dateTo')
+      .optional()
+      .isISO8601().withMessage('结束日期格式不正确')
+  ],
+  
+  // 创建账单分类验证规则
+  createBillCategory: [
+    body('name')
+      .exists({ checkFalsy: true }).withMessage('分类名称为必填项')
+      .isString().withMessage('分类名称必须是字符串')
+      .isLength({ min: 1, max: 50 }).withMessage('分类名称长度必须在1-50个字符之间'),
+    body('description')
+      .optional()
+      .isString().withMessage('分类描述必须是字符串')
+      .isLength({ max: 200 }).withMessage('分类描述不能超过200个字符'),
+    body('icon')
+      .optional()
+      .isString().withMessage('图标必须是字符串')
+      .isLength({ max: 50 }).withMessage('图标不能超过50个字符'),
+    body('color')
+      .optional()
+      .matches(/^#[0-9A-F]{6}$/i).withMessage('颜色必须是有效的十六进制颜色代码')
+  ],
+  
+  // 更新账单分类验证规则
+  updateBillCategory: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('分类ID为必填项')
+      .isInt({ min: 1 }).withMessage('分类ID必须是正整数'),
+    body('name')
+      .optional()
+      .isString().withMessage('分类名称必须是字符串')
+      .isLength({ min: 1, max: 50 }).withMessage('分类名称长度必须在1-50个字符之间'),
+    body('description')
+      .optional()
+      .isString().withMessage('分类描述必须是字符串')
+      .isLength({ max: 200 }).withMessage('分类描述不能超过200个字符'),
+    body('icon')
+      .optional()
+      .isString().withMessage('图标必须是字符串')
+      .isLength({ max: 50 }).withMessage('图标不能超过50个字符'),
+    body('color')
+      .optional()
+      .matches(/^#[0-9A-F]{6}$/i).withMessage('颜色必须是有效的十六进制颜色代码')
+  ],
+  
+  // 删除账单分类验证规则
+  deleteBillCategory: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('分类ID为必填项')
+      .isInt({ min: 1 }).withMessage('分类ID必须是正整数')
+  ],
+  
+  // 获取账单分类列表验证规则
+  getBillCategories: [
+    query('page')
+      .optional()
+      .isInt({ min: 1 }).withMessage('页码必须是正整数'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 }).withMessage('每页数量必须是1-100之间的整数')
+  ],
+  
+  // 分享账单验证规则
+  shareBill: [
+    param('id')
+      .exists({ checkFalsy: true }).withMessage('账单ID为必填项')
+      .isInt({ min: 1 }).withMessage('账单ID必须是正整数'),
+    body('shareType')
+      .exists({ checkFalsy: true }).withMessage('分享类型为必填项')
+      .isIn(['link', 'image', 'export']).withMessage('分享类型无效'),
+    body('expireTime')
+      .optional()
+      .isISO8601().withMessage('过期时间格式不正确')
+  ],
+  
+  // 导出账单验证规则
+  exportBills: [
+    query('format')
+      .optional()
+      .isIn(['excel', 'csv', 'pdf']).withMessage('导出格式无效'),
+    query('roomId')
+      .optional()
+      .isInt({ min: 1 }).withMessage('房间ID必须是正整数'),
+    query('dateFrom')
+      .optional()
+      .isISO8601().withMessage('开始日期格式不正确'),
+    query('dateTo')
+      .optional()
+      .isISO8601().withMessage('结束日期格式不正确')
+  ],
+  
+  changePassword: [
+    body('currentPassword')
+      .exists({ checkFalsy: true }).withMessage('currentPassword 为必填项')
+      .isString().withMessage('currentPassword 必须是字符串')
+      .isLength({ min: 8 }).withMessage('currentPassword 长度至少 8 位'),
+    body('newPassword')
+      .exists({ checkFalsy: true }).withMessage('newPassword 为必填项')
+      .isString().withMessage('newPassword 必须是字符串')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/)
+      .withMessage('newPassword 需包含大小写、数字、特殊字符且至少 8 位'),
+    body('confirmPassword')
+      .exists({ checkFalsy: true }).withMessage('confirmPassword 为必填项')
+      .isString().withMessage('confirmPassword 必须是字符串')
+      .custom((value, { req }) => {
+        if (value !== req.body.newPassword) {
+          throw new Error('confirmPassword 必须与 newPassword 相同');
+        }
+        return true;
+      })
+  ],
+  refreshToken: [
+    body('refreshToken')
+      .exists({ checkFalsy: true }).withMessage('refreshToken 为必填项')
+      .isString().withMessage('refreshToken 必须是字符串')
+  ],
+  verifyPermission: [
+    body('permission')
+      .exists({ checkFalsy: true }).withMessage('permission 为必填项')
+      .isString().withMessage('permission 必须是字符串')
+      .isLength({ min: 1, max: 100 }).withMessage('permission 长度需在 1-100 之间')
+  ],
+  
+  // 创建权限验证规则
+  // 更新权限验证规则
+  // 创建角色权限关联验证规则
+  // 这些规则已移动到roleValidationRules对象内
 };
 
 /** 统计相关校验规则 */
@@ -318,6 +735,86 @@ const roleValidationRules = {
   assignPermission: [
     param('id').exists().isInt().withMessage('id 必须为整数'),
     body('permissionId').exists().isInt().withMessage('permissionId 必须为整数')
+  ],
+  createRolePermission: [
+    body('roleId')
+      .notEmpty()
+      .withMessage('角色ID不能为空')
+      .isInt({ min: 1 })
+      .withMessage('角色ID必须是正整数'),
+    body('permissionId')
+      .notEmpty()
+      .withMessage('权限ID不能为空')
+      .isInt({ min: 1 })
+      .withMessage('权限ID必须是正整数'),
+  ],
+  // 创建权限验证规则
+  createPermission: [
+    body('name')
+      .notEmpty()
+      .withMessage('权限名称不能为空')
+      .isLength({ max: 100 })
+      .withMessage('权限名称不能超过100个字符'),
+    body('code')
+      .notEmpty()
+      .withMessage('权限代码不能为空')
+      .matches(/^[a-zA-Z0-9_:]+$/)
+      .withMessage('权限代码只能包含字母、数字、下划线和冒号')
+      .isLength({ max: 100 })
+      .withMessage('权限代码不能超过100个字符'),
+    body('description')
+      .optional()
+      .isString()
+      .withMessage('权限描述必须是字符串')
+      .isLength({ max: 255 })
+      .withMessage('权限描述不能超过255个字符'),
+    body('resource')
+      .notEmpty()
+      .withMessage('资源不能为空')
+      .isString()
+      .withMessage('资源必须是字符串')
+      .isLength({ max: 100 })
+      .withMessage('资源不能超过100个字符'),
+    body('action')
+      .notEmpty()
+      .withMessage('操作不能为空')
+      .isString()
+      .withMessage('操作必须是字符串')
+      .isLength({ max: 100 })
+      .withMessage('操作不能超过100个字符'),
+  ],
+  // 更新权限验证规则
+  updatePermission: [
+    body('name')
+      .optional()
+      .isString()
+      .withMessage('权限名称必须是字符串')
+      .isLength({ max: 100 })
+      .withMessage('权限名称不能超过100个字符'),
+    body('code')
+      .optional()
+      .matches(/^[a-zA-Z0-9_:]+$/)
+      .withMessage('权限代码只能包含字母、数字、下划线和冒号')
+      .isLength({ max: 100 })
+      .withMessage('权限代码不能超过100个字符'),
+    body('description')
+      .optional()
+      .isString()
+      .withMessage('权限描述必须是字符串')
+      .isLength({ max: 255 })
+      .withMessage('权限描述不能超过255个字符'),
+    body('resource')
+      .optional()
+      .isString()
+      .withMessage('资源必须是字符串')
+      .isLength({ max: 100 })
+      .withMessage('资源不能超过100个字符'),
+    body('action')
+      .optional()
+      .isString()
+      .withMessage('操作必须是字符串')
+      .isLength({ max: 100 })
+      .withMessage('操作不能超过100个字符'),
   ]
 };
 

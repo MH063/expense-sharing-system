@@ -1779,4 +1779,1131 @@ BillController.prototype.getBillByShareCode = async function getBillByShareCode(
   }
 };
 
+BillController.prototype.getBillSplits = async function getBillSplits(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params; // bill_id
+      const user_id = req.user.id;
+      
+      // 验证用户是否有权限查看该账单
+      const permissionCheck = await client.query(
+        `SELECT 1 FROM bills b
+         JOIN room_members rm ON b.room_id = rm.room_id
+         WHERE b.id = $1 AND rm.user_id = $2`,
+        [id, user_id]
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您没有权限查看该账单');
+      }
+      
+      // 获取账单分摊详情
+      const splitsQuery = `
+        SELECT bs.*, u.username, u.avatar
+        FROM bill_splits bs
+        JOIN users u ON bs.user_id = u.id
+        WHERE bs.bill_id = $1
+        ORDER BY bs.created_at
+      `;
+      
+      const splitsResult = await client.query(splitsQuery, [id]);
+      
+      res.success(200, '获取账单分摊详情成功', { splits: splitsResult.rows });
+    } catch (error) {
+      logger.error('获取账单分摊详情失败:', error);
+      res.error(500, '获取账单分摊详情失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  BillController.prototype.createBillSplit = async function createBillSplit(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params; // bill_id
+      const { user_id, amount, note } = req.body;
+      const creator_id = req.user.id;
+      
+      // 验证必填字段
+      if (!user_id || !amount) {
+        return res.error(400, '用户ID和金额为必填项');
+      }
+      
+      // 验证金额格式
+      if (isNaN(amount) || parseFloat(amount) <= 0) {
+        return res.error(400, '金额必须是大于0的数字');
+      }
+      
+      // 验证用户是否有权限操作该账单（创建者或寝室管理员）
+      const permissionCheck = await client.query(
+        `SELECT b.*, rm.role as member_role
+         FROM bills b
+         JOIN room_members rm ON b.room_id = rm.room_id
+         WHERE b.id = $1 AND rm.user_id = $2`,
+        [id, creator_id]
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您没有权限操作该账单');
+      }
+      
+      const bill = permissionCheck.rows[0];
+      const memberRole = bill.member_role;
+      
+      // 只有创建者或寝室管理员可以创建分摊
+      if (bill.creator_id !== creator_id && memberRole !== 'admin') {
+        return res.error(403, '只有创建者或寝室管理员可以创建账单分摊');
+      }
+      
+      // 验证分摊用户是否为寝室成员
+      const memberCheck = await client.query(
+        'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2',
+        [bill.room_id, user_id]
+      );
+      
+      if (memberCheck.rows.length === 0) {
+        return res.error(400, '分摊用户不是该寝室的成员');
+      }
+      
+      // 检查是否已存在该用户的分摊记录
+      const existingSplit = await client.query(
+        'SELECT 1 FROM bill_splits WHERE bill_id = $1 AND user_id = $2',
+        [id, user_id]
+      );
+      
+      if (existingSplit.rows.length > 0) {
+        return res.error(400, '该用户已存在分摊记录');
+      }
+      
+      // 开始事务
+      await client.query('BEGIN');
+      
+      // 创建账单分摊记录
+      const splitResult = await client.query(
+        `INSERT INTO bill_splits (bill_id, user_id, amount, note, status)
+         VALUES ($1, $2, $3, $4, 'PENDING')
+         RETURNING *`,
+        [id, user_id, amount, note]
+      );
+      
+      const split = splitResult.rows[0];
+      
+      // 检查账单是否已全部分摊
+      const totalSplitAmount = await client.query(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM bill_splits WHERE bill_id = $1',
+        [id]
+      );
+      
+      const totalAmount = parseFloat(totalSplitAmount.rows[0].total);
+      
+      // 如果分摊总额等于账单总额，更新账单状态为已分摊
+      if (Math.abs(totalAmount - parseFloat(bill.total_amount)) < 0.01) {
+        await client.query(
+          'UPDATE bills SET status = $1 WHERE id = $2',
+          ['SPLIT', id]
+        );
+      }
+      
+      await client.query('COMMIT');
+      
+      logger.info(`账单分摊创建成功: 账单ID=${id}, 用户ID=${user_id}, 金额=${amount}, 创建者=${creator_id}`);
+      
+      res.success(201, '账单分摊创建成功', { split });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('创建账单分摊失败:', error);
+      res.error(500, '创建账单分摊失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  BillController.prototype.updateBillSplit = async function updateBillSplit(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id, splitId } = req.params; // bill_id, split_id
+      const { amount, note, status } = req.body;
+      const user_id = req.user.id;
+      
+      // 验证金额格式（如果提供）
+      if (amount !== undefined && (isNaN(amount) || parseFloat(amount) <= 0)) {
+        return res.error(400, '金额必须是大于0的数字');
+      }
+      
+      // 验证用户是否有权限操作该账单（创建者或寝室管理员）
+      const permissionCheck = await client.query(
+        `SELECT b.*, rm.role as member_role
+         FROM bills b
+         JOIN room_members rm ON b.room_id = rm.room_id
+         WHERE b.id = $1 AND rm.user_id = $2`,
+        [id, user_id]
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您没有权限操作该账单');
+      }
+      
+      const bill = permissionCheck.rows[0];
+      const memberRole = bill.member_role;
+      
+      // 只有创建者或寝室管理员可以更新分摊
+      if (bill.creator_id !== user_id && memberRole !== 'admin') {
+        return res.error(403, '只有创建者或寝室管理员可以更新账单分摊');
+      }
+      
+      // 验证分摊记录是否存在
+      const splitCheck = await client.query(
+        'SELECT * FROM bill_splits WHERE id = $1 AND bill_id = $2',
+        [splitId, id]
+      );
+      
+      if (splitCheck.rows.length === 0) {
+        return res.error(404, '分摊记录不存在');
+      }
+      
+      // 开始事务
+      await client.query('BEGIN');
+      
+      // 更新账单分摊记录
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
+      
+      if (amount !== undefined) {
+        updateFields.push(`amount = $${paramIndex++}`);
+        updateValues.push(amount);
+      }
+      
+      if (note !== undefined) {
+        updateFields.push(`note = $${paramIndex++}`);
+        updateValues.push(note);
+      }
+      
+      if (status !== undefined) {
+        updateFields.push(`status = $${paramIndex++}`);
+        updateValues.push(status);
+      }
+      
+      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+      updateValues.push(splitId, id);
+      
+      const updateQuery = `
+        UPDATE bill_splits
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex++} AND bill_id = $${paramIndex++}
+        RETURNING *
+      `;
+      
+      const splitResult = await client.query(updateQuery, updateValues);
+      const split = splitResult.rows[0];
+      
+      // 检查账单是否已全部分摊
+      const totalSplitAmount = await client.query(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM bill_splits WHERE bill_id = $1',
+        [id]
+      );
+      
+      const totalAmount = parseFloat(totalSplitAmount.rows[0].total);
+      
+      // 如果分摊总额等于账单总额，更新账单状态为已分摊
+      if (Math.abs(totalAmount - parseFloat(bill.total_amount)) < 0.01) {
+        await client.query(
+          'UPDATE bills SET status = $1 WHERE id = $2',
+          ['SPLIT', id]
+        );
+      } else {
+        // 否则更新账单状态为待分摊
+        await client.query(
+          'UPDATE bills SET status = $1 WHERE id = $2',
+          ['PENDING', id]
+        );
+      }
+      
+      await client.query('COMMIT');
+      
+      logger.info(`账单分摊更新成功: 分摊ID=${splitId}, 账单ID=${id}, 更新者=${user_id}`);
+      
+      res.success(200, '账单分摊更新成功', { split });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('更新账单分摊失败:', error);
+      res.error(500, '更新账单分摊失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 删除账单分摊
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.deleteBillSplit = async function deleteBillSplit(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id, splitId } = req.params; // bill_id, split_id
+      const user_id = req.user.id;
+      
+      // 验证用户是否有权限操作该账单（创建者或寝室管理员）
+      const permissionCheck = await client.query(
+        `SELECT b.*, rm.role as member_role
+         FROM bills b
+         JOIN room_members rm ON b.room_id = rm.room_id
+         WHERE b.id = $1 AND rm.user_id = $2`,
+        [id, user_id]
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您没有权限操作该账单');
+      }
+      
+      const bill = permissionCheck.rows[0];
+      const memberRole = bill.member_role;
+      
+      // 只有创建者或寝室管理员可以删除分摊
+      if (bill.creator_id !== user_id && memberRole !== 'admin') {
+        return res.error(403, '只有创建者或寝室管理员可以删除账单分摊');
+      }
+      
+      // 验证分摊记录是否存在
+      const splitCheck = await client.query(
+        'SELECT 1 FROM bill_splits WHERE id = $1 AND bill_id = $2',
+        [splitId, id]
+      );
+      
+      if (splitCheck.rows.length === 0) {
+        return res.error(404, '分摊记录不存在');
+      }
+      
+      // 开始事务
+      await client.query('BEGIN');
+      
+      // 删除账单分摊记录
+      await client.query(
+        'DELETE FROM bill_splits WHERE id = $1 AND bill_id = $2',
+        [splitId, id]
+      );
+      
+      // 更新账单状态为待分摊
+      await client.query(
+        'UPDATE bills SET status = $1 WHERE id = $2',
+        ['PENDING', id]
+      );
+      
+      await client.query('COMMIT');
+      
+      logger.info(`账单分摊删除成功: 分摊ID=${splitId}, 账单ID=${id}, 删除者=${user_id}`);
+      
+      res.success(200, '账单分摊删除成功');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('删除账单分摊失败:', error);
+      res.error(500, '删除账单分摊失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 获取账单结算状态
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.getBillSettlementStatus = async function getBillSettlementStatus(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params; // bill_id
+      const user_id = req.user.id;
+      
+      // 验证用户是否有权限查看该账单
+      const permissionCheck = await client.query(
+        `SELECT 1 FROM bills b
+         JOIN room_members rm ON b.room_id = rm.room_id
+         WHERE b.id = $1 AND rm.user_id = $2`,
+        [id, user_id]
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您没有权限查看该账单');
+      }
+      
+      // 获取账单基本信息
+      const billQuery = await client.query(
+        'SELECT * FROM bills WHERE id = $1',
+        [id]
+      );
+      
+      if (billQuery.rows.length === 0) {
+        return res.error(404, '账单不存在');
+      }
+      
+      const bill = billQuery.rows[0];
+      
+      // 获取账单分摊详情
+      const splitsQuery = `
+        SELECT bs.*, u.username, u.avatar
+        FROM bill_splits bs
+        JOIN users u ON bs.user_id = u.id
+        WHERE bs.bill_id = $1
+        ORDER BY bs.created_at
+      `;
+      
+      const splitsResult = await client.query(splitsQuery, [id]);
+      const splits = splitsResult.rows;
+      
+      // 获取结算记录
+      const settlementsQuery = `
+        SELECT bs.*, u.username as payer_name, up.username as payee_name
+        FROM bill_settlements bs
+        JOIN users u ON bs.payer_id = u.id
+        JOIN users up ON bs.payee_id = up.id
+        WHERE bs.bill_id = $1
+        ORDER BY bs.created_at DESC
+      `;
+      
+      const settlementsResult = await client.query(settlementsQuery, [id]);
+      const settlements = settlementsResult.rows;
+      
+      // 计算结算状态
+      const totalSplits = splits.length;
+      const paidSplits = splits.filter(s => s.status === 'PAID').length;
+      const pendingSplits = totalSplits - paidSplits;
+      
+      let settlementStatus = 'PENDING';
+      if (paidSplits === 0) {
+        settlementStatus = 'PENDING';
+      } else if (paidSplits === totalSplits) {
+        settlementStatus = 'COMPLETED';
+      } else {
+        settlementStatus = 'PARTIAL';
+      }
+      
+      res.success(200, '获取账单结算状态成功', {
+        bill: {
+          id: bill.id,
+          title: bill.title,
+          total_amount: bill.total_amount,
+          status: bill.status
+        },
+        settlement_status: settlementStatus,
+        splits: splits,
+        settlements: settlements,
+        summary: {
+          total_splits: totalSplits,
+          paid_splits: paidSplits,
+          pending_splits: pendingSplits,
+          settlement_percentage: totalSplits > 0 ? Math.round((paidSplits / totalSplits) * 100) : 0
+        }
+      });
+    } catch (error) {
+      logger.error('获取账单结算状态失败:', error);
+      res.error(500, '获取账单结算状态失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 结算账单
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.settleBill = async function settleBill(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params; // bill_id
+      const { payer_id, payee_id, amount, note } = req.body;
+      const user_id = req.user.id;
+      
+      // 验证必填字段
+      if (!payer_id || !payee_id || !amount) {
+        return res.error(400, '付款人、收款人和金额为必填项');
+      }
+      
+      // 验证金额格式
+      if (isNaN(amount) || parseFloat(amount) <= 0) {
+        return res.error(400, '金额必须是大于0的数字');
+      }
+      
+      // 验证用户是否有权限操作该账单（创建者或寝室管理员）
+      const permissionCheck = await client.query(
+        `SELECT b.*, rm.role as member_role
+         FROM bills b
+         JOIN room_members rm ON b.room_id = rm.room_id
+         WHERE b.id = $1 AND rm.user_id = $2`,
+        [id, user_id]
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您没有权限操作该账单');
+      }
+      
+      const bill = permissionCheck.rows[0];
+      const memberRole = bill.member_role;
+      
+      // 只有创建者或寝室管理员可以结算账单
+      if (bill.creator_id !== user_id && memberRole !== 'admin') {
+        return res.error(403, '只有创建者或寝室管理员可以结算账单');
+      }
+      
+      // 验证付款人和收款人是否为寝室成员
+      const memberCheck = await client.query(
+        'SELECT user_id FROM room_members WHERE room_id = $1 AND user_id = ANY($2)',
+        [bill.room_id, [payer_id, payee_id]]
+      );
+      
+      if (memberCheck.rows.length !== 2) {
+        return res.error(400, '付款人或收款人不是该寝室的成员');
+      }
+      
+      // 验证付款人的分摊记录是否存在且未支付
+      const splitCheck = await client.query(
+        'SELECT * FROM bill_splits WHERE bill_id = $1 AND user_id = $2',
+        [id, payer_id]
+      );
+      
+      if (splitCheck.rows.length === 0) {
+        return res.error(400, '付款人没有该账单的分摊记录');
+      }
+      
+      const split = splitCheck.rows[0];
+      
+      if (split.status === 'PAID') {
+        return res.error(400, '付款人已支付该账单');
+      }
+      
+      // 验证支付金额是否超过分摊金额
+      if (parseFloat(amount) > parseFloat(split.amount)) {
+        return res.error(400, '支付金额不能超过分摊金额');
+      }
+      
+      // 开始事务
+      await client.query('BEGIN');
+      
+      // 创建结算记录
+      const settlementResult = await client.query(
+        `INSERT INTO bill_settlements (bill_id, payer_id, payee_id, amount, note, status)
+         VALUES ($1, $2, $3, $4, $5, 'COMPLETED')
+         RETURNING *`,
+        [id, payer_id, payee_id, amount, note]
+      );
+      
+      const settlement = settlementResult.rows[0];
+      
+      // 更新分摊记录状态
+      if (parseFloat(amount) >= parseFloat(split.amount)) {
+        // 全额支付
+        await client.query(
+          'UPDATE bill_splits SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          ['PAID', split.id]
+        );
+      } else {
+        // 部分支付
+        await client.query(
+          'UPDATE bill_splits SET amount = amount - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [amount, split.id]
+        );
+        
+        // 创建新的部分支付记录
+        await client.query(
+          `INSERT INTO bill_splits (bill_id, user_id, amount, status, note)
+           VALUES ($1, $2, $3, 'PAID', $4)`,
+          [id, payer_id, amount, `部分支付: ${note || ''}`]
+        );
+      }
+      
+      // 检查账单是否已全部结算
+      const unpaidSplits = await client.query(
+        'SELECT COUNT(*) as count FROM bill_splits WHERE bill_id = $1 AND status != $2',
+        [id, 'PAID']
+      );
+      
+      if (parseInt(unpaidSplits.rows[0].count) === 0) {
+        // 所有分摊已支付，更新账单状态为已结算
+        await client.query(
+          'UPDATE bills SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          ['SETTLED', id]
+        );
+      }
+      
+      await client.query('COMMIT');
+      
+      logger.info(`账单结算成功: 账单ID=${id}, 付款人=${payer_id}, 收款人=${payee_id}, 金额=${amount}, 操作者=${user_id}`);
+      
+      res.success(201, '账单结算成功', { settlement });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('结算账单失败:', error);
+      res.error(500, '结算账单失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 获取账单分类列表
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.getBillCategories = async function getBillCategories(req, res) {
+    const client = await pool.connect();
+    try {
+      const user_id = req.user.id;
+      const { room_id } = req.query;
+      
+      // 验证用户是否有权限查看该寝室的分类
+      let roomFilter = '';
+      const params = [user_id];
+      let paramIndex = 2;
+      
+      if (room_id) {
+        roomFilter = `AND rm.room_id = $${paramIndex++}`;
+        params.push(room_id);
+      }
+      
+      // 获取用户所在的寝室
+      const roomQuery = `
+        SELECT rm.room_id
+        FROM room_members rm
+        WHERE rm.user_id = $1 AND rm.status = 'active'
+        ${roomFilter}
+      `;
+      
+      const roomResult = await client.query(roomQuery, params);
+      
+      if (roomResult.rows.length === 0) {
+        return res.error(404, '未找到您所在的寝室');
+      }
+      
+      // 获取账单分类
+      const categoryQuery = `
+        SELECT DISTINCT category as name, COUNT(*) as count
+        FROM bills b
+        JOIN room_members rm ON b.room_id = rm.room_id
+        WHERE rm.user_id = $1 AND b.category IS NOT NULL
+        ${roomFilter}
+        GROUP BY category
+        ORDER BY count DESC
+      `;
+      
+      const categoryResult = await client.query(categoryQuery, params);
+      const categories = categoryResult.rows;
+      
+      res.success(200, '获取账单分类列表成功', { categories });
+    } catch (error) {
+      logger.error('获取账单分类列表失败:', error);
+      res.error(500, '获取账单分类列表失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 创建账单分类
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.createBillCategory = async function createBillCategory(req, res) {
+    const client = await pool.connect();
+    try {
+      const { name, description, color, icon } = req.body;
+      const user_id = req.user.id;
+      const { room_id } = req.query;
+      
+      // 验证必填字段
+      if (!name) {
+        return res.error(400, '分类名称为必填项');
+      }
+      
+      // 验证用户是否有权限操作该寝室
+      if (!room_id) {
+        return res.error(400, '房间ID为必填项');
+      }
+      
+      const permissionCheck = await client.query(
+        'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2 AND status = $3',
+        [room_id, user_id, 'active']
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您不是该寝室的成员');
+      }
+      
+      // 检查分类是否已存在
+      const existingCategory = await client.query(
+        'SELECT 1 FROM bill_categories WHERE room_id = $1 AND name = $2',
+        [room_id, name]
+      );
+      
+      if (existingCategory.rows.length > 0) {
+        return res.error(400, '该分类已存在');
+      }
+      
+      // 创建账单分类
+      const categoryResult = await client.query(
+        `INSERT INTO bill_categories (room_id, name, description, color, icon)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [room_id, name, description, color, icon]
+      );
+      
+      const category = categoryResult.rows[0];
+      
+      logger.info(`账单分类创建成功: 分类ID=${category.id}, 名称=${name}, 房间ID=${room_id}, 创建者=${user_id}`);
+      
+      res.success(201, '账单分类创建成功', { category });
+    } catch (error) {
+      logger.error('创建账单分类失败:', error);
+      res.error(500, '创建账单分类失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 更新账单分类
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.updateBillCategory = async function updateBillCategory(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params; // category_id
+      const { name, description, color, icon } = req.body;
+      const user_id = req.user.id;
+      
+      // 验证分类是否存在
+      const categoryCheck = await client.query(
+        'SELECT * FROM bill_categories WHERE id = $1',
+        [id]
+      );
+      
+      if (categoryCheck.rows.length === 0) {
+        return res.error(404, '分类不存在');
+      }
+      
+      const category = categoryCheck.rows[0];
+      
+      // 验证用户是否有权限操作该寝室
+      const permissionCheck = await client.query(
+        'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2 AND status = $3',
+        [category.room_id, user_id, 'active']
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您不是该寝室的成员');
+      }
+      
+      // 检查分类名称是否已存在（排除当前分类）
+      if (name && name !== category.name) {
+        const existingCategory = await client.query(
+          'SELECT 1 FROM bill_categories WHERE room_id = $1 AND name = $2 AND id != $3',
+          [category.room_id, name, id]
+        );
+        
+        if (existingCategory.rows.length > 0) {
+          return res.error(400, '该分类名称已存在');
+        }
+      }
+      
+      // 更新账单分类
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
+      
+      if (name !== undefined) {
+        updateFields.push(`name = $${paramIndex++}`);
+        updateValues.push(name);
+      }
+      
+      if (description !== undefined) {
+        updateFields.push(`description = $${paramIndex++}`);
+        updateValues.push(description);
+      }
+      
+      if (color !== undefined) {
+        updateFields.push(`color = $${paramIndex++}`);
+        updateValues.push(color);
+      }
+      
+      if (icon !== undefined) {
+        updateFields.push(`icon = $${paramIndex++}`);
+        updateValues.push(icon);
+      }
+      
+      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+      updateValues.push(id);
+      
+      const updateQuery = `
+        UPDATE bill_categories
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex++}
+        RETURNING *
+      `;
+      
+      const categoryResult = await client.query(updateQuery, updateValues);
+      const updatedCategory = categoryResult.rows[0];
+      
+      logger.info(`账单分类更新成功: 分类ID=${id}, 更新者=${user_id}`);
+      
+      res.success(200, '账单分类更新成功', { category: updatedCategory });
+    } catch (error) {
+      logger.error('更新账单分类失败:', error);
+      res.error(500, '更新账单分类失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 删除账单分类
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.deleteBillCategory = async function deleteBillCategory(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params; // category_id
+      const user_id = req.user.id;
+      
+      // 验证分类是否存在
+      const categoryCheck = await client.query(
+        'SELECT * FROM bill_categories WHERE id = $1',
+        [id]
+      );
+      
+      if (categoryCheck.rows.length === 0) {
+        return res.error(404, '分类不存在');
+      }
+      
+      const category = categoryCheck.rows[0];
+      
+      // 验证用户是否有权限操作该寝室
+      const permissionCheck = await client.query(
+        'SELECT rm.role FROM room_members WHERE room_id = $1 AND user_id = $2 AND status = $3',
+        [category.room_id, user_id, 'active']
+      );
+      
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您不是该寝室的成员');
+      }
+      
+      const memberRole = permissionCheck.rows[0].role;
+      
+      // 只有寝室管理员可以删除分类
+      if (memberRole !== 'admin') {
+        return res.error(403, '只有寝室管理员可以删除账单分类');
+      }
+      
+      // 检查是否有账单使用该分类
+      const billsUsingCategory = await client.query(
+        'SELECT COUNT(*) as count FROM bills WHERE category = $1',
+        [category.name]
+      );
+      
+      if (parseInt(billsUsingCategory.rows[0].count) > 0) {
+        return res.error(400, '该分类正在被账单使用，无法删除');
+      }
+      
+      // 删除账单分类
+      await client.query(
+        'DELETE FROM bill_categories WHERE id = $1',
+        [id]
+      );
+      
+      logger.info(`账单分类删除成功: 分类ID=${id}, 删除者=${user_id}`);
+      
+      res.success(200, '账单分类删除成功');
+    } catch (error) {
+      logger.error('删除账单分类失败:', error);
+      res.error(500, '删除账单分类失败', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 更新账单评论
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.updateBillComment = async function updateBillComment(req, res) {
+    const client = await pool.connect();
+    try {
+      const { commentId } = req.params;
+      const { content } = req.body;
+      const user_id = req.user.id;
+
+      // 验证评论是否存在
+      const commentCheck = await client.query(
+        'SELECT bc.*, b.room_id FROM bill_comments bc JOIN bills b ON bc.bill_id = b.id WHERE bc.id = $1',
+        [commentId]
+      );
+
+      if (commentCheck.rows.length === 0) {
+        return res.error(404, '评论不存在');
+      }
+
+      const comment = commentCheck.rows[0];
+
+      // 验证用户是否有权限更新评论（评论创建者或房间管理员）
+      const permissionCheck = await client.query(
+        'SELECT rm.role FROM room_members rm WHERE rm.room_id = $1 AND rm.user_id = $2',
+        [comment.room_id, user_id]
+      );
+
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您不是该寝室的成员');
+      }
+
+      const memberRole = permissionCheck.rows[0].role;
+
+      // 只有评论创建者或房间管理员可以更新评论
+      if (comment.user_id !== user_id && memberRole !== 'admin') {
+        return res.error(403, '只有评论创建者或房间管理员可以更新评论');
+      }
+
+      // 验证评论内容
+      if (!content || content.trim().length < 1) {
+        return res.error(400, '评论内容不能为空');
+      }
+
+      // 更新评论
+      const updateResult = await client.query(
+        'UPDATE bill_comments SET content = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [content.trim(), commentId]
+      );
+
+      const updatedComment = updateResult.rows[0];
+
+      logger.info(`账单评论更新成功: 评论ID=${commentId}, 更新者=${user_id}`);
+
+      res.success(200, '账单评论更新成功', { comment: updatedComment });
+    } catch (error) {
+      logger.error('更新账单评论失败:', error);
+      res.error(500, '更新账单评论失败', error.message);
+    } finally {
+      client.release();
+    }
+  };
+
+  /**
+   * 删除账单评论
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.deleteBillComment = async function deleteBillComment(req, res) {
+    const client = await pool.connect();
+    try {
+      const { commentId } = req.params;
+      const user_id = req.user.id;
+
+      // 验证评论是否存在
+      const commentCheck = await client.query(
+        'SELECT bc.*, b.room_id FROM bill_comments bc JOIN bills b ON bc.bill_id = b.id WHERE bc.id = $1',
+        [commentId]
+      );
+
+      if (commentCheck.rows.length === 0) {
+        return res.error(404, '评论不存在');
+      }
+
+      const comment = commentCheck.rows[0];
+
+      // 验证用户是否有权限删除评论（评论创建者或房间管理员）
+      const permissionCheck = await client.query(
+        'SELECT rm.role FROM room_members rm WHERE rm.room_id = $1 AND rm.user_id = $2',
+        [comment.room_id, user_id]
+      );
+
+      if (permissionCheck.rows.length === 0) {
+        return res.error(403, '您不是该寝室的成员');
+      }
+
+      const memberRole = permissionCheck.rows[0].role;
+
+      // 只有评论创建者或房间管理员可以删除评论
+      if (comment.user_id !== user_id && memberRole !== 'admin') {
+        return res.error(403, '只有评论创建者或房间管理员可以删除评论');
+      }
+
+      // 删除评论
+      await client.query('DELETE FROM bill_comments WHERE id = $1', [commentId]);
+
+      logger.info(`账单评论删除成功: 评论ID=${commentId}, 删除者=${user_id}`);
+
+      res.success(200, '账单评论删除成功');
+    } catch (error) {
+      logger.error('删除账单评论失败:', error);
+      res.error(500, '删除账单评论失败', error.message);
+    } finally {
+      client.release();
+    }
+  };
+
+  /**
+   * 获取账单统计数据
+   * @param {Object} req - 请求对象
+   * @param {Object} res - 响应对象
+   */
+  BillController.prototype.getBillStatistics = async function getBillStatistics(req, res) {
+    const client = await pool.connect();
+    try {
+      const { roomId, userId, period, dateFrom, dateTo } = req.query;
+      const admin_user_id = req.user.id;
+
+      // 构建查询条件
+      let whereConditions = [];
+      let queryParams = [];
+      let paramIndex = 1;
+
+      // 如果指定了房间ID，验证管理员是否有权限查看该房间
+      if (roomId) {
+        const roomPermissionCheck = await client.query(
+          'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2 AND status = $3',
+          [roomId, admin_user_id, 'active']
+        );
+
+        if (roomPermissionCheck.rows.length === 0) {
+          return res.error(403, '您不是该寝室的成员');
+        }
+
+        whereConditions.push(`b.room_id = $${paramIndex++}`);
+        queryParams.push(roomId);
+      }
+
+      // 如果指定了用户ID，验证用户是否存在
+      if (userId) {
+        whereConditions.push(`b.creator_id = $${paramIndex++}`);
+        queryParams.push(userId);
+      }
+
+      // 处理日期范围
+      if (dateFrom) {
+        whereConditions.push(`b.date >= $${paramIndex++}`);
+        queryParams.push(dateFrom);
+      }
+
+      if (dateTo) {
+        whereConditions.push(`b.date <= $${paramIndex++}`);
+        queryParams.push(dateTo);
+      }
+
+      // 处理周期
+      if (period) {
+        const now = new Date();
+        let dateFromCondition = '';
+
+        switch (period) {
+          case 'week':
+            dateFromCondition = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString().split('T')[0];
+            break;
+          case 'month':
+            dateFromCondition = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            break;
+          case 'quarter':
+            const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+            dateFromCondition = new Date(now.getFullYear(), quarterStartMonth, 1).toISOString().split('T')[0];
+            break;
+          case 'year':
+            dateFromCondition = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+            break;
+        }
+
+        if (dateFromCondition) {
+          whereConditions.push(`b.date >= $${paramIndex++}`);
+          queryParams.push(dateFromCondition);
+        }
+      }
+
+      // 构建WHERE子句
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+      // 获取账单总数
+      const totalBillsQuery = `SELECT COUNT(*) as total FROM bills b ${whereClause}`;
+      const totalBillsResult = await client.query(totalBillsQuery, queryParams);
+      const totalBills = parseInt(totalBillsResult.rows[0].total);
+
+      // 获取账单总金额
+      const totalAmountQuery = `SELECT COALESCE(SUM(amount), 0) as total FROM bills b ${whereClause}`;
+      const totalAmountResult = await client.query(totalAmountQuery, queryParams);
+      const totalAmount = parseFloat(totalAmountResult.rows[0].total);
+
+      // 获取按状态分组的账单统计
+      const statusQuery = `
+        SELECT b.status, COUNT(*) as count, COALESCE(SUM(b.amount), 0) as amount
+        FROM bills b ${whereClause}
+        GROUP BY b.status
+      `;
+      const statusResult = await client.query(statusQuery, queryParams);
+      const statusStats = statusResult.rows;
+
+      // 获取按分类分组的账单统计
+      const categoryQuery = `
+        SELECT b.category, COUNT(*) as count, COALESCE(SUM(b.amount), 0) as amount
+        FROM bills b ${whereClause}
+        GROUP BY b.category
+        ORDER BY amount DESC
+        LIMIT 10
+      `;
+      const categoryResult = await client.query(categoryQuery, queryParams);
+      const categoryStats = categoryResult.rows;
+
+      // 获取按月份分组的账单统计（最近12个月）
+      const monthlyQuery = `
+        SELECT 
+          TO_CHAR(b.date, 'YYYY-MM') as month,
+          COUNT(*) as count,
+          COALESCE(SUM(b.amount), 0) as amount
+        FROM bills b 
+        WHERE b.date >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'
+        ${whereConditions.length > 0 ? 'AND ' + whereConditions.join(' AND ') : ''}
+        GROUP BY TO_CHAR(b.date, 'YYYY-MM')
+        ORDER BY month
+      `;
+      const monthlyResult = await client.query(monthlyQuery, queryParams);
+      const monthlyStats = monthlyResult.rows;
+
+      // 获取按创建者分组的账单统计（前10名）
+      const creatorQuery = `
+        SELECT 
+          u.id,
+          u.username,
+          u.display_name,
+          COUNT(*) as count,
+          COALESCE(SUM(b.amount), 0) as amount
+        FROM bills b
+        JOIN users u ON b.creator_id = u.id
+        ${whereClause}
+        GROUP BY u.id, u.username, u.display_name
+        ORDER BY amount DESC
+        LIMIT 10
+      `;
+      const creatorResult = await client.query(creatorQuery, queryParams);
+      const creatorStats = creatorResult.rows;
+
+      // 构建响应数据
+      const statistics = {
+        summary: {
+          totalBills,
+          totalAmount,
+          averageAmount: totalBills > 0 ? totalAmount / totalBills : 0
+        },
+        statusStats,
+        categoryStats,
+        monthlyStats,
+        creatorStats
+      };
+
+      logger.info(`账单统计数据获取成功: 查询条件=${JSON.stringify(req.query)}`);
+
+      res.success(200, '账单统计数据获取成功', { statistics });
+    } catch (error) {
+      logger.error('获取账单统计数据失败:', error);
+      res.error(500, '获取账单统计数据失败', error.message);
+    } finally {
+      client.release();
+    }
+  };
+
 module.exports = new BillController();

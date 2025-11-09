@@ -6212,6 +6212,435 @@
 }
 ```
 
+## 十七、请假记录接口
+
+### 1. 获取请假记录列表
+```json
+{
+  "address": "/leave-records",
+  "method": "GET",
+  "description": "获取当前用户的请假记录列表，支持分页和筛选",
+  "parameters": {
+    "query": {
+      "page": {
+        "type": "integer",
+        "required": false,
+        "description": "页码，默认1"
+      },
+      "page_size": {
+        "type": "integer",
+        "required": false,
+        "description": "每页数量，默认20"
+      },
+      "status": {
+        "type": "string",
+        "required": false,
+        "description": "状态筛选：pending/approved/rejected/cancelled",
+        "options": ["pending", "approved", "rejected", "cancelled"]
+      },
+      "start_date": {
+        "type": "string",
+        "required": false,
+        "description": "开始日期，格式：YYYY-MM-DD"
+      },
+      "end_date": {
+        "type": "string",
+        "required": false,
+        "description": "结束日期，格式：YYYY-MM-DD"
+      }
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "leave_records": [
+        {
+          "id": 1,
+          "user_id": 1,
+          "username": "张三",
+          "leave_type": "annual",
+          "leave_type_name": "年假",
+          "start_date": "2024-01-01",
+          "end_date": "2024-01-03",
+          "days": 3,
+          "reason": "回家过年",
+          "status": "approved",
+          "status_name": "已批准",
+          "approved_by": 2,
+          "approved_by_name": "李四",
+          "approved_at": "2023-12-20T10:30:00Z",
+          "created_at": "2023-12-15T09:15:00Z",
+          "updated_at": "2023-12-20T10:30:00Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total": 1,
+        "total_pages": 1
+      }
+    }
+  },
+  "errors": {
+    "401": "未授权访问",
+    "500": "服务器内部错误"
+  }
+}
+```
+
+### 2. 获取请假记录详情
+```json
+{
+  "address": "/leave-records/{id}",
+  "method": "GET",
+  "description": "获取指定请假记录的详细信息",
+  "parameters": {
+    "path": {
+      "id": {
+        "type": "integer",
+        "required": true,
+        "description": "请假记录ID"
+      }
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "leave_record": {
+        "id": 1,
+        "user_id": 1,
+        "username": "张三",
+        "employee_id": "EMP001",
+        "department": "技术部",
+        "position": "前端工程师",
+        "leave_type": "annual",
+        "leave_type_name": "年假",
+        "start_date": "2024-01-01",
+        "end_date": "2024-01-03",
+        "days": 3,
+        "reason": "回家过年",
+        "attachments": [
+          {
+            "id": 1,
+            "name": "请假申请.docx",
+            "url": "https://example.com/attachments/1.docx"
+          }
+        ],
+        "status": "approved",
+        "status_name": "已批准",
+        "approver_id": 2,
+        "approver_name": "李四",
+        "approved_at": "2023-12-20T10:30:00Z",
+        "approval_notes": "同意申请，祝旅途愉快",
+        "created_at": "2023-12-15T09:15:00Z",
+        "updated_at": "2023-12-20T10:30:00Z"
+      }
+    }
+  },
+  "errors": {
+    "401": "未授权访问",
+    "403": "无权查看该请假记录",
+    "404": "请假记录不存在",
+    "500": "服务器内部错误"
+  }
+}
+```
+
+### 3. 创建请假记录
+```json
+{
+  "address": "/leave-records",
+  "method": "POST",
+  "description": "创建新的请假记录",
+  "parameters": {
+    "body": {
+      "leave_type": {
+        "type": "string",
+        "required": true,
+        "description": "请假类型",
+        "options": ["annual", "sick", "personal", "maternity", "paternity", "others"]
+      },
+      "start_date": {
+        "type": "string",
+        "required": true,
+        "description": "开始日期，格式：YYYY-MM-DD"
+      },
+      "end_date": {
+        "type": "string",
+        "required": true,
+        "description": "结束日期，格式：YYYY-MM-DD"
+      },
+      "reason": {
+        "type": "string",
+        "required": true,
+        "description": "请假原因"
+      },
+      "attachments": {
+        "type": "array",
+        "required": false,
+        "description": "附件URL列表",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "leave_record": {
+        "id": 2,
+        "user_id": 1,
+        "username": "张三",
+        "leave_type": "sick",
+        "leave_type_name": "病假",
+        "start_date": "2024-01-10",
+        "end_date": "2024-01-12",
+        "days": 3,
+        "reason": "感冒发烧",
+        "status": "pending",
+        "status_name": "待审批",
+        "created_at": "2024-01-05T14:20:00Z",
+        "updated_at": "2024-01-05T14:20:00Z"
+      }
+    }
+  },
+  "errors": {
+    "400": "请求参数错误",
+    "401": "未授权访问",
+    "500": "服务器内部错误"
+  }
+}
+```
+
+### 4. 更新请假记录
+```json
+{
+  "address": "/leave-records/{id}",
+  "method": "PUT",
+  "description": "更新请假记录信息（仅限状态为pending的记录）",
+  "parameters": {
+    "path": {
+      "id": {
+        "type": "integer",
+        "required": true,
+        "description": "请假记录ID"
+      }
+    },
+    "body": {
+      "leave_type": {
+        "type": "string",
+        "required": false,
+        "description": "请假类型",
+        "options": ["annual", "sick", "personal", "maternity", "paternity", "others"]
+      },
+      "start_date": {
+        "type": "string",
+        "required": false,
+        "description": "开始日期，格式：YYYY-MM-DD"
+      },
+      "end_date": {
+        "type": "string",
+        "required": false,
+        "description": "结束日期，格式：YYYY-MM-DD"
+      },
+      "reason": {
+        "type": "string",
+        "required": false,
+        "description": "请假原因"
+      },
+      "attachments": {
+        "type": "array",
+        "required": false,
+        "description": "附件URL列表",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "leave_record": {
+        "id": 2,
+        "user_id": 1,
+        "username": "张三",
+        "leave_type": "sick",
+        "leave_type_name": "病假",
+        "start_date": "2024-01-10",
+        "end_date": "2024-01-12",
+        "days": 3,
+        "reason": "感冒发烧，需要休息",
+        "status": "pending",
+        "status_name": "待审批",
+        "created_at": "2024-01-05T14:20:00Z",
+        "updated_at": "2024-01-05T15:30:00Z"
+      }
+    }
+  },
+  "errors": {
+    "400": "请求参数错误",
+    "401": "未授权访问",
+    "403": "无权更新该请假记录",
+    "404": "请假记录不存在",
+    "409": "请假记录状态不是pending，无法更新",
+    "500": "服务器内部错误"
+  }
+}
+```
+
+### 5. 删除请假记录
+```json
+{
+  "address": "/leave-records/{id}",
+  "method": "DELETE",
+  "description": "删除请假记录（仅限状态为pending的记录）",
+  "parameters": {
+    "path": {
+      "id": {
+        "type": "integer",
+        "required": true,
+        "description": "请假记录ID"
+      }
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "message": "请假记录删除成功"
+    }
+  },
+  "errors": {
+    "401": "未授权访问",
+    "403": "无权删除该请假记录",
+    "404": "请假记录不存在",
+    "409": "请假记录状态不是pending，无法删除",
+    "500": "服务器内部错误"
+  }
+}
+```
+
+### 6. 获取请假类型列表
+```json
+{
+  "address": "/leave-records/types",
+  "method": "GET",
+  "description": "获取系统支持的请假类型列表",
+  "parameters": {},
+  "response": {
+    "success": true,
+    "data": {
+      "leave_types": [
+        {
+          "key": "annual",
+          "name": "年假",
+          "description": "年度带薪休假"
+        },
+        {
+          "key": "sick",
+          "name": "病假",
+          "description": "因病需要休息的假期"
+        },
+        {
+          "key": "personal",
+          "name": "事假",
+          "description": "处理个人事务的假期"
+        },
+        {
+          "key": "maternity",
+          "name": "产假",
+          "description": "女性员工生育期间的假期"
+        },
+        {
+          "key": "paternity",
+          "name": "陪产假",
+          "description": "男性员工配偶生育期间的假期"
+        },
+        {
+          "key": "others",
+          "name": "其他",
+          "description": "其他类型的假期"
+        }
+      ]
+    }
+  },
+  "errors": {
+    "401": "未授权访问",
+    "500": "服务器内部错误"
+  }
+}
+```
+
+### 7. 获取请假统计
+```json
+{
+  "address": "/leave-records/stats",
+  "method": "GET",
+  "description": "获取当前用户的请假统计数据",
+  "parameters": {
+    "query": {
+      "start_date": {
+        "type": "string",
+        "required": false,
+        "description": "开始日期，格式：YYYY-MM-DD"
+      },
+      "end_date": {
+        "type": "string",
+        "required": false,
+        "description": "结束日期，格式：YYYY-MM-DD"
+      }
+    }
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "total_records": 5,
+      "pending_count": 1,
+      "approved_count": 3,
+      "rejected_count": 1,
+      "cancelled_count": 0,
+      "leave_type_stats": [
+        {
+          "type": "annual",
+          "type_name": "年假",
+          "count": 2,
+          "days": 7
+        },
+        {
+          "type": "sick",
+          "type_name": "病假",
+          "count": 2,
+          "days": 5
+        },
+        {
+          "type": "personal",
+          "type_name": "事假",
+          "count": 1,
+          "days": 2
+        }
+      ],
+      "monthly_stats": [
+        {
+          "month": "2023-12",
+          "count": 2,
+          "days": 5
+        },
+        {
+          "month": "2024-01",
+          "count": 3,
+          "days": 9
+        }
+      ]
+    }
+  },
+  "errors": {
+    "401": "未授权访问",
+    "500": "服务器内部错误"
+  }
+}
+```
+
 ### 7. 批量审核
 
 **接口地址：** `POST /audit/batch`

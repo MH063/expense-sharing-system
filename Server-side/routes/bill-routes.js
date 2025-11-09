@@ -7,6 +7,7 @@ const express = require('express');
 const billService = require('../services/database/bill-service');
 const { authenticateToken } = require('../middleware/auth-middleware');
 const enhancedCacheMiddleware = require('../middleware/enhanced-cache-middleware');
+const billController = require('../controllers/bill-controller');
 
 const router = express.Router();
 
@@ -359,5 +360,23 @@ router.post('/batch', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// 获取账单结算状态
+router.get('/:id/settlement', authenticateToken, enhancedCacheMiddleware.getSmartCache('bill:settlement', { ttl: 60 }), billController.getBillSettlementStatus);
+
+// 结算账单
+router.post('/:id/settle', authenticateToken, billController.settleBill);
+
+// 获取账单分类列表
+router.get('/categories', authenticateToken, enhancedCacheMiddleware.getSmartCache('bill:categories', { ttl: 300 }), billController.getBillCategories);
+
+// 创建账单分类
+router.post('/categories', authenticateToken, billController.createBillCategory);
+
+// 更新账单分类
+router.put('/categories/:id', authenticateToken, billController.updateBillCategory);
+
+// 删除账单分类
+router.delete('/categories/:id', authenticateToken, billController.deleteBillCategory);
 
 module.exports = router;

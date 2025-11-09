@@ -152,9 +152,12 @@ console.log('缓存预热服务加载完成');
 // 导入路由
 const authRoutes = require('./routes/auth-routes');
 const adminAuthRoutes = require('./routes/admin-auth-routes');
+const adminUserRoutes = require('./routes/admin-user-routes');
+const adminBillRoutes = require('./routes/admin-bill-routes');
 const userRoutes = require('./routes/user-routes');
 const roomRoutes = require('./routes/room-routes');
 const expenseRoutes = require('./routes/expense-routes');
+const adminLeaveRecordRoutes = require('./routes/admin-leave-record-routes');
 const expenseTypeRoutes = require('./routes/expense-type-routes');
 const billRoutes = require('./routes/bill-routes');
 const statsRoutes = require('./routes/stats-routes');
@@ -162,6 +165,10 @@ const qrCodeRoutes = require('./routes/qr-code-routes');
 const paymentRoutes = require('./routes/payment-routes');
 const inviteCodeRoutes = require('./routes/invite-code-routes');
 const specialPaymentRoutes = require('./routes/special-payment-routes');
+const specialPaymentRuleRoutes = require('./routes/special-payment-rule-routes');
+const roomPaymentRuleRoutes = require('./routes/room-payment-rule-routes');
+const activityRoutes = require('./routes/activity-routes');
+const permissionRoutes = require('./routes/permission-routes');
 const paymentTransferRoutes = require('./routes/payment-transfer-routes');
 const paymentOptimizationRoutes = require('./routes/payment-optimization-routes');
 const notificationRoutes = require('./routes/notification-routes');
@@ -180,6 +187,29 @@ const stayDaysRoutes = require('./routes/stay-days-routes');
 const cacheRoutes = require('./routes/cache-routes');
 const bruteForceMonitorRoutes = require('./routes/brute-force-monitor');
 const monitoringRoutes = require('./routes/monitoring-routes');
+const otherRoutes = require('./routes/other-routes');
+const docsRoutes = require('./routes/docs-routes');
+const adminSessionRoutes = require('./routes/adminSession-routes');
+const adminPermissionHistoryRoutes = require('./routes/adminPermissionHistory-routes');
+const adminOperationRestrictionRoutes = require('./routes/adminOperationRestriction-routes');
+const adminOperationStatisticsRoutes = require('./routes/adminOperationStatistics-routes');
+const systemPerformanceRoutes = require('./routes/systemPerformance-routes');
+const systemMaintenanceRoutes = require('./routes/system-maintenance-routes');
+
+// 导入数据导出路由
+const dataExportRoutes = require('./routes/data-export-routes');
+
+// 导入缓存管理路由
+const cacheManagementRoutes = require('./routes/cache-management-routes');
+
+// 导入用户资料和设置路由
+const userProfileRoutes = require('./routes/user-profile-routes');
+
+// 导入第三方账号管理路由
+const thirdPartyAccountRoutes = require('./routes/third-party-account-routes');
+
+// 导入密码重置路由
+const passwordResetRoutes = require('./routes/password-reset-routes');
 
 // 导入增强的审计日志路由
 console.log('即将加载增强的审计日志路由...');
@@ -248,8 +278,14 @@ app.use('/api/ai', aiTokenHandler);
 // HTTP请求日志中间件
 app.use(httpLogger);
 
-// 增强的审计日志中间件（记录所有API请求）
-app.use(enhancedAuditLogger);
+// 增强的审计日志中间件（暂时禁用，避免阻塞API请求）
+// app.use((req, res, next) => {
+//   // 跳过健康检查端点，避免审计日志阻塞
+//   if (req.path === '/health' || req.path === '/health-page') {
+//     return next();
+//   }
+//   return enhancedAuditLogger(req, res, next);
+// });
 
 // 根路径处理 - 必须在静态文件中间件之前
 app.get('/', (req, res) => {
@@ -299,6 +335,8 @@ app.use('/api/files', fileRoutes);
 app.use('/api/ws', websocketManagementRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/admin', adminUserRoutes);
+app.use('/api/admin/bills', adminBillRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/rooms', roomRoutes);
@@ -310,6 +348,10 @@ app.use('/api/qr-codes', qrCodeRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/invite-codes', inviteCodeRoutes);
 app.use('/api/special-payments', specialPaymentRoutes);
+app.use('/api/special-payment-rules', specialPaymentRuleRoutes);
+app.use('/api/room-payment-rules', roomPaymentRuleRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/permissions', permissionRoutes);
 app.use('/api/payment-transfers', paymentTransferRoutes);
 app.use('/api/payment-optimization', paymentOptimizationRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -322,6 +364,30 @@ app.use('/api/stay-days', stayDaysRoutes);
 app.use('/api/cache-test', cacheTestRoutes);
 app.use('/api/cache', cacheRoutes);
 app.use('/api/brute-force-monitor', bruteForceMonitorRoutes);
+app.use('/api/admin/leave-records', adminLeaveRecordRoutes);
+app.use('/api/other', otherRoutes);
+app.use('/api/docs', docsRoutes);
+app.use('/api/admin/sessions', adminSessionRoutes);
+app.use('/api/admin/permission-history', adminPermissionHistoryRoutes);
+app.use('/api/admin/operation-restriction', adminOperationRestrictionRoutes);
+app.use('/api/admin/operation-statistics', adminOperationStatisticsRoutes);
+app.use('/api/admin/system-performance', systemPerformanceRoutes);
+app.use('/api/system-maintenance', systemMaintenanceRoutes);
+
+// 数据导出路由
+app.use('/api/data-export', dataExportRoutes);
+
+// 缓存管理路由
+app.use('/api/cache-management', cacheManagementRoutes);
+
+// 用户资料和设置路由
+app.use('/api/user-profile', userProfileRoutes);
+
+// 第三方账号管理路由
+app.use('/api/third-party-accounts', thirdPartyAccountRoutes);
+
+// 密码重置路由
+app.use('/api/password-reset', passwordResetRoutes);
 
 // 增强的审计日志路由
 app.use('/api/enhanced-audit', enhancedAuditRoutes);

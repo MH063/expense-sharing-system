@@ -1,214 +1,332 @@
-## 一、用户认证与账户管理接口 (user.js)
-1. 登录接口 - POST /auth/login
-2. 注册接口 - POST /auth/register
-3. 登出接口 - POST /auth/logout
-4. 刷新令牌接口 - POST /auth/refresh-token
-5. 获取当前用户信息 - GET /users/profile
-6. 更新用户资料 - PUT /users/profile
-7. 上传用户头像 - POST /users/avatar
-8. 获取用户通知 - GET /notifications
-9. 标记通知为已读 - PUT /notifications/{id}/read
-10. 批量标记通知为已读 - PUT /notifications/mark-all-read
-11. 删除通知 - DELETE /notifications/{id}
-12. 获取用户设置 - GET /users/settings
-13. 更新用户设置 - PUT /users/settings
-14. 绑定第三方账号 - POST /users/bind-third-party
-15. 解绑第三方账号 - DELETE /users/unbind-third-party
-16. 获取用户活动日志 - GET /users/activity-logs
-## 二、账单管理接口 (bills.js, bill.js, bill-api.js)
-1. 获取账单列表 - GET /bills
-2. 获取账单详情 - GET /bills/{billId}
-3. 创建账单 - POST /bills
-4. 更新账单 - PUT /bills/{billId}
-5. 删除账单 - DELETE /bills/{billId}
-6. 结算账单 - POST /bills/{billId}/settle
-7. 确认账单结算 - POST /bills/{billId}/confirm-settlement
-8. 分摊账单 - POST /bills/{billId}/split
-9. 获取账单统计 - GET /bills/stats
-10. 导出账单 - GET /bills/export
-11. 分享账单 - POST /bills/{billId}/share
-12. 添加账单备注 - POST /bills/{billId}/comments
-13. 获取账单备注 - GET /bills/{billId}/comments
-14. 更新账单备注 - PUT /bills/comments/{commentId}
-15. 删除账单备注 - DELETE /bills/comments/{commentId}
-16. 获取支付转移记录 - GET /payment-transfers
-17. 创建支付转移记录 - POST /payment-transfers
-18. 确认支付转移记录 - PUT /payment-transfers/{id}/confirm
-19. 取消支付转移记录 - PUT /payment-transfers/{id}/cancel
-20. 获取账单分账记录 - GET /bills/{billId}/splits
-21. 获取账单分类 - GET /bills/categories
-## 三、费用管理接口 (expenses.js)
-1. 获取费用列表 - GET /expenses
-2. 获取费用详情 - GET /expenses/{expenseId}
-3. 创建费用记录 - POST /expenses（请求体中添加split_algorithm和period_start_date、period_end_date字段）
-4. 更新费用记录 - PUT /expenses/{expenseId}
-5. 删除费用记录 - DELETE /expenses/{expenseId}
-6. 批量删除费用记录 - POST /expenses/batch-delete
-7. 获取费用分类列表 - GET /expenses/categories
-8. 创建费用分类 - POST /expenses/categories（请求体中添加supports_days_based_split字段）
-9. 更新费用分类 - PUT /expenses/categories/{categoryId}（请求体中添加supports_days_based_split字段）
-10. 删除费用分类 - DELETE /expenses/categories/{categoryId}
-11. 获取费用统计 - GET /expenses/statistics
-12. 获取费用分类统计 - GET /expenses/category-stats
-13. 获取费用趋势数据 - GET /expenses/trends
-14. 获取成员消费对比 - GET /expenses/comparison
-15. 获取费用分摊详情 - GET /expenses/{expenseId}/split
-16. 更新费用分摊 - PUT /expenses/{expenseId}/split
-17. 结算费用分摊 - POST /expenses/{expenseId}/settle
-18. 导出费用记录 - GET /expenses/export
-19. 上传费用凭证 - POST /expenses/{expenseId}/receipt
-20. 删除费用凭证 - DELETE /expenses/{expenseId}/receipt/{receiptId}
-21. 按在寝天数计算分摊 - POST /expenses/{expenseId}/calculate-days-based-split
-## 十九、请假记录接口 (leave-records.js)
-1. 获取请假记录列表 - GET /leave-records
-2. 获取请假记录详情 - GET /leave-records/{id}
-3. 创建请假记录 - POST /leave-records
-4. 更新请假记录 - PUT /leave-records/{id}
-5. 删除请假记录 - DELETE /leave-records/{id}
-6. 获取用户请假记录 - GET /leave-records/user/{userId}
-7. 获取房间请假记录 - GET /leave-records/room/{roomId}
-8. 批量导入请假记录 - POST /leave-records/batch-import
-9. 获取请假统计数据 - GET /leave-records/statistics
-10. 获取在寝天数统计 - GET /leave-records/days-statistics
-## 四、房间管理接口 (rooms.js)
-1. 获取用户加入的房间列表 - GET /rooms/my-rooms
-2. 获取房间详情 - GET /rooms/{roomId}
-3. 创建房间 - POST /rooms
-4. 更新房间信息 - PUT /rooms/{roomId}
-5. 删除房间 - DELETE /rooms/{roomId}
-6. 加入房间 - POST /rooms/join
-7. 离开房间 - POST /rooms/{roomId}/leave
-8. 获取房间成员列表 - GET /rooms/{roomId}/members
-9. 邀请成员加入房间 - POST /rooms/{roomId}/invite
-10. 移除房间成员 - DELETE /rooms/{roomId}/members/{userId}
-11. 更新成员角色 - PUT /rooms/{roomId}/members/{userId}/role
-12. 生成房间邀请码 - POST /rooms/{roomId}/invite-code
-13. 获取房间邀请列表 - GET /rooms/{roomId}/invitations
-14. 获取用户收到的邀请 - GET /rooms/invitations
-15. 接受邀请 - POST /rooms/invitations/{invitationId}/accept
-16. 拒绝邀请 - POST /rooms/invitations/{invitationId}/reject
-17. 取消邀请 - DELETE /rooms/invitations/{invitationId}
-18. 重新发送邀请 - POST /rooms/invitations/{invitationId}/resend
-19. 获取用户当前房间 - GET /rooms/current
-20. 获取房间统计信息 - GET /rooms/{roomId}/statistics
-21. 获取房间最近支出 - GET /rooms/{roomId}/expenses/recent
-22. 更新房间设置 - PUT /rooms/{roomId}/settings
-## 五、支付管理接口 (payments.js)
-1. 获取支付记录列表 - GET /payments
-2. 获取支付记录详情 - GET /payments/{id}
-3. 创建支付记录 - POST /payments
-4. 更新支付记录 - PUT /payments/{id}
-5. 删除支付记录 - DELETE /payments/{id}
-6. 确认支付 - POST /payments/{id}/confirm
-7. 取消支付 - POST /payments/{id}/cancel
-8. 获取支付统计 - GET /payments/stats
-9. 获取支付历史 - GET /payments/history
-10. 扫码支付 - POST /payments/{billId}/scan
-## 六、通知管理接口 (notifications.js)
-1. 获取通知列表 - GET /notifications
-2. 获取未读通知数量 - GET /notifications/unread-count
-3. 标记通知为已读 - PUT /notifications/{id}/read
-4. 批量标记通知为已读 - PUT /notifications/mark-all-read
-5. 删除通知 - DELETE /notifications/{id}
-6. 创建通知 - POST /notifications
-7. 获取账单到期提醒 - GET /notifications/bill-due-reminders
-8. 获取支付状态变更通知 - GET /notifications/payment-status-changes
-## 七、邀请码管理接口 (invite-codes.js)
-1. 生成新的邀请码 - POST /invite-codes
-2. 获取邀请码列表 - GET /invite-codes
-3. 获取邀请码详情 - GET /invite-codes/{id}
-4. 更新邀请码 - PUT /invite-codes/{id}
-5. 删除邀请码 - DELETE /invite-codes/{id}
-6. 验证邀请码 - POST /invite-codes/verify
-7. 使用邀请码 - POST /invite-codes/use
-8. 获取指定房间的邀请码列表 - GET /invite-codes/room/{roomId}
-9. 撤销邀请码 - DELETE /invite-codes/{id}
-## 八、二维码管理接口 (qr-codes.js)
-1. 获取收款码列表 - GET /qr-codes
-2. 创建收款码 - POST /qr-codes
-3. 更新收款码 - PUT /qr-codes/{id}
-4. 删除收款码 - DELETE /qr-codes/{id}
-5. 设置默认收款码 - PATCH /qr-codes/{id}/default
-6. 切换收款码状态 - PATCH /qr-codes/{id}/status
-7. 获取默认收款码 - GET /qr-codes/default
-8. 上传收款码图片 - POST /qr-codes/upload
-## 九、数据分析接口 (analytics.js)
-1. 获取概览数据 - GET /analytics/overview
-2. 获取支出趋势数据 - GET /analytics/expense-trend
-3. 获取用户增长数据 - GET /analytics/user-growth
-4. 获取支出分类数据 - GET /analytics/expense-category
-5. 获取房间活跃度数据 - GET /analytics/room-activity
-6. 获取用户消费数据 - GET /analytics/user-expense
-7. 获取房间详细数据 - GET /analytics/room-detail
-8. 获取最近活动 - GET /analytics/recent-activities
-9. 获取用户活跃度数据 - GET /analytics/user-activity
-10. 获取支付统计数据 - GET /analytics/payment-stats
-11. 获取争议统计数据 - GET /analytics/dispute-stats
-12. 获取评论统计数据 - GET /analytics/review-stats
-13. 导出数据报表 - GET /analytics/export
-## 十、争议管理接口 (disputes.js)
-1. 获取争议列表 - GET /disputes
-2. 获取争议详情 - GET /disputes/{id}
-3. 创建争议 - POST /disputes
-4. 更新争议 - PUT /disputes/{id}
-5. 删除争议 - DELETE /disputes/{id}
-6. 解决争议 - POST /disputes/{id}/resolve
-7. 上报争议 - POST /disputes/{id}/escalate
-8. 重新开启争议 - POST /disputes/{id}/reopen
-9. 获取争议统计数据 - GET /disputes/stats
-10. 获取房间争议 - GET /rooms/{roomId}/disputes
-11. 获取用户争议 - GET /users/{userId}/disputes
-12. 上传争议证据 - POST /disputes/upload-evidence
-13. 添加争议参与者 - POST /disputes/{id}/participants
-14. 移除争议参与者 - DELETE /disputes/{id}/participants/{userId}
-## 十一、评论管理接口 (reviews.js)
-1. 获取评论列表 - GET /reviews
-2. 获取评论详情 - GET /reviews/{id}
-3. 创建评论 - POST /reviews
-4. 更新评论 - PUT /reviews/{id}
-5. 删除评论 - DELETE /reviews/{id}
-6. 审核通过评论 - POST /reviews/{id}/approve
-7. 拒绝评论 - POST /reviews/{id}/reject
-8. 获取评论统计数据 - GET /reviews/stats
-9. 获取房间评论 - GET /rooms/{roomId}/reviews
-10. 获取用户评论 - GET /users/{userId}/reviews
-11. 上传评论图片 - POST /reviews/upload-image
-## 十二、统计数据接口 (stats.js, bill-forecast.js)
-1. 获取用户统计数据 - GET /stats/user
-2. 获取房间统计数据 - GET /stats/room
-3. 获取系统统计数据 - GET /stats/system
-4. 获取预测统计数据 - GET /stats/forecast
-5. 获取账单预测数据 - GET /stats/forecast
-6. 获取账单状态分布 - GET /stats/bill-status
-7. 获取即将到期账单 - GET /stats/upcoming-bills
-8. 获取账单趋势分析 - GET /stats/bill-trend
-## 十三、特殊支付规则接口 (bill.js)
-1. 获取费用类型 - GET /expense-types
-2. 获取特殊支付规则 - GET /special-payments/rooms/{roomId}/rules
-3. 创建特殊支付规则 - POST /special-payments/rooms/{roomId}/rules
-4. 更新特殊支付规则 - PUT /special-payments/rules/{ruleId}
-5. 删除特殊支付规则 - DELETE /special-payments/rules/{ruleId}
-6. 获取适用的特殊支付规则 - GET /special-payments/bills/{billId}/applicable-rules
-## 十四、房间支付规则接口
-1. 获取房间支付规则 - GET /rooms/{roomId}/payment-rules
-2. 创建房间支付规则 - POST /rooms/{roomId}/payment-rules
-3. 更新房间支付规则 - PUT /rooms/{roomId}/payment-rules/{ruleId}
-4. 删除房间支付规则 - DELETE /rooms/{roomId}/payment-rules/{ruleId}
-## 十五、审核面板接口
-1. 获取审核列表 - GET /reviews/pending
-2. 获取审核详情 - GET /reviews/{reviewId}
-3. 通过审核 - POST /reviews/{reviewId}/approve
-4. 拒绝审核 - POST /reviews/{reviewId}/reject
-## 十六、活动管理接口
-1. 获取活动列表 - GET /activities
-2. 获取活动详情 - GET /activities/{activityId}
-3. 创建活动 - POST /activities
-4. 更新活动 - PUT /activities/{activityId}
-5. 删除活动 - DELETE /activities/{activityId}
-## 十七、权限管理接口
-1. 获取用户权限 - GET /admin/permissions
-2. 更新用户权限 - PUT /admin/permissions/{userId}
-## 十八、其他接口
-1. 忘记密码 - POST /auth/forgot-password
-2. 重置密码 - POST /auth/reset-password
-3. 修改密码 - POST /auth/change-password
+## 1. 用户认证与账户管理相关API (userAuthApi)
+- POST /auth/login - 用户登录
+- POST /auth/logout - 用户登出
+- POST /auth/register - 用户注册
+- POST /auth/refresh-token - 刷新令牌
+- GET /auth/profile - 获取用户个人信息
+- PUT /auth/profile - 更新用户个人信息
+- POST /auth/change-password - 修改密码
+- POST /auth/reset-password - 重置密码
+- POST /auth/verify-reset-code - 验证重置密码验证码
+- GET /auth/sessions - 获取用户会话列表
+- DELETE /auth/sessions/{sessionId} - 删除指定会话
+- DELETE /auth/sessions - 删除所有会话
+- POST /auth/bind-third-party - 绑定第三方账号
+- DELETE /auth/third-party/{id} - 解绑第三方账号
+- GET /auth/third-party - 获取第三方账号列表
+
+## 2. 账单管理相关API (billApi)
+- GET /bills - 获取账单列表
+- GET /bills/{id} - 获取账单详情
+- POST /bills - 创建账单
+- PUT /bills/{id} - 更新账单
+- DELETE /bills/{id} - 删除账单
+- GET /bills/{id}/comments - 获取账单评论
+- POST /bills/{id}/comments - 添加账单评论
+- PUT /bills/comments/{commentId} - 更新账单评论
+- DELETE /bills/comments/{commentId} - 删除账单评论
+- GET /bills/{id}/splits - 获取账单分摊详情
+- POST /bills/{id}/splits - 创建账单分摊
+- PUT /bills/splits/{splitId} - 更新账单分摊
+- DELETE /bills/splits/{splitId} - 删除账单分摊
+- GET /bills/statistics - 获取账单统计数据
+- GET /bills/categories - 获取账单分类列表
+- POST /bills/categories - 创建账单分类
+- PUT /bills/categories/{id} - 更新账单分类
+- DELETE /bills/categories/{id} - 删除账单分类
+- GET /bills/settlement-status - 获取账单结算状态
+- POST /bills/{id}/settle - 结算账单
+
+## 3. 费用管理相关API (expenseApi)
+- GET /expenses - 获取费用列表
+- GET /expenses/{id} - 获取费用详情
+- POST /expenses - 创建费用
+- PUT /expenses/{id} - 更新费用
+- DELETE /expenses/{id} - 删除费用
+- GET /expenses/{id}/splits - 获取费用分摊详情
+- POST /expenses/{id}/splits - 创建费用分摊
+- PUT /expenses/splits/{splitId} - 更新费用分摊
+- DELETE /expenses/splits/{splitId} - 删除费用分摊
+- GET /expenses/{id}/receipts - 获取费用收据
+- POST /expenses/{id}/receipts - 上传费用收据
+- DELETE /expenses/receipts/{receiptId} - 删除费用收据
+- GET /expenses/approval-status - 获取费用审批状态
+- POST /expenses/{id}/submit - 提交费用审批
+- GET /expenses/statistics - 获取费用统计数据
+- GET /expenses/categories - 获取费用分类列表
+- POST /expenses/categories - 创建费用分类
+- PUT /expenses/categories/{id} - 更新费用分类
+- DELETE /expenses/categories/{id} - 删除费用分类
+- GET /expenses/limits - 获取费用限制
+- POST /expenses/limits - 创建费用限制
+- PUT /expenses/limits/{id} - 更新费用限制
+- DELETE /expenses/limits/{id} - 删除费用限制
+- GET /expenses/history - 获取历史费用数据
+- GET /expenses/reading-history - 获取历史读数数据
+- GET /expenses/dispute-status - 获取费用争议状态
+- POST /expenses/{id}/dispute - 创建费用争议
+- GET /expenses/tags - 获取费用标签
+- POST /expenses/tags - 创建费用标签
+- PUT /expenses/tags/{id} - 更新费用标签
+- DELETE /expenses/tags/{id} - 删除费用标签
+- GET /expenses/{id}/tags - 获取费用关联标签
+- POST /expenses/{id}/tags/{tagId} - 关联费用标签
+- DELETE /expenses/{id}/tags/{tagId} - 取消关联费用标签
+- GET /expenses/split-history - 获取费用分摊历史
+- GET /expenses/lines - 获取费用线路
+- POST /expenses/lines - 创建费用线路
+- PUT /expenses/lines/{lineId} - 更新费用线路
+- DELETE /expenses/lines/{lineId} - 删除费用线路
+- GET /expenses/audit - 获取费用审核记录
+- POST /expenses/{id}/audit - 提交费用审核
+- GET /abnormal-expenses - 获取异常支出列表
+- PUT /abnormal-expenses/{id}/status - 更新异常支出状态
+- GET /abnormal-expenses/stats - 获取异常支出统计
+- GET /abnormal-expenses/export - 导出异常支出报告(Excel/PDF)
+
+## 4. 请假记录相关API (leaveRecordApi)
+- GET /leave-records - 获取请假记录列表
+- GET /leave-records/{id} - 获取请假记录详情
+- POST /leave-records - 创建请假记录
+- PUT /leave-records/{id} - 更新请假记录
+- DELETE /leave-records/{id} - 删除请假记录
+- GET /leave-records/statistics - 获取请假统计数据
+- GET /leave-records/days-statistics - 获取在寝天数统计
+- POST /leave-records/batch-import - 批量导入请假记录
+- GET /leave-records/pending - 获取待审批请假记录
+- POST /leave-records/{id}/approve - 审批请假记录
+- POST /leave-records/{id}/reject - 拒绝请假记录
+
+## 5. 房间管理相关API (roomApi)
+- GET /rooms - 获取房间列表
+- GET /rooms/{id} - 获取房间详情
+- POST /rooms - 创建房间
+- PUT /rooms/{id} - 更新房间
+- DELETE /rooms/{id} - 删除房间
+- GET /rooms/{id}/members - 获取房间成员列表
+- POST /rooms/{id}/members - 添加房间成员
+- DELETE /rooms/{id}/members/{memberId} - 移除房间成员
+- PUT /rooms/{id}/leader - 设置房间长
+- GET /rooms/{id}/invitations - 获取房间邀请列表
+- POST /rooms/{id}/invitations - 创建房间邀请
+- DELETE /rooms/invitations/{invitationId} - 删除房间邀请
+- GET /rooms/{id}/expense-settings - 获取房间费用设置
+- PUT /rooms/{id}/expense-settings - 更新房间费用设置
+- GET /rooms/available - 获取可加入房间列表
+- POST /rooms/{id}/join - 申请加入房间
+- POST /rooms/{id}/leave - 离开房间
+- GET /rooms/{id}/statistics - 获取房间统计数据
+
+## 6. 支付管理相关API (paymentApi)
+- GET /payments - 获取支付记录列表
+- GET /payments/{id} - 获取支付记录详情
+- POST /payments - 创建支付记录
+- PUT /payments/{id} - 更新支付记录
+- DELETE /payments/{id} - 删除支付记录
+- GET /payments/statistics - 获取支付统计数据
+- GET /payment-transfers - 获取支付转移记录
+- GET /payment-transfers/{id} - 获取支付转移记录详情
+- POST /payment-transfers - 创建支付转移记录
+- PUT /payment-transfers/{id}/confirm - 确认支付转移记录
+- PUT /payment-transfers/{id}/cancel - 取消支付转移记录
+- GET /qr-codes - 获取二维码列表
+- GET /qr-codes/{id} - 获取二维码详情
+- POST /qr-codes - 创建二维码
+- PUT /qr-codes/{id} - 更新二维码
+- DELETE /qr-codes/{id} - 删除二维码
+- GET /qr-payment-records - 获取二维码支付记录
+- POST /qr-payment-records - 创建二维码支付记录
+- GET /user-payment-preferences - 获取用户支付偏好
+- GET /user-payment-preferences/{id} - 获取用户支付偏好详情
+- POST /user-payment-preferences - 创建用户支付偏好
+- PUT /user-payment-preferences/{id} - 更新用户支付偏好
+- DELETE /user-payment-preferences/{id} - 删除用户支付偏好
+
+## 7. 通知管理相关API (notificationApi)
+- GET /notifications - 获取通知列表
+- GET /notifications/{id} - 获取通知详情
+- POST /notifications - 创建通知
+- PUT /notifications/{id} - 更新通知
+- DELETE /notifications/{id} - 删除通知
+- PUT /notifications/{id}/read - 标记通知为已读
+- PUT /notifications/read-all - 标记所有通知为已读
+- GET /bill-payment-reminders - 获取账单支付提醒
+- GET /bill-payment-reminders/{id} - 获取账单支付提醒详情
+- POST /bill-payment-reminders - 创建账单支付提醒
+- PUT /bill-payment-reminders/{id} - 更新账单支付提醒
+- DELETE /bill-payment-reminders/{id} - 删除账单支付提醒
+- GET /notifications/unread-count - 获取未读通知数量
+- POST /notifications/settings - 设置通知偏好
+
+## 8. 邀请码管理相关API (inviteCodeApi)
+- GET /invite-codes - 获取邀请码列表
+- GET /invite-codes/{id} - 获取邀请码详情
+- POST /invite-codes - 创建邀请码
+- PUT /invite-codes/{id} - 更新邀请码
+- DELETE /invite-codes/{id} - 删除邀请码
+- POST /invite-codes/{id}/use - 使用邀请码
+- GET /invite-codes/{id}/usage - 获取邀请码使用记录
+- GET /invite-code-usage - 获取邀请码使用记录列表
+
+## 9. 二维码管理相关API (qrCodeApi)
+- GET /qr-codes - 获取二维码列表
+- GET /qr-codes/{id} - 获取二维码详情
+- POST /qr-codes - 创建二维码
+- PUT /qr-codes/{id} - 更新二维码
+- DELETE /qr-codes/{id} - 删除二维码
+- GET /qr-codes/{id}/scan-records - 获取二维码扫描记录
+- POST /qr-codes/{id}/scan - 记录二维码扫描
+- GET /qr-payment-records - 获取二维码支付记录
+- POST /qr-payment-records - 创建二维码支付记录
+
+## 10. 数据分析相关API (dataAnalysisApi)
+- GET /data-analysis/user-stats - 获取用户统计数据
+- GET /data-analysis/room-stats - 获取房间统计数据
+- GET /data-analysis/bill-stats - 获取账单统计数据
+- GET /data-analysis/expense-stats - 获取费用统计数据
+- GET /data-analysis/payment-stats - 获取支付统计数据
+- GET /data-analysis/dispute-stats - 获取争议统计数据
+- GET /data-analysis/activity-stats - 获取活动统计数据
+- GET /data-analysis/leave-stats - 获取请假统计数据
+- GET /data-analysis/export - 导出数据分析报告
+
+## 11. 争议管理相关API (disputeApi)
+- GET /disputes - 获取争议列表
+- GET /disputes/{id} - 获取争议详情
+- POST /disputes - 创建争议
+- PUT /disputes/{id} - 更新争议
+- DELETE /disputes/{id} - 删除争议
+- GET /disputes/{id}/participants - 获取争议参与者
+- POST /disputes/{id}/participants - 添加争议参与者
+- DELETE /disputes/{id}/participants/{userId} - 移除争议参与者
+- GET /disputes/{id}/evidence - 获取争议证据
+- POST /disputes/{id}/evidence - 上传争议证据
+- DELETE /disputes/evidence/{evidenceId} - 删除争议证据
+- GET /disputes/{id}/handling-logs - 获取争议处理日志
+- GET /disputes/stats - 获取争议统计数据
+- POST /disputes/{id}/resolve - 解决争议
+- GET /disputes/types - 获取争议类型
+
+## 12. 评论管理相关API (reviewApi)
+- GET /reviews - 获取评论列表
+- GET /reviews/{id} - 获取评论详情
+- POST /reviews - 创建评论
+- PUT /reviews/{id} - 更新评论
+- DELETE /reviews/{id} - 删除评论
+- GET /reviews/{id}/images - 获取评论图片
+- POST /reviews/{id}/images - 上传评论图片
+- DELETE /reviews/images/{imageId} - 删除评论图片
+- GET /reviews/statistics - 获取评论统计数据
+- POST /reviews/{id}/like - 点赞评论
+- DELETE /reviews/{id}/like - 取消点赞评论
+- GET /reviews/{id}/replies - 获取评论回复
+- POST /reviews/{id}/replies - 回复评论
+- PUT /reviews/replies/{replyId} - 更新评论回复
+- DELETE /reviews/replies/{replyId} - 删除评论回复
+
+## 13. 统计数据相关API (statisticsApi)
+- GET /statistics/user - 获取用户统计数据
+- GET /statistics/room - 获取房间统计数据
+- GET /statistics/bill - 获取账单统计数据
+- GET /statistics/expense - 获取费用统计数据
+- GET /statistics/payment - 获取支付统计数据
+- GET /statistics/dispute - 获取争议统计数据
+- GET /statistics/activity - 获取活动统计数据
+- GET /statistics/leave - 获取请假统计数据
+- GET /statistics/summary - 获取统计汇总数据
+- GET /statistics/export - 导出统计数据
+
+## 14. 特殊支付规则相关API (specialPaymentRuleApi)
+- GET /expense-types - 获取费用类型列表
+- GET /expense-types/{id} - 获取费用类型详情
+- POST /expense-types - 创建费用类型
+- PUT /expense-types/{id} - 更新费用类型
+- DELETE /expense-types/{id} - 删除费用类型
+- GET /special-payment-rules - 获取特殊支付规则列表
+- GET /special-payment-rules/{id} - 获取特殊支付规则详情
+- POST /special-payment-rules - 创建特殊支付规则
+- PUT /special-payment-rules/{id} - 更新特殊支付规则
+- DELETE /special-payment-rules/{id} - 删除特殊支付规则
+- GET /room-payment-rules - 获取房间支付规则列表
+- GET /room-payment-rules/{id} - 获取房间支付规则详情
+- POST /room-payment-rules - 创建房间支付规则
+- PUT /room-payment-rules/{id} - 更新房间支付规则
+- DELETE /room-payment-rules/{id} - 删除房间支付规则
+
+## 15. 房间支付规则相关API (roomPaymentRuleApi)
+- GET /room-payment-rules - 获取房间支付规则列表
+- GET /room-payment-rules/{id} - 获取房间支付规则详情
+- POST /room-payment-rules - 创建房间支付规则
+- PUT /room-payment-rules/{id} - 更新房间支付规则
+- DELETE /room-payment-rules/{id} - 删除房间支付规则
+- GET /room-payment-rules/room/{roomId} - 获取房间支付规则
+- POST /room-payment-rules/room/{roomId} - 设置房间支付规则
+- PUT /room-payment-rules/{id}/activate - 激活房间支付规则
+- PUT /room-payment-rules/{id}/deactivate - 停用房间支付规则
+
+## 16. 审核面板相关API (moderationPanelApi)
+- GET /moderation/queue - 获取审核队列
+- GET /moderation/queue/{id} - 获取审核项详情
+- POST /moderation/approve - 审核通过
+- POST /moderation/reject - 审核拒绝
+- GET /moderation/history - 获取审核历史
+- GET /moderation/statistics - 获取审核统计数据
+- POST /moderation/batch-approve - 批量审核通过
+- POST /moderation/batch-reject - 批量审核拒绝
+
+## 17. 活动管理相关API (activityApi)
+- GET /activities - 获取活动列表
+- GET /activities/{id} - 获取活动详情
+- POST /activities - 创建活动
+- PUT /activities/{id} - 更新活动
+- DELETE /activities/{id} - 删除活动
+- GET /activities/{id}/participants - 获取活动参与者
+- POST /activities/{id}/participants - 添加活动参与者
+- DELETE /activities/{id}/participants/{userId} - 移除活动参与者
+- GET /activities/statistics - 获取活动统计数据
+- POST /activities/{id}/join - 参加活动
+- DELETE /activities/{id}/leave - 退出活动
+- GET /activities/types - 获取活动类型
+- GET /activities/upcoming - 获取即将开始的活动
+- GET /activities/past - 获取已结束的活动
+
+## 18. 权限管理相关API (permissionApi)
+- GET /permissions - 获取权限列表
+- GET /permissions/{id} - 获取权限详情
+- GET /user/permissions - 获取用户权限
+- GET /roles - 获取角色列表
+- GET /roles/{id} - 获取角色详情
+- GET /user/roles - 获取用户角色
+- POST /roles - 创建角色
+- PUT /roles/{id} - 更新角色
+- DELETE /roles/{id} - 删除角色
+
+## 19. 其他接口 (otherApi)
+- GET /system/info - 获取系统信息
+- GET /system/version - 获取系统版本
+- GET /system/health - 获取系统健康状态
+- POST /feedback - 提交反馈
+- GET /help - 获取帮助信息
+- GET /faq - 获取常见问题
+- POST /report-bug - 提交错误报告
+- GET /announcements - 获取公告列表
+- GET /announcements/{id} - 获取公告详情
+- GET /search - 搜索功能
+- GET /export/data - 导出数据
+- POST /import/data - 导入数据
+- GET /logs - 获取日志
+- GET /settings - 获取设置
+- PUT /settings - 更新设置
+- GET /notifications/settings - 获取通知设置
+- PUT /notifications/settings - 更新通知设置
+- GET /privacy - 获取隐私政策
+- GET /terms - 获取服务条款
+- POST /contact - 联系我们
+- GET /about - 关于我们
+- GET /download/app - 下载应用
+- GET /changelog - 更新日志
+- GET /status - 系统状态
+- GET /maintenance - 维护通知
+- POST /suggestions - 提交建议
+- GET /tutorial - 教程
+- GET /guide - 使用指南

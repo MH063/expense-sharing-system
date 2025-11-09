@@ -6250,6 +6250,455 @@
 
 ---
 
+## 15. 请假记录管理相关接口 (leaveRecordApi)
+
+### 15.1 获取请假记录列表
+- **接口地址**: `/admin/leave-records`
+- **请求方法**: `GET`
+- **接口描述**: 获取请假记录列表，支持分页和筛选
+- **请求参数**:
+  ```json
+  {
+    "page": "number", // 页码，默认为1
+    "limit": "number", // 每页条数，默认为10，最大100
+    "user_id": "number", // 用户ID，可选
+    "status": "string", // 状态，可选
+    "type": "string", // 请假类型，可选
+    "start_date": "string", // 开始日期，可选，格式YYYY-MM-DD
+    "end_date": "string" // 结束日期，可选，格式YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "list": [
+        {
+          "id": "number",
+          "user_id": "number",
+          "user_name": "string",
+          "type": "string",
+          "start_time": "string",
+          "end_time": "string",
+          "duration": "number",
+          "reason": "string",
+          "status": "string",
+          "reviewer_id": "number",
+          "reviewer_name": "string",
+          "review_comment": "string",
+          "created_at": "string",
+          "updated_at": "string"
+        }
+      ],
+      "pagination": {
+        "page": "number",
+        "limit": "number",
+        "total": "number",
+        "pages": "number"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.view
+- **说明**: 支持按用户、状态、类型和日期范围筛选
+
+### 15.2 获取请假记录详情
+- **接口地址**: `/admin/leave-records/{id}`
+- **请求方法**: `GET`
+- **接口描述**: 获取指定请假记录的详细信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 请假记录ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "record": {
+        "id": "number",
+        "user_id": "number",
+        "user_name": "string",
+        "user_avatar": "string",
+        "type": "string",
+        "start_time": "string",
+        "end_time": "string",
+        "duration": "number",
+        "reason": "string",
+        "attachments": [
+          {
+            "id": "number",
+            "name": "string",
+            "url": "string",
+            "size": "number"
+          }
+        ],
+        "status": "string",
+        "reviewer_id": "number",
+        "reviewer_name": "string",
+        "review_comment": "string",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 请假记录不存在
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.view
+- **说明**: 包含附件信息
+
+### 15.3 创建请假记录
+- **接口地址**: `/admin/leave-records`
+- **请求方法**: `POST`
+- **接口描述**: 创建新的请假记录
+- **请求参数**:
+  ```json
+  {
+    "user_id": "number", // 用户ID
+    "type": "string", // 请假类型
+    "start_time": "string", // 开始时间，格式YYYY-MM-DD HH:mm:ss
+    "end_time": "string", // 结束时间，格式YYYY-MM-DD HH:mm:ss
+    "reason": "string", // 请假原因
+    "attachments": [
+      {
+        "name": "string", // 文件名
+        "url": "string" // 文件URL
+      }
+    ] // 附件列表，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "record": {
+        "id": "number",
+        "user_id": "number",
+        "user_name": "string",
+        "type": "string",
+        "start_time": "string",
+        "end_time": "string",
+        "duration": "number",
+        "reason": "string",
+        "status": "string", // 默认为pending
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.create
+- **说明**: 创建后状态默认为待审批
+
+### 15.4 更新请假记录
+- **接口地址**: `/admin/leave-records/{id}`
+- **请求方法**: `PUT`
+- **接口描述**: 更新请假记录信息
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 请假记录ID（路径参数）
+    "type": "string", // 请假类型，可选
+    "start_time": "string", // 开始时间，格式YYYY-MM-DD HH:mm:ss，可选
+    "end_time": "string", // 结束时间，格式YYYY-MM-DD HH:mm:ss，可选
+    "reason": "string", // 请假原因，可选
+    "attachments": [
+      {
+        "name": "string", // 文件名
+        "url": "string" // 文件URL
+      }
+    ] // 附件列表，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "record": {
+        "id": "number",
+        "user_id": "number",
+        "user_name": "string",
+        "type": "string",
+        "start_time": "string",
+        "end_time": "string",
+        "duration": "number",
+        "reason": "string",
+        "status": "string",
+        "reviewer_id": "number",
+        "reviewer_name": "string",
+        "review_comment": "string",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 请假记录不存在
+  - 409: 状态冲突（已审批的记录不能修改）
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.update
+- **说明**: 只能更新状态为pending的记录
+
+### 15.5 删除请假记录
+- **接口地址**: `/admin/leave-records/{id}`
+- **请求方法**: `DELETE`
+- **接口描述**: 删除请假记录
+- **请求参数**:
+  ```json
+  {
+    "id": "number" // 请假记录ID（路径参数）
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "删除成功"
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 请假记录不存在
+  - 409: 状态冲突（已审批的记录不能删除）
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.delete
+- **说明**: 只能删除状态为pending的记录
+
+### 15.6 审批请假记录
+- **接口地址**: `/admin/leave-records/{id}/review`
+- **请求方法**: `POST`
+- **接口描述**: 审批请假记录
+- **请求参数**:
+  ```json
+  {
+    "id": "number", // 请假记录ID（路径参数）
+    "status": "string", // 审批结果，approved或rejected
+    "comment": "string" // 审批意见，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "record": {
+        "id": "number",
+        "user_id": "number",
+        "user_name": "string",
+        "type": "string",
+        "start_time": "string",
+        "end_time": "string",
+        "duration": "number",
+        "reason": "string",
+        "status": "string", // updated status
+        "reviewer_id": "number",
+        "reviewer_name": "string",
+        "review_comment": "string",
+        "created_at": "string",
+        "updated_at": "string"
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 404: 请假记录不存在
+  - 409: 状态冲突（只能审批状态为pending的记录）
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.review
+- **说明**: 审批后状态不可更改
+
+### 15.7 批量审批请假记录
+- **接口地址**: `/admin/leave-records/batch-review`
+- **请求方法**: `POST`
+- **接口描述**: 批量审批请假记录
+- **请求参数**:
+  ```json
+  {
+    "ids": ["number"], // 请假记录ID数组
+    "status": "string", // 审批结果，approved或rejected
+    "comment": "string" // 审批意见，可选
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "result": {
+        "success_count": "number", // 成功审批数量
+        "failures": [
+          {
+            "id": "number", // 失败的记录ID
+            "reason": "string" // 失败原因
+          }
+        ]
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.review
+- **说明**: 只能审批状态为pending的记录
+
+### 15.8 导出请假记录
+- **接口地址**: `/admin/leave-records/export`
+- **请求方法**: `GET`
+- **接口描述**: 导出符合条件的请假记录
+- **请求参数**:
+  ```json
+  {
+    "user_id": "number", // 用户ID，可选
+    "status": "string", // 状态，可选
+    "type": "string", // 请假类型，可选
+    "start_date": "string", // 开始日期，可选，格式YYYY-MM-DD
+    "end_date": "string", // 结束日期，可选，格式YYYY-MM-DD
+    "format": "string" // 导出格式，xlsx或csv，默认xlsx
+  }
+  ```
+- **返回结果**: 文件流
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.export
+- **说明**: 返回Excel或CSV文件
+
+### 15.9 获取请假统计
+- **接口地址**: `/admin/leave-records/stats`
+- **请求方法**: `GET`
+- **接口描述**: 获取请假统计信息
+- **请求参数**:
+  ```json
+  {
+    "user_id": "number", // 用户ID，可选
+    "type": "string", // 请假类型，可选
+    "start_date": "string", // 开始日期，可选，格式YYYY-MM-DD
+    "end_date": "string" // 结束日期，可选，格式YYYY-MM-DD
+  }
+  ```
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "stats": {
+        "total_count": "number", // 总记录数
+        "approved_count": "number", // 已批准数量
+        "rejected_count": "number", // 已拒绝数量
+        "pending_count": "number", // 待审批数量
+        "total_duration": "number", // 总时长（小时）
+        "by_type": [
+          {
+            "type": "string", // 请假类型
+            "count": "number", // 数量
+            "duration": "number" // 时长
+          }
+        ],
+        "by_status": [
+          {
+            "status": "string", // 状态
+            "count": "number" // 数量
+          }
+        ]
+      }
+    }
+  }
+  ```
+- **错误处理**:
+  - 400: 请求参数错误
+  - 401: 未授权访问
+  - 403: 权限不足
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.view
+- **说明**: 提供多维度统计信息
+
+### 15.10 获取请假类型列表
+- **接口地址**: `/admin/leave-records/types`
+- **请求方法**: `GET`
+- **接口描述**: 获取可用的请假类型列表
+- **请求参数**: 无
+- **返回结果**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "types": [
+        {
+          "key": "string", // 类型键值
+          "label": "string", // 类型名称
+          "description": "string" // 描述
+        }
+      ]
+    }
+  }
+  ```
+- **错误处理**:
+  - 401: 未授权访问
+  - 500: 服务器内部错误
+- **权限要求**: admin.leave_record.view
+- **说明**: 用于前端下拉选择
+
+---
+
+### 附录A：状态说明
+
+| 状态值 | 说明 |
+|--------|------|
+| pending | 待审批 |
+| approved | 已批准 |
+| rejected | 已拒绝 |
+
+### 附录B：请假类型说明
+
+| 类型键值 | 类型名称 | 说明 |
+|----------|----------|------|
+| annual | 年假 | 年度带薪休假 |
+| sick | 病假 | 因病请假 |
+| personal | 事假 | 私人事务请假 |
+| maternity | 产假 | 生育相关假期 |
+| paternity | 陪产假 | 陪伴配偶生育假期 |
+| marriage | 婚假 | 结婚假期 |
+| bereavement | 丧假 | 直系亲属去世假期 |
+| other | 其他 | 其他类型的假期 |
+
+---
+
 ## 附录：接口使用示例和最佳实践
 
 ### 1. 开发环境配置

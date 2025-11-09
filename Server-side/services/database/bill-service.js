@@ -5,7 +5,7 @@
 
 const BaseService = require('./base-service');
 const { v4: uuidv4 } = require('uuid');
-const cacheService = require('../cache-service');
+const enhancedCacheService = require('../enhanced-cache-service');
 
 class BillService extends BaseService {
   constructor() {
@@ -13,22 +13,48 @@ class BillService extends BaseService {
   }
 
   /**
-   * 创建新账单
+   * 创建账单
    * @param {Object} billData - 账单数据
    * @returns {Promise<Object>} 创建的账单
    */
   async createBill(billData) {
     const id = uuidv4();
-    const { roomId, title, description, totalAmount, creatorId, dueDate } = billData;
-    
+    const { 
+      room_id, 
+      title, 
+      description, 
+      amount, 
+      due_date, 
+      created_by, 
+      is_recurring, 
+      recurring_type, 
+      recurring_end_date 
+    } = billData;
+
     const sql = `
-      INSERT INTO bills (id, room_id, title, description, total_amount, status, creator_id, due_date, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO bills (
+        id, room_id, title, description, amount, 
+        due_date, created_by, is_recurring, 
+        recurring_type, recurring_end_date, status, created_at, updated_at
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', 
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
       RETURNING *
     `;
     
-    const values = [id, roomId, title, description, totalAmount, 'PENDING', creatorId, dueDate];
+    const values = [
+      id, room_id, title, description, amount, 
+      due_date, created_by, is_recurring, 
+      recurring_type, recurring_end_date
+    ];
+    
     const result = await this.query(sql, values);
+    
+    // 清除相关缓存
+    await this.clearBillCache(room_id, null);
+    
     return result.rows[0];
   }
 
@@ -36,86 +62,114 @@ class BillService extends BaseService {
    * 获取房间账单列表
    * @param {string} roomId - 房间ID
    * @param {Object} options - 查询选项
-   * @returns {Promise<Array>} 账单列表
+   * @returns {Promise<Object>} 账单列表和分页信息
    */
   async getRoomBills(roomId, options = {}) {
-    // 创建缓存键，包含房间ID和查询选项的哈希
-    const optionsHash = require('crypto')
-      .createHash('md5')
-      .update(JSON.stringify(options))
-      .digest('hex');
+    const { 
+      page = 1, 
+      limit = 20, 
+      status, 
+      search, 
+      sort_by = 'created_at', 
+      sort_order = 'DESC' 
+    } = options;
+    
+    // 创建选项哈希，用于生成缓存键
+    const optionsHash = this.hashOptions(options);
     const cacheKey = `room:bills:${roomId}:${optionsHash}`;
     
-    // 使用getOrSet方法实现缓存穿透保护
-    return await cacheService.getOrSet(cacheKey, async () => {
-      let sql = `
-        SELECT b.*, u.username as creator_name, u.name as creator_display_name
-        FROM bills b
-        LEFT JOIN users u ON b.creator_id = u.id
-        WHERE b.room_id = $1
-      `;
-      const params = [roomId];
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      const offset = (page - 1) * limit;
+      
+      // 构建查询条件
+      let whereClause = 'WHERE b.room_id = $1';
+      const queryParams = [roomId];
       let paramIndex = 2;
-
-      // 添加状态过滤
-      if (options.status) {
-        sql += ` AND b.status = $${paramIndex}`;
-        params.push(options.status);
+      
+      if (status) {
+        whereClause += ` AND b.status = $${paramIndex}`;
+        queryParams.push(status);
         paramIndex++;
       }
-
-      // 添加日期范围过滤
-      if (options.startDate) {
-        sql += ` AND b.created_at >= $${paramIndex}`;
-        params.push(options.startDate);
+      
+      if (search) {
+        whereClause += ` AND (b.title ILIKE $${paramIndex} OR b.description ILIKE $${paramIndex})`;
+        queryParams.push(`%${search}%`);
         paramIndex++;
       }
-
-      if (options.endDate) {
-        sql += ` AND b.created_at <= $${paramIndex}`;
-        params.push(options.endDate);
-        paramIndex++;
-      }
-
-      // 排序
-      sql += ` ORDER BY b.created_at DESC`;
-
-      // 分页
-      if (options.limit) {
-        sql += ` LIMIT $${paramIndex}`;
-        params.push(options.limit);
-        paramIndex++;
-
-        if (options.offset) {
-          sql += ` OFFSET $${paramIndex}`;
-          params.push(options.offset);
+      
+      // 构建排序条件
+      const validSortFields = ['created_at', 'due_date', 'amount', 'title'];
+      const sortField = validSortFields.includes(sort_by) ? sort_by : 'created_at';
+      const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      
+      // 查询账单列表
+      const billsQuery = `
+        SELECT 
+          b.*,
+          u.username as creator_name,
+          u.avatar as creator_avatar,
+          COALESCE(SUM(p.amount), 0) as paid_amount,
+          (b.amount - COALESCE(SUM(p.amount), 0)) as remaining_amount
+        FROM bills b
+        LEFT JOIN users u ON b.created_by = u.id
+        LEFT JOIN payments p ON b.id = p.bill_id AND p.status = 'completed'
+        ${whereClause}
+        GROUP BY b.id, u.username, u.avatar
+        ORDER BY b.${sortField} ${sortDirection}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      
+      queryParams.push(limit, offset);
+      
+      const billsResult = await this.query(billsQuery, queryParams);
+      
+      // 查询总数
+      const countQuery = `
+        SELECT COUNT(DISTINCT b.id) as total
+        FROM bills b
+        ${whereClause}
+      `;
+      
+      const countResult = await this.query(countQuery, queryParams.slice(0, -2));
+      const total = parseInt(countResult.rows[0].total);
+      
+      return {
+        bills: billsResult.rows,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
         }
-      }
-
-      const result = await this.query(sql, params);
-      return result.rows;
-    }, 1800); // 缓存30分钟
+      };
+    }, enhancedCacheService.getDefaultTTL('bill'), ['bill', 'room']); // 使用账单类型的默认TTL并添加多个标签
   }
 
   /**
-   * 获取账单详情，包括支付信息
+   * 获取账单详情（包含支付记录）
    * @param {string} billId - 账单ID
-   * @returns {Promise<Object|null>} 账单详情
+   * @returns {Promise<Object>} 账单详情
    */
   async getBillWithPayments(billId) {
     // 使用缓存键模式：bill:detail:{billId}
     const cacheKey = `bill:detail:${billId}`;
     
-    // 使用getOrSet方法实现缓存穿透保护
-    return await cacheService.getOrSet(cacheKey, async () => {
-      // 获取账单基本信息
-      const billSql = `
-        SELECT b.*, u.username as creator_name, u.name as creator_display_name
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      // 查询账单基本信息
+      const billQuery = `
+        SELECT 
+          b.*,
+          u.username as creator_name,
+          u.avatar as creator_avatar
         FROM bills b
-        LEFT JOIN users u ON b.creator_id = u.id
+        LEFT JOIN users u ON b.created_by = u.id
         WHERE b.id = $1
       `;
-      const billResult = await this.query(billSql, [billId]);
+      
+      const billResult = await this.query(billQuery, [billId]);
       
       if (billResult.rows.length === 0) {
         return null;
@@ -123,37 +177,34 @@ class BillService extends BaseService {
       
       const bill = billResult.rows[0];
       
-      // 获取账单的支付记录
-      const paymentsSql = `
-        SELECT p.*, u.username, u.name as display_name
+      // 查询支付记录
+      const paymentsQuery = `
+        SELECT 
+          p.*,
+          u.username as payer_name,
+          u.avatar as payer_avatar
         FROM payments p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.bill_id = $1
         ORDER BY p.created_at DESC
       `;
-      const paymentsResult = await this.query(paymentsSql, [billId]);
       
-      bill.payments = paymentsResult.rows;
+      const paymentsResult = await this.query(paymentsQuery, [billId]);
       
-      // 计算已支付金额
-      const totalPaid = paymentsResult.rows
+      // 添加统计信息
+      const paidAmount = paymentsResult.rows
         .filter(p => p.status === 'completed')
         .reduce((sum, p) => sum + parseFloat(p.amount), 0);
       
-      bill.total_paid = totalPaid;
-      bill.remaining_amount = parseFloat(bill.total_amount) - totalPaid;
-      
-      // 根据支付情况更新账单状态
-      if (totalPaid >= parseFloat(bill.total_amount)) {
-        bill.payment_status = 'PAID';
-      } else if (totalPaid > 0) {
-        bill.payment_status = 'PARTIAL';
-      } else {
-        bill.payment_status = 'PENDING';
-      }
-      
-      return bill;
-    }, 1800); // 缓存30分钟
+      return {
+        ...bill,
+        payments: paymentsResult.rows,
+        paid_amount: paidAmount,
+        remaining_amount: parseFloat(bill.amount) - paidAmount,
+        payment_count: paymentsResult.rows.length,
+        completed_payment_count: paymentsResult.rows.filter(p => p.status === 'completed').length
+      };
+    }, enhancedCacheService.getDefaultTTL('bill'), ['bill']); // 使用账单类型的默认TTL并添加标签
   }
 
   /**
@@ -165,19 +216,23 @@ class BillService extends BaseService {
   async updateBillStatus(billId, status) {
     const sql = `
       UPDATE bills 
-      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      SET status = $1, updated_at = CURRENT_TIMESTAMP 
       WHERE id = $2
       RETURNING *
     `;
+    
     const result = await this.query(sql, [status, billId]);
     
-    if (result.rows.length > 0) {
-      // 清除相关缓存
-      await this.clearBillCache(billId);
-      return result.rows[0];
+    if (result.rows.length === 0) {
+      return null;
     }
     
-    return null;
+    const bill = result.rows[0];
+    
+    // 清除相关缓存
+    await this.clearBillCache(bill.room_id, billId);
+    
+    return bill;
   }
 
   /**
@@ -187,7 +242,10 @@ class BillService extends BaseService {
    * @returns {Promise<Object|null>} 更新后的账单
    */
   async updateBill(billId, updateData) {
-    const allowedFields = ['title', 'description', 'total_amount', 'due_date', 'status'];
+    const allowedFields = [
+      'title', 'description', 'amount', 'due_date', 
+      'is_recurring', 'recurring_type', 'recurring_end_date'
+    ];
     const updates = [];
     const values = [];
     let paramIndex = 1;
@@ -216,13 +274,16 @@ class BillService extends BaseService {
 
     const result = await this.query(sql, values);
     
-    if (result.rows.length > 0) {
-      // 清除相关缓存
-      await this.clearBillCache(billId, result.rows[0].room_id);
-      return result.rows[0];
+    if (result.rows.length === 0) {
+      return null;
     }
     
-    return null;
+    const bill = result.rows[0];
+    
+    // 清除相关缓存
+    await this.clearBillCache(bill.room_id, billId);
+    
+    return bill;
   }
 
   /**
@@ -232,21 +293,22 @@ class BillService extends BaseService {
    */
   async deleteBill(billId) {
     // 先获取账单信息以便清除缓存
-    const billSql = `SELECT room_id FROM bills WHERE id = $1`;
-    const billResult = await this.query(billSql, [billId]);
-    const roomId = billResult.rows.length > 0 ? billResult.rows[0].room_id : null;
+    const billQuery = `SELECT room_id FROM bills WHERE id = $1`;
+    const billResult = await this.query(billQuery, [billId]);
     
-    // 先删除相关的支付记录
-    const deletePaymentsSql = `DELETE FROM payments WHERE bill_id = $1`;
-    await this.query(deletePaymentsSql, [billId]);
+    if (billResult.rows.length === 0) {
+      return false;
+    }
     
-    // 删除账单
+    const roomId = billResult.rows[0].room_id;
+    
+    // 删除账单（级联删除相关的支付记录）
     const sql = `DELETE FROM bills WHERE id = $1`;
     const result = await this.query(sql, [billId]);
     
     if (result.rowCount > 0) {
       // 清除相关缓存
-      await this.clearBillCache(billId, roomId);
+      await this.clearBillCache(roomId, billId);
       return true;
     }
     
@@ -254,80 +316,92 @@ class BillService extends BaseService {
   }
 
   /**
-   * 清除账单相关的缓存
-   * @param {string} billId - 账单ID
-   * @param {string} roomId - 房间ID（可选）
-   * @returns {Promise<void>}
-   */
-  async clearBillCache(billId, roomId) {
-    // 清除账单详情缓存
-    await cacheService.del(`bill:detail:${billId}`);
-    
-    // 如果提供了房间ID，清除该房间的所有账单列表缓存
-    if (roomId) {
-      await cacheService.delPattern(`room:bills:${roomId}:*`);
-    } else {
-      // 如果没有提供房间ID，清除所有账单列表缓存
-      await cacheService.delPattern('room:bills:*');
-    }
-  }
-
-  /**
-   * 获取用户参与的账单
+   * 获取用户账单列表
    * @param {string} userId - 用户ID
    * @param {Object} options - 查询选项
-   * @returns {Promise<Array>} 账单列表
+   * @returns {Promise<Object>} 用户账单列表和分页信息
    */
   async getUserBills(userId, options = {}) {
-    let sql = `
-      SELECT DISTINCT b.*, u.username as creator_name, u.name as creator_display_name
+    const { 
+      page = 1, 
+      limit = 20, 
+      status, 
+      role = 'all', // 'all', 'creator', 'payer'
+      sort_by = 'created_at', 
+      sort_order = 'DESC' 
+    } = options;
+    
+    const offset = (page - 1) * limit;
+    
+    // 构建查询条件
+    let whereClause = 'WHERE rm.user_id = $1';
+    const queryParams = [userId];
+    let paramIndex = 2;
+    
+    if (status) {
+      whereClause += ` AND b.status = $${paramIndex}`;
+      queryParams.push(status);
+      paramIndex++;
+    }
+    
+    // 根据角色筛选
+    if (role === 'creator') {
+      whereClause += ` AND b.created_by = $1`;
+    } else if (role === 'payer') {
+      whereClause += ` AND p.user_id = $1`;
+    }
+    
+    // 构建排序条件
+    const validSortFields = ['created_at', 'due_date', 'amount', 'title'];
+    const sortField = validSortFields.includes(sort_by) ? sort_by : 'created_at';
+    const sortDirection = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
+    // 查询账单列表
+    const billsQuery = `
+      SELECT DISTINCT
+        b.*,
+        u.username as creator_name,
+        u.avatar as creator_avatar,
+        CASE 
+          WHEN b.created_by = $1 THEN true
+          ELSE false
+        END as is_creator,
+        COALESCE(SUM(p.amount), 0) as paid_amount,
+        (b.amount - COALESCE(SUM(p.amount), 0)) as remaining_amount
       FROM bills b
-      LEFT JOIN users u ON b.creator_id = u.id
-      LEFT JOIN payments p ON b.id = p.bill_id
-      LEFT JOIN room_members rm ON b.room_id = rm.room_id
-      WHERE (b.creator_id = $1 OR p.user_id = $1 OR rm.user_id = $1)
-      AND rm.is_active = $2
+      JOIN room_members rm ON b.room_id = rm.room_id
+      LEFT JOIN users u ON b.created_by = u.id
+      LEFT JOIN payments p ON b.id = p.bill_id AND p.status = 'completed'
+      ${whereClause}
+      GROUP BY b.id, u.username, u.avatar
+      ORDER BY b.${sortField} ${sortDirection}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
-    const params = [userId, true];
-    let paramIndex = 3;
-
-    // 添加状态过滤
-    if (options.status) {
-      sql += ` AND b.status = $${paramIndex}`;
-      params.push(options.status);
-      paramIndex++;
-    }
-
-    // 添加日期范围过滤
-    if (options.startDate) {
-      sql += ` AND b.created_at >= $${paramIndex}`;
-      params.push(options.startDate);
-      paramIndex++;
-    }
-
-    if (options.endDate) {
-      sql += ` AND b.created_at <= $${paramIndex}`;
-      params.push(options.endDate);
-      paramIndex++;
-    }
-
-    // 排序
-    sql += ` ORDER BY b.created_at DESC`;
-
-    // 分页
-    if (options.limit) {
-      sql += ` LIMIT $${paramIndex}`;
-      params.push(options.limit);
-      paramIndex++;
-
-      if (options.offset) {
-        sql += ` OFFSET $${paramIndex}`;
-        params.push(options.offset);
+    
+    queryParams.push(limit, offset);
+    
+    const billsResult = await this.query(billsQuery, queryParams);
+    
+    // 查询总数
+    const countQuery = `
+      SELECT COUNT(DISTINCT b.id) as total
+      FROM bills b
+      JOIN room_members rm ON b.room_id = rm.room_id
+      ${whereClause}
+    `;
+    
+    const countResult = await this.query(countQuery, queryParams.slice(0, -2));
+    const total = parseInt(countResult.rows[0].total);
+    
+    return {
+      bills: billsResult.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
       }
-    }
-
-    const result = await this.query(sql, params);
-    return result.rows;
+    };
   }
 
   /**
@@ -337,32 +411,189 @@ class BillService extends BaseService {
    * @returns {Promise<Object>} 统计信息
    */
   async getBillStats(roomId, options = {}) {
-    let sql = `
-      SELECT 
-        COUNT(*) as total_bills,
-        COALESCE(SUM(total_amount), 0) as total_amount,
-        COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending_bills,
-        COUNT(CASE WHEN status = 'PARTIAL' THEN 1 END) as partial_bills,
-        COUNT(CASE WHEN status = 'PAID' THEN 1 END) as paid_bills,
-        COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END) as cancelled_bills
-      FROM bills
-      WHERE room_id = $1
-    `;
-    const params = [roomId];
+    const { period = 'all' } = options;
+    
+    // 创建选项哈希，用于生成缓存键
+    const optionsHash = this.hashOptions(options);
+    const cacheKey = `room:stats:${roomId}:${optionsHash}`;
+    
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      let dateFilter = '';
+      const queryParams = [roomId];
+      
+      if (period === 'month') {
+        dateFilter = 'AND b.created_at >= date_trunc(\'month\', CURRENT_DATE)';
+      } else if (period === 'quarter') {
+        dateFilter = 'AND b.created_at >= date_trunc(\'quarter\', CURRENT_DATE)';
+      } else if (period === 'year') {
+        dateFilter = 'AND b.created_at >= date_trunc(\'year\', CURRENT_DATE)';
+      }
+      
+      // 查询账单统计
+      const statsQuery = `
+        SELECT 
+          COUNT(*) as total_bills,
+          COALESCE(SUM(b.amount), 0) as total_amount,
+          COALESCE(SUM(CASE WHEN b.status = 'paid' THEN b.amount ELSE 0 END), 0) as paid_amount,
+          COALESCE(SUM(CASE WHEN b.status = 'pending' THEN b.amount ELSE 0 END), 0) as pending_amount,
+          COALESCE(SUM(CASE WHEN b.status = 'overdue' THEN b.amount ELSE 0 END), 0) as overdue_amount,
+          COALESCE(AVG(b.amount), 0) as average_amount
+        FROM bills b
+        WHERE b.room_id = $1 ${dateFilter}
+      `;
+      
+      const statsResult = await this.query(statsQuery, queryParams);
+      const stats = statsResult.rows[0];
+      
+      // 查询支付统计
+      const paymentStatsQuery = `
+        SELECT 
+          COUNT(*) as total_payments,
+          COALESCE(SUM(p.amount), 0) as total_paid,
+          COUNT(DISTINCT p.user_id) as unique_payers
+        FROM payments p
+        JOIN bills b ON p.bill_id = b.id
+        WHERE b.room_id = $1 AND p.status = 'completed' ${dateFilter}
+      `;
+      
+      const paymentStatsResult = await this.query(paymentStatsQuery, queryParams);
+      const paymentStats = paymentStatsResult.rows[0];
+      
+      // 按状态分组统计
+      const statusQuery = `
+        SELECT 
+          b.status,
+          COUNT(*) as count,
+          COALESCE(SUM(b.amount), 0) as amount
+        FROM bills b
+        WHERE b.room_id = $1 ${dateFilter}
+        GROUP BY b.status
+      `;
+      
+      const statusResult = await this.query(statusQuery, queryParams);
+      const byStatus = statusResult.rows.reduce((acc, row) => {
+        acc[row.status] = {
+          count: parseInt(row.count),
+          amount: parseFloat(row.amount)
+        };
+        return acc;
+      }, {});
+      
+      return {
+        total: {
+          bills: parseInt(stats.total_bills),
+          amount: parseFloat(stats.total_amount),
+          paid: parseFloat(stats.paid_amount),
+          pending: parseFloat(stats.pending_amount),
+          overdue: parseFloat(stats.overdue_amount),
+          average: parseFloat(stats.average_amount)
+        },
+        payments: {
+          count: parseInt(paymentStats.total_payments),
+          amount: parseFloat(paymentStats.total_paid),
+          uniquePayers: parseInt(paymentStats.unique_payers)
+        },
+        byStatus
+      };
+    }, enhancedCacheService.getDefaultTTL('stats'), ['stats', 'bill', 'room']); // 使用统计类型的默认TTL并添加多个标签
+  }
 
-    // 添加日期范围过滤
-    if (options.startDate) {
-      sql += ` AND created_at >= $2`;
-      params.push(options.startDate);
+  /**
+   * 批量获取账单信息
+   * @param {Array<string>} billIds - 账单ID数组
+   * @returns {Promise<Map<string, Object>>} 账单ID到账单信息的映射
+   */
+  async getBillsBatch(billIds) {
+    if (!billIds || billIds.length === 0) {
+      return new Map();
     }
-
-    if (options.endDate) {
-      sql += ` AND created_at <= $3`;
-      params.push(options.endDate);
+    
+    // 生成缓存键数组
+    const cacheKeys = billIds.map(id => `bill:id:${id}`);
+    
+    // 尝试从批量缓存获取
+    const cachedResults = await enhancedCacheService.mget(cacheKeys);
+    const results = new Map();
+    const uncachedIds = [];
+    
+    // 分离已缓存和未缓存的账单
+    for (let i = 0; i < billIds.length; i++) {
+      const billId = billIds[i];
+      const cacheKey = cacheKeys[i];
+      const cachedBill = cachedResults.get(cacheKey);
+      
+      if (cachedBill) {
+        results.set(billId, cachedBill);
+      } else {
+        uncachedIds.push(billId);
+      }
     }
+    
+    // 如果有未缓存的账单，从数据库获取
+    if (uncachedIds.length > 0) {
+      const sql = `SELECT id, room_id, title, description, amount, status, due_date, created_by, created_at, updated_at FROM bills WHERE id = ANY($1)`;
+      const dbResult = await this.query(sql, [uncachedIds]);
+      
+      // 批量设置缓存
+      const cacheItems = [];
+      
+      for (const bill of dbResult.rows) {
+        results.set(bill.id, bill);
+        cacheItems.push({
+          key: `bill:id:${bill.id}`,
+          value: bill,
+          ttl: enhancedCacheService.getDefaultTTL('bill'),
+          tags: ['bill']
+        });
+      }
+      
+      // 批量设置缓存
+      if (cacheItems.length > 0) {
+        await enhancedCacheService.mset(cacheItems);
+      }
+    }
+    
+    return results;
+  }
 
-    const result = await this.query(sql, params);
-    return result.rows[0];
+  /**
+   * 清除账单相关的缓存
+   * @param {string} roomId - 房间ID
+   * @param {string} billId - 账单ID
+   * @returns {Promise<void>}
+   */
+  async clearBillCache(roomId, billId) {
+    // 清除账单详情缓存
+    if (billId) {
+      await enhancedCacheService.del(`bill:detail:${billId}`);
+      await enhancedCacheService.del(`bill:id:${billId}`);
+    }
+    
+    // 使用标签批量清除房间账单列表缓存
+    await enhancedCacheService.delByTag(`room:bills:${roomId}`);
+    
+    // 清除房间统计缓存
+    await enhancedCacheService.delByTag(`room:stats:${roomId}`);
+  }
+
+  /**
+   * 生成选项哈希，用于缓存键
+   * @param {Object} options - 选项对象
+   * @returns {string} 哈希字符串
+   */
+  hashOptions(options) {
+    // 简单的哈希函数，用于生成缓存键的一部分
+    const str = JSON.stringify(options, Object.keys(options).sort());
+    let hash = 0;
+    
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // 转换为32位整数
+    }
+    
+    return Math.abs(hash).toString(36);
   }
 }
 

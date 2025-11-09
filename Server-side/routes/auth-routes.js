@@ -2,9 +2,8 @@ const express = require('express');
 const userController = require('../controllers/user-controller');
 const { authenticateToken } = require('../middleware/tokenManager');
 const { loginRateLimiter, devLoginRateLimiter, registerRateLimiter } = require('../middleware/rateLimiter');
-const { loginBruteProtector } = require('../middleware/bruteForce');
+const { loginBruteProtectorRedis } = require('../middleware/bruteForceRedis');
 const { accountLockCheck } = require('../middleware/securityEnhancements');
-const { auditLoggers } = require('../middleware/auditLogger');
 const { 
   handleValidationErrors, 
   userValidation,
@@ -15,31 +14,30 @@ const {
 
 const router = express.Router();
 
-// 用户登录（输入校验 + 限流 + 防暴力 + 账户锁定检查 + 审计日志）
+// 用户登录（输入校验 + 限流 + 防暴力 + 账户锁定检查）
 router.post(
   '/login',
   loginValidationRules,
   handleValidationErrors,
   devLoginRateLimiter,
-  loginBruteProtector,
+  loginBruteProtectorRedis,
   accountLockCheck,
-  auditLoggers.login,  // 添加登录审计日志
   userController.login
 );
 
 // 用户注册（限流 + 输入校验）
-router.post(
-  '/register',
-  registerRateLimiter,
-  userValidationRules.register,
-  businessValidation.isUsernameAvailable,
-  businessValidation.isEmailAvailable,
-  handleValidationErrors,
-  userController.register
-);
+// router.post(
+//   '/register',
+//   registerRateLimiter,
+//   userValidationRules.register,
+//   businessValidation.isUsernameAvailable,
+//   businessValidation.isEmailAvailable,
+//   handleValidationErrors,
+//   userController.register
+// );
 
 // 用户登出 - 需要认证
-router.post('/logout', authenticateToken, auditLoggers.logout, (req, res) => {
+router.post('/logout', authenticateToken, (req, res) => {
   // 这里可以添加登出逻辑，比如将token加入黑名单
   res.status(200).json({
     success: true,

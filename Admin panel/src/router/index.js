@@ -144,6 +144,12 @@ const routes = [
         name: 'SystemStatistics',
         component: () => import('../views/config/SystemStatistics.vue'),
         meta: { title: '系统使用统计' }
+      },
+      {
+        path: 'brute-force-monitor',
+        name: 'BruteForceMonitor',
+        component: () => import('../views/config/BruteForceMonitor.vue'),
+        meta: { title: '暴力破解防护监控' }
       }
     ]
   },

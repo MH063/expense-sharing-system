@@ -50,16 +50,38 @@ function getEnvironmentConfig() {
       port: parseInt(process.env.REDIS_PORT) || 6379
     },
     jwt: {
-      secret: process.env.JWT_SECRET || 'default_secret',
-      refreshSecret: process.env.JWT_REFRESH_SECRET || 'default_refresh_secret',
+      secret: process.env.JWT_SECRET || '', // 将由secrets.js管理
+      refreshSecret: process.env.JWT_REFRESH_SECRET || '', // 将由secrets.js管理
       expiresIn: process.env.JWT_EXPIRES_IN || '24h'
     },
     logging: {
       level: process.env.LOG_LEVEL || 'info'
     },
     api: {
-      rateLimit: parseInt(process.env.API_RATE_LIMIT) || 10
-    },
+    rateLimit: parseInt(process.env.API_RATE_LIMIT) || 10
+  },
+
+  // 限流配置
+  rateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15分钟
+    max: parseInt(process.env.RATE_LIMIT_MAX) || 100, // 限制每个IP在窗口期内最多100次请求
+    message: process.env.RATE_LIMIT_MESSAGE || '请求过于频繁，请稍后再试',
+    statusCode: parseInt(process.env.RATE_LIMIT_STATUS_CODE) || 429
+  },
+
+  // 暴力破解防护配置
+  bruteForceProtection: {
+    windowMs: parseInt(process.env.BRUTE_FORCE_WINDOW_MS) || 15 * 60 * 1000, // 15分钟
+    ipMaxAttempts: parseInt(process.env.BRUTE_FORCE_IP_MAX_ATTEMPTS) || 50, // IP最大尝试次数
+    userMaxAttempts: parseInt(process.env.BRUTE_FORCE_USER_MAX_ATTEMPTS) || 10, // 用户最大尝试次数
+    blockDurationMs: parseInt(process.env.BRUTE_FORCE_BLOCK_DURATION_MS) || 15 * 60 * 1000, // 封禁时长
+    // 开发环境配置
+    dev: {
+      ipMaxAttempts: parseInt(process.env.BRUTE_FORCE_DEV_IP_MAX_ATTEMPTS) || 20,
+      userMaxAttempts: parseInt(process.env.BRUTE_FORCE_DEV_USER_MAX_ATTEMPTS) || 5,
+      blockDurationMs: parseInt(process.env.BRUTE_FORCE_DEV_BLOCK_DURATION_MS) || 60 * 1000
+    }
+  },
     upload: {
       maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5
     },

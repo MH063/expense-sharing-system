@@ -84,6 +84,11 @@ console.log('即将加载指标中间件...');
 const { metricsMiddleware } = require('./middleware/metrics');
 console.log('指标中间件加载完成');
 
+// 导入增强的审计日志中间件
+console.log('即将加载增强的审计日志中间件...');
+const { enhancedAuditLogger, logSystemEvent } = require('./middleware/enhanced-audit-logger');
+console.log('增强的审计日志中间件加载完成');
+
 // 导入安全增强中间件
 console.log('即将加载安全增强中间件...');
 // const { verifyRequestSignature, ipWhitelist } = require('./middleware/securityEnhancements');
@@ -130,6 +135,11 @@ const { initRedis, isRedisConnected } = require('./config/redis');
 const cacheTestRoutes = require('./routes/cache-test-routes');
 console.log('Redis配置加载完成');
 
+// 导入缓存预热服务
+console.log('即将加载缓存预热服务...');
+const CacheWarmupService = require('./services/cache-warmup-service');
+console.log('缓存预热服务加载完成');
+
 // 导入路由
 const authRoutes = require('./routes/auth-routes');
 const adminAuthRoutes = require('./routes/admin-auth-routes');
@@ -158,6 +168,14 @@ const websocketManagementRoutes = require('./routes/websocket-management-routes'
 const roleRoutes = require('./routes/role-routes');
 const leaveRecordRoutes = require('./routes/leave-record-routes');
 const stayDaysRoutes = require('./routes/stay-days-routes');
+const cacheRoutes = require('./routes/cache-routes');
+const bruteForceMonitorRoutes = require('./routes/brute-force-monitor');
+const monitoringRoutes = require('./routes/monitoring-routes');
+
+// 导入增强的审计日志路由
+console.log('即将加载增强的审计日志路由...');
+const enhancedAuditRoutes = require('./routes/enhanced-audit-routes');
+console.log('增强的审计日志路由加载完成');
 
 // 导入错误处理中间件
 const { errorHandler, notFoundHandler } = require('./middleware/error-handler');
@@ -221,6 +239,9 @@ app.use('/api/ai', aiTokenHandler);
 // HTTP请求日志中间件
 app.use(httpLogger);
 
+// 增强的审计日志中间件（记录所有API请求）
+app.use(enhancedAuditLogger);
+
 // 静态文件服务 - 用于部署前端应用与上传文件
 app.use(express.static('public'));
 // 暴露 /uploads 目录供收据访问（确保与 multer 配置一致）
@@ -264,6 +285,12 @@ app.use('/api/abnormal-expenses', abnormalExpenseRoutes);
 app.use('/api/leave-records', leaveRecordRoutes);
 app.use('/api/stay-days', stayDaysRoutes);
 app.use('/api/cache-test', cacheTestRoutes);
+app.use('/api/cache', cacheRoutes);
+app.use('/api/brute-force-monitor', bruteForceMonitorRoutes);
+
+// 增强的审计日志路由
+app.use('/api/enhanced-audit', enhancedAuditRoutes);
+app.use('/api/monitoring', monitoringRoutes);
 
 // 前端应用路由（使用绝对路径，兼容空格路径；目录不存在则跳过挂载并记录日志）
 const clientDistPath = path.resolve(__dirname, '..', 'Client application', 'dist');
@@ -458,6 +485,25 @@ async function startServer() {
         if (config.nodeEnv !== 'production') {
           throw error;
         }
+      }
+      
+      // 初始化缓存预热服务
+      console.log('初始化缓存预热服务...');
+      try {
+        const cacheWarmupService = new CacheWarmupService();
+        // 在服务器启动后延迟执行缓存预热，避免影响启动速度
+        setTimeout(async () => {
+          try {
+            console.log('开始执行缓存预热...');
+            await cacheWarmupService.warmupCache();
+            console.log('缓存预热完成');
+          } catch (error) {
+            console.error('缓存预热失败:', error);
+          }
+        }, 30000); // 30秒后开始预热
+        console.log('缓存预热服务初始化完成');
+      } catch (error) {
+        console.error('缓存预热服务初始化失败:', error);
       }
     });
     console.log('server.listen调用完成');

@@ -16,6 +16,7 @@
     "zeabur:deploy": "npm run zeabur:init && npm run start:prod",
     "dev": "concurrently \"cd Server-side && npm run dev\" \"cd \"Client application\" && npm run dev\" \"cd \"Admin panel\" && npm run dev\"",
     "test:integration": "cd Server-side && npm run test:integration",
+    "test:bruteforce": "cd Server-side && npm run test:bruteforce",
     "docs:check": "cd Server-side && npm run docs:check"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
 const { logger } = require('../config/logger');
 const { totpVerify } = require('../utils/totp');
+const { recordFailure, recordSuccess, isBlocked } = require('./bruteForceRedis');
 
 /**
  * 安全增强中间件

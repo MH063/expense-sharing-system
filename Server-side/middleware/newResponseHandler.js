@@ -135,6 +135,62 @@ const newResponseMiddleware = (req, res, next) => {
     return res.status(statusCode).json(response);
   };
   
+  /**
+   * 客户端错误响应方法
+   * @param {string} message - 错误消息
+   * @param {Object} error - 错误详情
+   * @param {number} statusCode - HTTP状态码，默认400
+   */
+  res.clientError = function(message = '客户端请求错误', error = null, statusCode = 400) {
+    const response = {
+      success: false,
+      message: message
+    };
+    
+    if (error) {
+      response.error = error;
+    }
+    
+    // 记录错误日志
+    logger.error('API客户端错误', {
+      url: req.url,
+      method: req.method,
+      statusCode: statusCode,
+      message: message,
+      error: error
+    });
+    
+    return res.status(statusCode).json(response);
+  };
+  
+  /**
+   * 冲突错误响应方法
+   * @param {string} message - 错误消息
+   * @param {Object} error - 错误详情
+   * @param {number} statusCode - HTTP状态码，默认409
+   */
+  res.conflict = function(message = '资源冲突', error = null, statusCode = 409) {
+    const response = {
+      success: false,
+      message: message
+    };
+    
+    if (error) {
+      response.error = error;
+    }
+    
+    // 记录错误日志
+    logger.error('API冲突错误', {
+      url: req.url,
+      method: req.method,
+      statusCode: statusCode,
+      message: message,
+      error: error
+    });
+    
+    return res.status(statusCode).json(response);
+  };
+  
   next();
 };
 

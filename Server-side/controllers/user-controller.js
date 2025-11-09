@@ -5,7 +5,9 @@ const winston = require('winston');
 const { TokenManager } = require('../middleware/tokenManager');
 const crypto = require('crypto');
 const { recordFailedLoginAttempt, resetFailedLoginAttempts, isAccountLocked } = require('../middleware/securityEnhancements');
+const { recordFailure, recordSuccess } = require('../middleware/bruteForceRedis');
 const { newResponseMiddleware } = require('../middleware/newResponseHandler');
+const { logUserActivity, logSystemEvent, logSecurityEvent } = require('../middleware/enhanced-audit-logger');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -168,6 +170,10 @@ class UserController {
       );
       
       if (userResult.rows.length === 0) {
+        // 记录Redis暴力破解防护失败
+        if (req.ip && username) {
+          await recordFailure(req.ip, username);
+        }
         return res.error(401, '用户名或密码错误');
       }
       
@@ -176,6 +182,10 @@ class UserController {
       // 验证密码
       const isPasswordValid = await bcrypt.compare(password, user.password_hash);
       if (!isPasswordValid) {
+        // 记录Redis暴力破解防护失败
+        if (req.ip && username) {
+          await recordFailure(req.ip, username);
+        }
         return res.error(401, '用户名或密码错误');
       }
       
@@ -209,6 +219,11 @@ class UserController {
       }
       
       logger.info(`管理员登录成功: ${user.username}`);
+      
+      // 记录Redis暴力破解防护成功
+      if (req.ip && username) {
+        await recordSuccess(req.ip, username);
+      }
       
       res.success(200, '管理员登录成功', {
         user: {
@@ -251,6 +266,10 @@ class UserController {
         });
         
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+    // 记录Redis暴力破解防护失败
+    if (req.ip && req.body.username) {
+      await recordFailure(req.ip, req.body.username);
+    }
         return res.error(400, '登录信息不完整');
       }
 
@@ -411,6 +430,10 @@ class UserController {
 
       // 记录登录成功
       if (typeof req._recordLoginSuccess === 'function') req._recordLoginSuccess(username);
+      // 记录Redis暴力破解防护成功
+      if (req.ip && username) {
+        await recordSuccess(req.ip, username);
+      }
 
       const duration = Date.now() - startTime;
       logger.info(`用户登录成功 [${requestId}]`, {

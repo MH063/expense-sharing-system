@@ -29,6 +29,34 @@ function authenticateToken(req, res, next) {
 }
 
 /**
+ * 管理员权限检查中间件
+ */
+async function isAdmin(req, res, next) {
+  try {
+    // 检查用户是否已认证
+    if (!req.user) {
+      return res.unauthorized('用户未认证');
+    }
+
+    // 从数据库获取用户角色
+    const { TokenManager } = require('./tokenManager');
+    const userRole = await TokenManager.getUserRole(req.user.sub);
+
+    // 检查用户是否为管理员
+    if (userRole !== 'admin') {
+      return res.forbidden('需要管理员权限');
+    }
+
+    // 更新req.user中的角色信息
+    req.user.roles = [userRole];
+    next();
+  } catch (error) {
+    console.error('管理员权限验证失败:', error);
+    return res.error(500, '服务器内部错误');
+  }
+}
+
+/**
  * 角色权限检查中间件
  * @param {Array} allowedRoles - 允许访问的角色列表
  */
@@ -85,6 +113,7 @@ function checkPermission(requiredPermissions) {
 
 module.exports = {
   authenticateToken,
+  isAdmin,
   checkRole,
   checkPermission
 };

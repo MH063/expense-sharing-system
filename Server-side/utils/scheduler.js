@@ -9,6 +9,8 @@ const paymentReminderService = require('../services/payment-reminder-service');
 const offlinePaymentService = require('../services/offline-payment-service');
 const notificationService = require('../utils/notification-service');
 const paymentQueryService = require('../services/payment-query-service');
+const { collectSystemMetrics, collectBusinessMetrics } = require('../middleware/enhanced-metrics');
+const { cleanupExpiredLogs, generateSystemHealthReport } = require('../services/monitoring-service');
 
 // 存储已启动的定时任务（生产环境使用）
 const scheduledTasks = {};
@@ -139,6 +141,62 @@ const tasks = {
         return { success: false, message: `支付统计报告生成失败: ${error.message}` };
       }
     }
+  },
+  collectSystemMetrics: {
+    name: 'collectSystemMetrics',
+    // 每5分钟
+    interval: 5 * 60 * 1000,
+    running: false,
+    task: async function collectSystemMetricsTask() {
+      try {
+        await collectSystemMetrics();
+        return { success: true, message: '系统指标收集完成' };
+      } catch (error) {
+        return { success: false, message: `系统指标收集失败: ${error.message}` };
+      }
+    }
+  },
+  collectBusinessMetrics: {
+    name: 'collectBusinessMetrics',
+    // 每小时
+    interval: 60 * 60 * 1000,
+    running: false,
+    task: async function collectBusinessMetricsTask() {
+      try {
+        await collectBusinessMetrics();
+        return { success: true, message: '业务指标收集完成' };
+      } catch (error) {
+        return { success: false, message: `业务指标收集失败: ${error.message}` };
+      }
+    }
+  },
+  cleanupExpiredLogs: {
+    name: 'cleanupExpiredLogs',
+    // 每天 4 点
+    interval: 24 * 60 * 60 * 1000,
+    running: false,
+    task: async function cleanupExpiredLogsTask() {
+      try {
+        await cleanupExpiredLogs();
+        return { success: true, message: '过期日志清理完成' };
+      } catch (error) {
+        return { success: false, message: `过期日志清理失败: ${error.message}` };
+      }
+    }
+  },
+  generateHealthReport: {
+    name: 'generateHealthReport',
+    // 每天 5 点
+    interval: 24 * 60 * 60 * 1000,
+    running: false,
+    task: async function generateHealthReportTask() {
+      try {
+        await generateSystemHealthReport();
+        return { success: true, message: '系统健康报告生成完成' };
+      } catch (error) {
+        return { success: false, message: `系统健康报告生成失败: ${error.message}` };
+      }
+    }
   }
 };
 
@@ -185,6 +243,22 @@ const startAllTasks = () => {
     if (!scheduledTasks.generatePaymentStats) {
       const t = cron.schedule('0 3 * * *', () => runWithLock('generatePaymentStats', tasks.generatePaymentStats.task), { scheduled: true });
       scheduledTasks.generatePaymentStats = t;
+    }
+    if (!scheduledTasks.collectSystemMetrics) {
+      const t = cron.schedule('*/5 * * * *', () => runWithLock('collectSystemMetrics', tasks.collectSystemMetrics.task), { scheduled: true });
+      scheduledTasks.collectSystemMetrics = t;
+    }
+    if (!scheduledTasks.collectBusinessMetrics) {
+      const t = cron.schedule('0 * * * *', () => runWithLock('collectBusinessMetrics', tasks.collectBusinessMetrics.task), { scheduled: true });
+      scheduledTasks.collectBusinessMetrics = t;
+    }
+    if (!scheduledTasks.cleanupExpiredLogs) {
+      const t = cron.schedule('0 4 * * *', () => runWithLock('cleanupExpiredLogs', tasks.cleanupExpiredLogs.task), { scheduled: true });
+      scheduledTasks.cleanupExpiredLogs = t;
+    }
+    if (!scheduledTasks.generateHealthReport) {
+      const t = cron.schedule('0 5 * * *', () => runWithLock('generateHealthReport', tasks.generateHealthReport.task), { scheduled: true });
+      scheduledTasks.generateHealthReport = t;
     }
   }
   Object.keys(tasks).forEach((k) => { tasks[k].running = true; });
@@ -233,7 +307,11 @@ const getTaskStatus = () => {
       paymentReminderCheck: { name: tasks.paymentReminderCheck.name, interval: tasks.paymentReminderCheck.interval, running: tasks.paymentReminderCheck.running },
       offlinePaymentSync: { name: tasks.offlinePaymentSync.name, interval: tasks.offlinePaymentSync.interval, running: tasks.offlinePaymentSync.running },
       cleanupExpiredReminders: { name: tasks.cleanupExpiredReminders.name, interval: tasks.cleanupExpiredReminders.interval, running: tasks.cleanupExpiredReminders.running },
-      generatePaymentStats: { name: tasks.generatePaymentStats.name, interval: tasks.generatePaymentStats.interval, running: tasks.generatePaymentStats.running }
+      generatePaymentStats: { name: tasks.generatePaymentStats.name, interval: tasks.generatePaymentStats.interval, running: tasks.generatePaymentStats.running },
+      collectSystemMetrics: { name: tasks.collectSystemMetrics.name, interval: tasks.collectSystemMetrics.interval, running: tasks.collectSystemMetrics.running },
+      collectBusinessMetrics: { name: tasks.collectBusinessMetrics.name, interval: tasks.collectBusinessMetrics.interval, running: tasks.collectBusinessMetrics.running },
+      cleanupExpiredLogs: { name: tasks.cleanupExpiredLogs.name, interval: tasks.cleanupExpiredLogs.interval, running: tasks.cleanupExpiredLogs.running },
+      generateHealthReport: { name: tasks.generateHealthReport.name, interval: tasks.generateHealthReport.interval, running: tasks.generateHealthReport.running }
     }
   };
 };
@@ -253,5 +331,9 @@ module.exports = {
   checkPaymentReminders: tasks.paymentReminderCheck.task,
   syncOfflinePayments: tasks.offlinePaymentSync.task,
   cleanupExpiredReminders: tasks.cleanupExpiredReminders.task,
-  generatePaymentStats: tasks.generatePaymentStats.task
+  generatePaymentStats: tasks.generatePaymentStats.task,
+  collectSystemMetrics: tasks.collectSystemMetrics.task,
+  collectBusinessMetrics: tasks.collectBusinessMetrics.task,
+  cleanupExpiredLogs: tasks.cleanupExpiredLogs.task,
+  generateHealthReport: tasks.generateHealthReport.task
 };

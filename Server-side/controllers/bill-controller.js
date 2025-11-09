@@ -449,41 +449,52 @@ class BillController {
       const countResult = await client.query(countQuery, countParams);
       const total = parseInt(countResult.rows[0].total);
       
-      // 获取每个账单的分摊信息
-      const billsWithSplits = await Promise.all(
-        result.rows.map(async (bill) => {
-          const splitsQuery = `
-            SELECT bp.*, u.username as user_name
-            FROM bill_participants bp
-            JOIN users u ON bp.user_id = u.id
-            WHERE bp.bill_id = $1
-          `;
-          
-          const splitsResult = await client.query(splitsQuery, [bill.id]);
-          bill.participants = splitsResult.rows;
-          
-          // 计算支付状态（基于 bill_participants.paid_status）
-          const totalSplits = splitsResult.rows.length;
-          const paidSplits = splitsResult.rows.filter(s => s.paid_status === 'confirmed').length;
-          
-          if (totalSplits === paidSplits && totalSplits > 0) {
-            bill.payment_status = 'paid';
-          } else if (paidSplits > 0) {
-            bill.payment_status = 'partial';
-          } else {
-            bill.payment_status = 'pending';
-          }
-          
-          // 检查是否逾期
-          const dueDate = new Date(bill.due_date);
-          const today = new Date();
-          if (dueDate < today && bill.payment_status !== 'paid' && bill.status === 'open') {
-            bill.status = 'open';
-          }
-          
-          return bill;
-        })
-      );
+      // 批量获取所有账单的分摊信息，避免N+1查询问题
+      const billIds = result.rows.map(bill => bill.id);
+      let splitsQuery = `
+        SELECT bp.*, u.username as user_name, bp.bill_id
+        FROM bill_participants bp
+        JOIN users u ON bp.user_id = u.id
+        WHERE bp.bill_id = ANY($1)
+      `;
+      
+      const splitsResult = await client.query(splitsQuery, [billIds]);
+      
+      // 将分摊信息按账单ID分组
+      const splitsByBillId = {};
+      splitsResult.rows.forEach(split => {
+        if (!splitsByBillId[split.bill_id]) {
+          splitsByBillId[split.bill_id] = [];
+        }
+        splitsByBillId[split.bill_id].push(split);
+      });
+      
+      // 为每个账单添加分摊信息和支付状态
+      const billsWithSplits = result.rows.map(bill => {
+        const splits = splitsByBillId[bill.id] || [];
+        bill.participants = splits;
+        
+        // 计算支付状态（基于 bill_participants.paid_status）
+        const totalSplits = splits.length;
+        const paidSplits = splits.filter(s => s.paid_status === 'confirmed').length;
+        
+        if (totalSplits === paidSplits && totalSplits > 0) {
+          bill.payment_status = 'paid';
+        } else if (paidSplits > 0) {
+          bill.payment_status = 'partial';
+        } else {
+          bill.payment_status = 'pending';
+        }
+        
+        // 检查是否逾期
+        const dueDate = new Date(bill.due_date);
+        const today = new Date();
+        if (dueDate < today && bill.payment_status !== 'paid' && bill.status === 'open') {
+          bill.status = 'overdue';
+        }
+        
+        return bill;
+      });
       
       res.success(200, '获取账单列表成功', {
         bills: billsWithSplits,

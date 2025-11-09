@@ -460,8 +460,7 @@ class ExpenseController {
             page: parseInt(page),
             limit: parseInt(limit),
             total: 0,
-              totalPages: 0
-            }
+            totalPages: 0
           }
         });
       }
@@ -527,6 +526,36 @@ class ExpenseController {
       const countQuery = `SELECT COUNT(*) FROM expenses e ${whereClause}`;
       const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
       const totalCount = parseInt(countResult.rows[0].count);
+
+      // 批量获取所有费用的分摊信息，避免N+1查询问题
+      if (expenses.length > 0) {
+        const expenseIds = expenses.map(expense => expense.id);
+        const splitsQuery = `
+          SELECT es.id, es.user_id, es.amount, es.split_type, es.is_paid, es.paid_date, es.created_at,
+                 es.expense_id,
+                 u.username, u.name
+          FROM expense_splits es
+          JOIN users u ON es.user_id = u.id
+          WHERE es.expense_id = ANY($1)
+          ORDER BY u.username
+        `;
+        
+        const splitsResult = await pool.query(splitsQuery, [expenseIds]);
+        
+        // 将分摊信息按费用ID分组
+        const splitsByExpenseId = {};
+        splitsResult.rows.forEach(split => {
+          if (!splitsByExpenseId[split.expense_id]) {
+            splitsByExpenseId[split.expense_id] = [];
+          }
+          splitsByExpenseId[split.expense_id].push(split);
+        });
+        
+        // 为每个费用添加分摊信息
+        expenses.forEach(expense => {
+          expense.splits = splitsByExpenseId[expense.id] || [];
+        });
+      }
 
       logger.info(`获取费用列表成功，共 ${totalCount} 条记录`);
 

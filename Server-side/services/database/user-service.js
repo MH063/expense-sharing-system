@@ -5,7 +5,7 @@
 
 const BaseService = require('./base-service');
 const { v4: uuidv4 } = require('uuid');
-const cacheService = require('../cache-service');
+const enhancedCacheService = require('../enhanced-cache-service');
 
 class UserService extends BaseService {
   constructor() {
@@ -21,8 +21,8 @@ class UserService extends BaseService {
     // 使用缓存键模式：user:username:{username}
     const cacheKey = `user:username:${username}`;
     
-    // 使用getOrSet方法实现缓存穿透保护
-    return await cacheService.getOrSet(cacheKey, async () => {
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `SELECT * FROM users WHERE username = $1`;
       const result = await this.query(sql, [username]);
       const user = result.rows.length > 0 ? result.rows[0] : null;
@@ -33,7 +33,7 @@ class UserService extends BaseService {
       }
       
       return user;
-    }, 3600); // 缓存1小时
+    }, enhancedCacheService.getDefaultTTL('user'), ['user']); // 使用用户类型的默认TTL并添加标签
   }
 
   /**
@@ -45,8 +45,8 @@ class UserService extends BaseService {
     // 使用缓存键模式：user:email:{email}
     const cacheKey = `user:email:${email}`;
     
-    // 使用getOrSet方法实现缓存穿透保护
-    return await cacheService.getOrSet(cacheKey, async () => {
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `SELECT * FROM users WHERE email = $1`;
       const result = await this.query(sql, [email]);
       const user = result.rows.length > 0 ? result.rows[0] : null;
@@ -57,7 +57,7 @@ class UserService extends BaseService {
       }
       
       return user;
-    }, 3600); // 缓存1小时
+    }, enhancedCacheService.getDefaultTTL('user'), ['user']); // 使用用户类型的默认TTL并添加标签
   }
 
   /**
@@ -191,8 +191,8 @@ class UserService extends BaseService {
     // 使用缓存键模式：user:rooms:{userId}
     const cacheKey = `user:rooms:${userId}`;
     
-    // 使用getOrSet方法实现缓存穿透保护
-    return await cacheService.getOrSet(cacheKey, async () => {
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `
         SELECT r.*, rm.relation_type, rm.join_date
         FROM rooms r
@@ -202,7 +202,7 @@ class UserService extends BaseService {
       `;
       const result = await this.query(sql, [userId, true]);
       return result.rows;
-    }, 1800); // 缓存30分钟
+    }, enhancedCacheService.getDefaultTTL('room'), ['user', 'room']); // 使用房间类型的默认TTL并添加多个标签
   }
 
   /**
@@ -214,8 +214,8 @@ class UserService extends BaseService {
     // 使用缓存键模式：room:users:{roomId}
     const cacheKey = `room:users:${roomId}`;
     
-    // 使用getOrSet方法实现缓存穿透保护
-    return await cacheService.getOrSet(cacheKey, async () => {
+    // 使用增强版缓存的getOrSet方法实现缓存穿透保护
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `
         SELECT u.id, u.username, u.email, u.name, u.avatar, u.phone, rm.relation_type, rm.join_date
         FROM users u
@@ -225,7 +225,65 @@ class UserService extends BaseService {
       `;
       const result = await this.query(sql, [roomId, true]);
       return result.rows;
-    }, 1800); // 缓存30分钟
+    }, enhancedCacheService.getDefaultTTL('room'), ['room', 'user']); // 使用房间类型的默认TTL并添加多个标签
+  }
+
+  /**
+   * 批量获取用户信息
+   * @param {Array<string>} userIds - 用户ID数组
+   * @returns {Promise<Map<string, Object>>} 用户ID到用户信息的映射
+   */
+  async getUsersBatch(userIds) {
+    if (!userIds || userIds.length === 0) {
+      return new Map();
+    }
+    
+    // 生成缓存键数组
+    const cacheKeys = userIds.map(id => `user:id:${id}`);
+    
+    // 尝试从批量缓存获取
+    const cachedResults = await enhancedCacheService.mget(cacheKeys);
+    const results = new Map();
+    const uncachedIds = [];
+    
+    // 分离已缓存和未缓存的用户
+    for (let i = 0; i < userIds.length; i++) {
+      const userId = userIds[i];
+      const cacheKey = cacheKeys[i];
+      const cachedUser = cachedResults.get(cacheKey);
+      
+      if (cachedUser) {
+        results.set(userId, cachedUser);
+      } else {
+        uncachedIds.push(userId);
+      }
+    }
+    
+    // 如果有未缓存的用户，从数据库获取
+    if (uncachedIds.length > 0) {
+      const sql = `SELECT id, username, email, name, avatar, phone FROM users WHERE id = ANY($1)`;
+      const dbResult = await this.query(sql, [uncachedIds]);
+      
+      // 批量设置缓存
+      const cacheItems = [];
+      
+      for (const user of dbResult.rows) {
+        results.set(user.id, user);
+        cacheItems.push({
+          key: `user:id:${user.id}`,
+          value: user,
+          ttl: enhancedCacheService.getDefaultTTL('user'),
+          tags: ['user']
+        });
+      }
+      
+      // 批量设置缓存
+      if (cacheItems.length > 0) {
+        await enhancedCacheService.mset(cacheItems);
+      }
+    }
+    
+    return results;
   }
 
   /**
@@ -238,16 +296,17 @@ class UserService extends BaseService {
   async clearUserCache(userId, username, email) {
     // 清除用户基本信息缓存
     if (username) {
-      await cacheService.del(`user:username:${username}`);
+      await enhancedCacheService.del(`user:username:${username}`);
     }
     
     if (email) {
-      await cacheService.del(`user:email:${email}`);
+      await enhancedCacheService.del(`user:email:${email}`);
     }
     
-    // 清除用户房间列表缓存
     if (userId) {
-      await cacheService.del(`user:rooms:${userId}`);
+      await enhancedCacheService.del(`user:id:${userId}`);
+      // 清除用户房间列表缓存
+      await enhancedCacheService.del(`user:rooms:${userId}`);
     }
   }
 
@@ -258,10 +317,10 @@ class UserService extends BaseService {
    */
   async clearRoomCache(roomId) {
     // 清除房间用户列表缓存
-    await cacheService.del(`room:users:${roomId}`);
+    await enhancedCacheService.del(`room:users:${roomId}`);
     
-    // 清除所有用户房间列表缓存（因为房间变化会影响所有成员）
-    await cacheService.delPattern('user:rooms:*');
+    // 使用标签批量清除所有用户房间列表缓存
+    await enhancedCacheService.delByTag('user:rooms');
   }
 }
 

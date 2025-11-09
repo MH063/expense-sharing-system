@@ -1,116 +1,65 @@
-# 数据库表初始化说明
+# 数据库初始化说明
 
 ## 概述
 
-本目录包含了记账系统数据库表初始化的相关脚本，用于在所有环境（开发、测试、生产）中创建必要的数据库表结构。
+本目录包含用于创建和初始化记账系统数据库的SQL脚本。根据不同的运行环境（开发、测试、生产），我们提供了相应的数据库创建脚本。
 
-## 文件说明
+## 数据库创建脚本
 
-- `init_postgres_v18.sql` - PostgreSQL数据库表结构定义脚本，包含所有表、枚举类型、索引等
-- `init_dev.sql` - 开发环境数据库初始化脚本
-- `init_test.sql` - 测试环境数据库初始化脚本
-- `init_prod.sql` - 生产环境数据库初始化脚本
-- `ensure-all-tables.js` - Node.js脚本，用于确保所有环境的数据库表都已创建
-- `init-database.bat` - Windows批处理脚本，方便在Windows环境下执行数据库初始化
+### 1. 开发环境
+- **脚本文件**: [create-database-dev.sql](create-database-dev.sql)
+- **数据库名称**: `expense_dev`
+- **使用命令**: `npm run init:database:dev`
 
-## 使用方法
+### 2. 测试环境
+- **脚本文件**: [create-database-test.sql](create-database-test.sql)
+- **数据库名称**: `expense_test`
+- **使用命令**: `npm run init:database:test`
 
-### 方法1：使用Node.js脚本（推荐）
+### 3. 生产环境
+- **脚本文件**: [create-database-prod.sql](create-database-prod.sql)
+- **数据库名称**: `expense_prod`
+- **使用命令**: `npm run init:database:prod`
 
-1. 确保已安装Node.js和PostgreSQL
-2. 确保PostgreSQL服务正在运行
-3. 在Server-side目录下执行以下命令：
+## 使用步骤
 
+### 1. 创建数据库
 ```bash
-# 初始化所有环境
-node ensure-all-tables.js all
+# 开发环境
+npm run init:database:dev
 
-# 仅初始化开发环境
-node ensure-all-tables.js dev
+# 测试环境
+npm run init:database:test
 
-# 仅初始化测试环境
-node ensure-all-tables.js test
-
-# 仅初始化生产环境
-node ensure-all-tables.js prod
+# 生产环境
+npm run init:database:prod
 ```
 
-### 方法2：使用Windows批处理脚本（仅限Windows）
-
-1. 双击运行 `init-database.bat` 文件
-2. 或在命令行中执行：
-   ```bash
-   init-database.bat [all|dev|test|prod]
-   ```
-
-### 方法3：使用psql命令行工具
-
-1. 设置密码环境变量：
-   ```bash
-   set PGPASSWORD=123456789
-   ```
-
-2. 执行初始化脚本：
-   ```bash
-   # 开发环境
-   psql -h localhost -p 5432 -U postgres -d expense_dev -f "Server-side/db/init_postgres_v18.sql"
-   
-   # 测试环境
-   psql -h localhost -p 5432 -U postgres -d expense_test -f "Server-side/db/init_postgres_v18.sql"
-   
-   # 生产环境
-   psql -h localhost -p 5432 -U postgres -d expense_prod -f "Server-side/db/init_postgres_v18.sql"
-   ```
-
-## 数据库配置
-
-默认的数据库配置如下：
-
-- 主机: localhost
-- 端口: 5432
-- 用户名: postgres
-- 密码: 123456789
-- 数据库名:
-  - 开发环境: expense_dev
-  - 测试环境: expense_test
-  - 生产环境: expense_prod
-
-如果需要修改这些配置，请编辑 `.env` 文件或修改 `ensure-all-tables.js` 脚本中的环境配置。
-
-## 验证数据库表
-
-执行完初始化脚本后，可以使用以下命令验证数据库表是否已创建：
-
+### 2. 初始化表结构
 ```bash
-# 设置密码环境变量
-set PGPASSWORD=123456789
+# 开发环境
+npm run schema:dev
 
-# 检查开发环境
-psql -h localhost -p 5432 -U postgres -d expense_dev -c "\dt"
+# 测试环境
+npm run schema:test
 
-# 检查测试环境
-psql -h localhost -p 5432 -U postgres -d expense_test -c "\dt"
-
-# 检查生产环境
-psql -h localhost -p 5432 -U postgres -d expense_prod -c "\dt"
+# 生产环境
+npm run schema:prod
 ```
-
-每个环境应该显示47个表。
 
 ## 注意事项
 
-1. 执行脚本前请确保PostgreSQL服务正在运行
-2. 确保数据库用户有创建数据库和表的权限
-3. 如果数据库已存在，脚本不会重新创建，只会执行表结构初始化
-4. 脚本执行过程中会显示详细的日志信息，可用于排查问题
+1. 执行数据库创建脚本前，请确保已安装并启动PostgreSQL数据库服务
+2. 确保当前用户具有创建数据库的权限（通常需要postgres用户权限）
+3. 生产环境脚本采用安全的创建方式，不会删除已存在的数据库
+4. 开发和测试环境脚本会删除已存在的同名数据库，请谨慎使用
+5. 数据库创建完成后，请确保相应的环境配置文件（.env.development, .env.test, .env.production）已正确配置数据库连接信息
 
-## 故障排除
+## 环境配置
 
-如果遇到问题，请检查：
+各环境的数据库连接信息配置在以下文件中：
+- 开发环境: [.env.development](../.env.development)
+- 测试环境: [.env.test](../.env.test)
+- 生产环境: [.env.production](../.env.production)
 
-1. PostgreSQL服务是否正在运行
-2. 数据库连接参数是否正确
-3. 数据库用户是否有足够的权限
-4. SQL脚本路径是否正确
-
-如果问题仍然存在，请查看脚本输出的错误信息，或联系开发人员获取帮助。
+本地开发时，建议在项目根目录创建 `.env` 文件来覆盖默认配置，包含真实的数据库密码等敏感信息.

@@ -6,9 +6,11 @@
 const jwt = require('jsonwebtoken');
 const { logger } = require('../config/logger');
 const { getEnvironmentConfig } = require('../config/environment');
+const { getSecrets } = require('../config/secrets');
 const crypto = require('crypto');
 
 const envConfig = getEnvironmentConfig();
+const secrets = getSecrets();
 
 /**
  * Token配置（支持密钥轮换与更强算法）
@@ -16,11 +18,11 @@ const envConfig = getEnvironmentConfig();
 const tokenConfig = {
   // JWT配置
   jwt: {
-    accessSecrets: envConfig.jwtKeys.accessSecrets.length ? envConfig.jwtKeys.accessSecrets : [(process.env.JWT_SECRET || 'change-me-please-change-me-32chars-minimum')],
-    refreshSecrets: envConfig.jwtKeys.refreshSecrets.length ? envConfig.jwtKeys.refreshSecrets : [(process.env.JWT_REFRESH_SECRET || 'change-me-please-change-me-32chars-minimum-refresh')],
+    accessSecrets: secrets.jwt.accessSecrets.length ? secrets.jwt.accessSecrets : [(process.env.JWT_SECRET || 'change-me-please-change-me-32chars-minimum')],
+    refreshSecrets: secrets.jwt.refreshSecrets.length ? secrets.jwt.refreshSecrets : [(process.env.JWT_REFRESH_SECRET || 'change-me-please-change-me-32chars-minimum-refresh')],
     accessTokenExpiry: process.env.JWT_EXPIRES_IN || '1h',
     refreshTokenExpiry: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-    algorithm: envConfig.jwtKeys.algorithm || 'HS512'
+    algorithm: secrets.jwt.algorithm || 'HS512'
   },
   
   // Token长度限制配置

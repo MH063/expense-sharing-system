@@ -3,15 +3,14 @@
  * 用于处理用户角色和权限验证
  */
 
-// 角色定义
+// 角色定义（根据需求文档标准）
 export const ROLES = {
-  ADMIN: 'admin',           // 管理员
-  SYSTEM_ADMIN: 'system_admin', // 系统管理员
-  SUPER_ADMIN: 'super_admin',   // 超级管理员
-  ROOM_OWNER: '寝室长',      // 寝室长
-  ROOM_MEMBER: 'payer',     // 付款人
-  USER: 'user',             // 普通用户
-  GUEST: 'guest'            // 访客/未登录用户
+  SYSTEM_ADMIN: '系统管理员',  // 系统管理员
+  ADMIN: '管理员',            // 管理员
+  ROOM_OWNER: '寝室长',       // 寝室长
+  PAYER: '缴费人',           // 缴费人
+  USER: '普通用户',          // 普通用户
+  GUEST: '访客'             // 访客/未登录用户
 }
 
 // 权限定义

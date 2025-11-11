@@ -130,7 +130,7 @@ class AnalyticsController {
           UNION
           SELECT user_id FROM payments WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' ${roomCondition}
           UNION
-          SELECT created_by as user_id FROM bills WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' ${roomCondition}
+          SELECT creator_id as user_id FROM bills WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' ${roomCondition}
         ) AS active_users
       `;
       const activeUserCountResult = await pool.query(activeUserCountQuery, room_id ? [room_id] : []);
@@ -254,7 +254,7 @@ class AnalyticsController {
           UNION ALL
           SELECT user_id, created_at::date as activity_date FROM payments WHERE 1=1 ${dateCondition} ${roomCondition}
           UNION ALL
-          SELECT created_by as user_id, created_at::date as activity_date FROM bills WHERE 1=1 ${dateCondition} ${roomCondition}
+          SELECT creator_id as user_id, created_at::date as activity_date FROM bills WHERE 1=1 ${dateCondition} ${roomCondition}
         ) AS activities
         GROUP BY TO_CHAR(activity_date, '${dateFormat}')
         ORDER BY period
@@ -1420,7 +1420,7 @@ class AnalyticsController {
         FROM users u
         LEFT JOIN expenses e ON u.id = e.created_by ${dateCondition.replace(/created_at/g, 'e.created_at')} ${roomCondition.replace(/room_id/g, 'e.room_id')}
         LEFT JOIN payments p ON u.id = p.user_id ${dateCondition.replace(/created_at/g, 'p.created_at')} ${roomCondition.replace(/room_id/g, 'p.room_id')}
-        LEFT JOIN bills b ON u.id = b.created_by ${dateCondition.replace(/created_at/g, 'b.created_at')} ${roomCondition.replace(/room_id/g, 'b.room_id')}
+        LEFT JOIN bills b ON u.id = b.creator_id ${dateCondition.replace(/created_at/g, 'b.created_at')} ${roomCondition.replace(/room_id/g, 'b.room_id')}
         WHERE u.id IS NOT NULL
         GROUP BY u.id, u.username, u.name
         ORDER BY total_activities DESC
@@ -1443,7 +1443,7 @@ class AnalyticsController {
           FROM users u
           LEFT JOIN expenses e ON u.id = e.created_by ${dateCondition.replace(/created_at/g, 'e.created_at')} ${roomCondition.replace(/room_id/g, 'e.room_id')}
           LEFT JOIN payments p ON u.id = p.user_id ${dateCondition.replace(/created_at/g, 'p.created_at')} ${roomCondition.replace(/room_id/g, 'p.room_id')}
-          LEFT JOIN bills b ON u.id = b.created_by ${dateCondition.replace(/created_at/g, 'b.created_at')} ${roomCondition.replace(/room_id/g, 'b.room_id')}
+          LEFT JOIN bills b ON u.id = b.creator_id ${dateCondition.replace(/created_at/g, 'b.created_at')} ${roomCondition.replace(/room_id/g, 'b.room_id')}
           GROUP BY u.id
         ) user_activities
       `;

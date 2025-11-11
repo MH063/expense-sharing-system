@@ -119,7 +119,7 @@ const getPaymentRecords = async (queryParams = {}) => {
         u.id as user_id,
         u.name as user_name,
         u.email as user_email,
-        u.avatar as user_avatar
+        u.avatar_url as user_avatar
       FROM payments p
       LEFT JOIN bills b ON p.bill_id = b.id
       LEFT JOIN users u ON p.user_id = u.id
@@ -204,7 +204,7 @@ const getPaymentRecordById = async (paymentId) => {
         u.id as user_id,
         u.name as user_name,
         u.email as user_email,
-        u.avatar as user_avatar
+        u.avatar_url as user_avatar
       FROM payments p
       LEFT JOIN bills b ON p.bill_id = b.id
       LEFT JOIN rooms r ON b.room_id = r.id
@@ -456,7 +456,7 @@ const getBillPayments = async (billId, options = {}) => {
         u.id as user_id,
         u.name as user_name,
         u.email as user_email,
-        u.avatar as user_avatar
+        u.avatar_url as user_avatar
       FROM payments p
       LEFT JOIN users u ON p.user_id = u.id
       WHERE ${whereClause}
@@ -561,11 +561,11 @@ const getUserPaymentTransfers = async (userId, options = {}) => {
         fu.id as from_user_id,
         fu.name as from_user_name,
         fu.email as from_user_email,
-        fu.avatar as from_user_avatar,
+        fu.avatar_url as from_user_avatar,
         tu.id as to_user_id,
         tu.name as to_user_name,
         tu.email as to_user_email,
-        tu.avatar as to_user_avatar
+        tu.avatar_url as to_user_avatar
       FROM payment_transfers pt
       LEFT JOIN bills b ON pt.bill_id = b.id
       LEFT JOIN users fu ON pt.from_user_id = fu.id

@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores'
 
 // 创建基础HTTP客户端
 const http = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://localhost:4000/api',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
@@ -34,6 +34,52 @@ const httpClient = createHttpClient(http, {
     }
   }
 })
+
+// 添加响应拦截器，处理响应结构
+httpClient.interceptors.response.use(
+  (response) => {
+    // 处理成功响应
+    const data = response.data
+    
+    // 如果后端返回的是标准格式 {success, data, message}
+    if (data && typeof data === 'object' && 'success' in data) {
+      return data
+    }
+    
+    // 否则包装为标准格式
+    return {
+      success: true,
+      data: data,
+      message: ''
+    }
+  },
+  (error) => {
+    // 处理错误响应
+    console.error('HTTP请求错误:', error)
+    
+    // 如果有响应数据，返回标准错误格式
+    if (error.response && error.response.data) {
+      const errorData = error.response.data
+      
+      if (errorData && typeof errorData === 'object' && 'success' in errorData) {
+        return Promise.reject(errorData)
+      }
+      
+      return Promise.reject({
+        success: false,
+        data: null,
+        message: errorData.message || error.message || '请求失败'
+      })
+    }
+    
+    // 网络错误或其他错误
+    return Promise.reject({
+      success: false,
+      data: null,
+      message: error.message || '网络连接失败'
+    })
+  }
+)
 
 // 导出配置好的HTTP客户端
 export default httpClient

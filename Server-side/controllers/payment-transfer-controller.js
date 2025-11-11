@@ -85,8 +85,8 @@ const getPaymentTransfers = async (req, res) => {
       SELECT 
         pt.*,
         b.id as bill_id, b.title as bill_title, b.amount as bill_amount, b.status as bill_status,
-        fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar as from_user_avatar,
-        tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar as to_user_avatar
+        fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar_url as from_user_avatar,
+        tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar_url as to_user_avatar
       FROM payment_transfers pt
       LEFT JOIN bills b ON pt.bill_id = b.id
       LEFT JOIN users fu ON pt.from_user_id = fu.id
@@ -232,8 +232,8 @@ const createPaymentTransfer = async (req, res) => {
         `SELECT 
          pt.*,
          b.id as bill_id, b.title as bill_title, b.amount as bill_amount, b.status as bill_status,
-         fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar as from_user_avatar,
-         tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar as to_user_avatar
+         fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar_url as from_user_avatar,
+         tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar_url as to_user_avatar
          FROM payment_transfers pt
          LEFT JOIN bills b ON pt.bill_id = b.id
          LEFT JOIN users fu ON pt.from_user_id = fu.id
@@ -316,8 +316,8 @@ const confirmPaymentTransfer = async (req, res) => {
       `SELECT 
        pt.*,
        b.id as bill_id, b.title as bill_title, b.amount as bill_amount, b.status as bill_status,
-       fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar as from_user_avatar,
-       tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar as to_user_avatar
+       fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar_url as from_user_avatar,
+       tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar_url as to_user_avatar
        FROM payment_transfers pt
        LEFT JOIN bills b ON pt.bill_id = b.id
        LEFT JOIN users fu ON pt.from_user_id = fu.id
@@ -362,8 +362,8 @@ const confirmPaymentTransfer = async (req, res) => {
         `SELECT 
          pt.*,
          b.id as bill_id, b.title as bill_title, b.amount as bill_amount, b.status as bill_status,
-         fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar as from_user_avatar,
-         tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar as to_user_avatar
+         fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar_url as from_user_avatar,
+         tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar_url as to_user_avatar
          FROM payment_transfers pt
          LEFT JOIN bills b ON pt.bill_id = b.id
          LEFT JOIN users fu ON pt.from_user_id = fu.id
@@ -448,8 +448,8 @@ const cancelPaymentTransfer = async (req, res) => {
       `SELECT 
        pt.*,
        b.id as bill_id, b.title as bill_title, b.amount as bill_amount, b.status as bill_status,
-       fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar as from_user_avatar,
-       tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar as to_user_avatar
+       fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar_url as from_user_avatar,
+       tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar_url as to_user_avatar
        FROM payment_transfers pt
        LEFT JOIN bills b ON pt.bill_id = b.id
        LEFT JOIN users fu ON pt.from_user_id = fu.id
@@ -496,8 +496,8 @@ const cancelPaymentTransfer = async (req, res) => {
         `SELECT 
          pt.*,
          b.id as bill_id, b.title as bill_title, b.amount as bill_amount, b.status as bill_status,
-         fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar as from_user_avatar,
-         tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar as to_user_avatar
+         fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar_url as from_user_avatar,
+         tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar_url as to_user_avatar
          FROM payment_transfers pt
          LEFT JOIN bills b ON pt.bill_id = b.id
          LEFT JOIN users fu ON pt.from_user_id = fu.id
@@ -583,8 +583,8 @@ const getPaymentTransferById = async (req, res) => {
        pt.*,
        b.id as bill_id, b.title as bill_title, b.amount as bill_amount, b.status as bill_status, b.room_id as bill_room_id,
        r.id as room_id, r.name as room_name,
-       fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar as from_user_avatar,
-       tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar as to_user_avatar
+       fu.id as from_user_id, fu.name as from_user_name, fu.email as from_user_email, fu.avatar_url as from_user_avatar,
+       tu.id as to_user_id, tu.name as to_user_name, tu.email as to_user_email, tu.avatar_url as to_user_avatar
        FROM payment_transfers pt
        LEFT JOIN bills b ON pt.bill_id = b.id
        LEFT JOIN rooms r ON b.room_id = r.id

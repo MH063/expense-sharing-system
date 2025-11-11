@@ -18,44 +18,66 @@ class BillService extends BaseService {
    * @returns {Promise<Object>} 创建的账单
    */
   async createBill(billData) {
-    const id = uuidv4();
-    const { 
-      room_id, 
-      title, 
-      description, 
-      amount, 
-      due_date, 
-      created_by, 
-      is_recurring, 
-      recurring_type, 
-      recurring_end_date 
+    const {
+      room_id,
+      title,
+      description,
+      amount,
+      currency,
+      category_id,
+      creator_id,
+      due_date,
+      is_recurring = false,
+      recurring_type = null,
+      recurring_end_date = null
     } = billData;
 
-    const sql = `
+    // 使用 Sequelize 插入数据
+    const [result] = await sequelize.query(`
       INSERT INTO bills (
-        id, room_id, title, description, amount, 
-        due_date, created_by, is_recurring, 
-        recurring_type, recurring_end_date, status, created_at, updated_at
+        uuid,
+        room_id,
+        title,
+        description,
+        amount,
+        currency,
+        category_id,
+        creator_id,
+        due_date,
+        is_recurring,
+        recurring_type,
+        recurring_end_date,
+        status,
+        created_at,
+        updated_at
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', 
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'pending', 
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
       RETURNING *
-    `;
-    
-    const values = [
-      id, room_id, title, description, amount, 
-      due_date, created_by, is_recurring, 
-      recurring_type, recurring_end_date
-    ];
-    
-    const result = await this.query(sql, values);
+    `, {
+      replacements: {
+        uuid: uuidv4(),
+        room_id,
+        title,
+        description,
+        amount,
+        currency,
+        category_id,
+        creator_id,
+        due_date,
+        created_by: creator_id,
+        is_recurring,
+        recurring_type,
+        recurring_end_date
+      }
+    });
     
     // 清除相关缓存
     await this.clearBillCache(room_id, null);
     
-    return result.rows[0];
+    return result[0];
   }
 
   /**
@@ -109,14 +131,14 @@ class BillService extends BaseService {
         SELECT 
           b.*,
           u.username as creator_name,
-          u.avatar as creator_avatar,
+          u.avatar_url as creator_avatar,
           COALESCE(SUM(p.amount), 0) as paid_amount,
           (b.amount - COALESCE(SUM(p.amount), 0)) as remaining_amount
         FROM bills b
-        LEFT JOIN users u ON b.created_by = u.id
+        LEFT JOIN users u ON b.creator_id = u.id
         LEFT JOIN payments p ON b.id = p.bill_id AND p.status = 'completed'
         ${whereClause}
-        GROUP BY b.id, u.username, u.avatar
+        GROUP BY b.id, u.username, u.avatar_url
         ORDER BY b.${sortField} ${sortDirection}
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
@@ -168,7 +190,7 @@ class BillService extends BaseService {
           u.username as creator_name,
           r.name as room_name
         FROM bills b
-        LEFT JOIN users u ON b.created_by = u.id
+        LEFT JOIN users u ON b.creator_id = u.id
         LEFT JOIN rooms r ON b.room_id = r.id
         ORDER BY b.created_at DESC
         LIMIT $1
@@ -193,10 +215,10 @@ class BillService extends BaseService {
         SELECT 
           b.*,
           u.username as creator_name,
-          u.avatar as creator_avatar,
+          u.avatar_url as creator_avatar,
           r.name as room_name
         FROM bills b
-        LEFT JOIN users u ON b.created_by = u.id
+        LEFT JOIN users u ON b.creator_id = u.id
         LEFT JOIN rooms r ON b.room_id = r.id
         WHERE b.id = $1
       `;
@@ -222,9 +244,9 @@ class BillService extends BaseService {
         SELECT 
           b.*,
           u.username as creator_name,
-          u.avatar as creator_avatar
+          u.avatar_url as creator_avatar
         FROM bills b
-        LEFT JOIN users u ON b.created_by = u.id
+        LEFT JOIN users u ON b.creator_id = u.id
         WHERE b.id = $1
       `;
       
@@ -241,7 +263,7 @@ class BillService extends BaseService {
         SELECT 
           p.*,
           u.username as payer_name,
-          u.avatar as payer_avatar
+          u.avatar_url as payer_avatar
         FROM payments p
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.bill_id = $1
@@ -405,7 +427,7 @@ class BillService extends BaseService {
     
     // 根据角色筛选
     if (role === 'creator') {
-      whereClause += ` AND b.created_by = $1`;
+      whereClause += ` AND b.creator_id = $1`;
     } else if (role === 'payer') {
       whereClause += ` AND p.user_id = $1`;
     }
@@ -420,19 +442,19 @@ class BillService extends BaseService {
       SELECT DISTINCT
         b.*,
         u.username as creator_name,
-        u.avatar as creator_avatar,
+        u.avatar_url as creator_avatar,
         CASE 
-          WHEN b.created_by = $1 THEN true
+          WHEN b.creator_id = $1 THEN true
           ELSE false
         END as is_creator,
         COALESCE(SUM(p.amount), 0) as paid_amount,
         (b.amount - COALESCE(SUM(p.amount), 0)) as remaining_amount
       FROM bills b
       JOIN room_members rm ON b.room_id = rm.room_id
-      LEFT JOIN users u ON b.created_by = u.id
+      LEFT JOIN users u ON b.creator_id = u.id
       LEFT JOIN payments p ON b.id = p.bill_id AND p.status = 'completed'
       ${whereClause}
-      GROUP BY b.id, u.username, u.avatar
+      GROUP BY b.id, u.username, u.avatar_url
       ORDER BY b.${sortField} ${sortDirection}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -591,7 +613,7 @@ class BillService extends BaseService {
     
     // 如果有未缓存的账单，从数据库获取
     if (uncachedIds.length > 0) {
-      const sql = `SELECT id, room_id, title, description, amount, status, due_date, created_by, created_at, updated_at FROM bills WHERE id = ANY($1)`;
+      const sql = `SELECT id, room_id, title, description, amount, status, due_date, creator_id, created_at, updated_at FROM bills WHERE id = ANY($1)`;
       const dbResult = await this.query(sql, [uncachedIds]);
       
       // 批量设置缓存

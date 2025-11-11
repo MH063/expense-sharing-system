@@ -91,7 +91,8 @@ function sanitizeRequestResponse(req, res, next) {
       const sanitizedBodyString = sanitizeMessage(bodyString);
       req.body = JSON.parse(sanitizedBodyString);
     } catch (error) {
-      logger.warn('请求体脱敏失败:', error);
+      // 使用console而不是logger避免循环导入
+      console.warn('请求体脱敏失败:', error.message);
     }
   }
   
@@ -102,7 +103,8 @@ function sanitizeRequestResponse(req, res, next) {
       const sanitizedQueryString = sanitizeMessage(queryString);
       req.query = JSON.parse(sanitizedQueryString);
     } catch (error) {
-      logger.warn('查询参数脱敏失败:', error);
+      // 使用console而不是logger避免循环导入
+      console.warn('查询参数脱敏失败:', error.message);
     }
   }
   

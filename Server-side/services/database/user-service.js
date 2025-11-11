@@ -22,7 +22,7 @@ class UserService extends BaseService {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.username = $1 AND r.name = '系统管理员'`;
+         WHERE u.username = $1 AND r.name = '管理员'`;
     const result = await this.query(sql, [username]);
     return result.rows.length > 0 ? result.rows[0] : null;
   }
@@ -217,13 +217,13 @@ class UserService extends BaseService {
     // 使用增强版缓存的getOrSet方法实现缓存穿透保护
     return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `
-        SELECT r.*, rm.relation_type, rm.join_date
+        SELECT r.*, rm.role, rm.joined_at
         FROM rooms r
         JOIN room_members rm ON r.id = rm.room_id
-        WHERE rm.user_id = $1 AND rm.is_active = $2 AND r.is_active = $2
-        ORDER BY rm.join_date DESC
+        WHERE rm.user_id = $1 AND r.status = $2
+        ORDER BY rm.joined_at DESC
       `;
-      const result = await this.query(sql, [userId, true]);
+      const result = await this.query(sql, [userId, 'active']);
       return result.rows;
     }, enhancedCacheService.getDefaultTTL('room'), ['user', 'room']); // 使用房间类型的默认TTL并添加多个标签
   }
@@ -240,13 +240,13 @@ class UserService extends BaseService {
     // 使用增强版缓存的getOrSet方法实现缓存穿透保护
     return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `
-        SELECT u.id, u.username, u.email, u.name, u.avatar, u.phone, rm.relation_type, rm.join_date
+        SELECT u.id, u.username, u.email, u.name, u.avatar, u.phone, rm.role, rm.joined_at
         FROM users u
         JOIN room_members rm ON u.id = rm.user_id
-        WHERE rm.room_id = $1 AND rm.is_active = $2 AND u.is_active = $2
-        ORDER BY rm.join_date ASC
+        WHERE rm.room_id = $1 AND u.status = $2
+        ORDER BY rm.joined_at ASC
       `;
-      const result = await this.query(sql, [roomId, true]);
+      const result = await this.query(sql, [roomId, 'active']);
       return result.rows;
     }, enhancedCacheService.getDefaultTTL('room'), ['room', 'user']); // 使用房间类型的默认TTL并添加多个标签
   }

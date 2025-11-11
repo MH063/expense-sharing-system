@@ -12,15 +12,7 @@ export default defineConfig({
   },
   server: {
     port: 8000,
-    host: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-        // 不重写路径，保持 /api 前缀，后端已以 /api 挂载
-        // rewrite: (path) => path.replace(/^\/api/, ''),
-      }
-    }
+    host: true
   },
   build: {
     outDir: 'dist',

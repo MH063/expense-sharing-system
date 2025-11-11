@@ -53,7 +53,8 @@ const corsOptions = {
     'Accept',
     'Authorization',
     'Cache-Control',
-    'X-File-Name'
+    'X-File-Name',
+    'X-Request-Id'
   ],
   
   // 暴露的响应头
@@ -96,7 +97,7 @@ const customCorsMiddleware = (req, res, next) => {
   // 处理预检请求
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-File-Name');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-File-Name, X-Request-Id');
     res.setHeader('Access-Control-Max-Age', '86400');
     return res.status(200).end();
   }

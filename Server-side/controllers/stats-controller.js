@@ -57,7 +57,7 @@ class StatsController {
           COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed_payments,
           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_payments
         FROM payments 
-        WHERE ${room_id ? 'room_id = $1 AND' : ''} user_id = $${room_id ? '2' : '1'}
+        WHERE ${room_id ? 'room_id = $1 AND' : ''} payer_id = $${room_id ? '2' : '1'}
       `;
       
       const paymentStatsResult = await client.query(
@@ -73,7 +73,7 @@ class StatsController {
           COUNT(CASE WHEN status = 'settled' THEN 1 END) as settled_splits,
           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_splits,
           COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount
-        FROM splits 
+        FROM expense_splits 
         WHERE ${room_id ? 'room_id = $1 AND' : ''} user_id = $${room_id ? '2' : '1'}
       `;
       
@@ -91,7 +91,7 @@ class StatsController {
           COUNT(CASE WHEN status = 'open' THEN 1 END) as open_bills,
           COALESCE(SUM(CASE WHEN status = 'open' THEN amount ELSE 0 END), 0) as open_amount
         FROM bills 
-        WHERE ${room_id ? 'room_id = $1 AND' : ''} created_by = $${room_id ? '2' : '1'}
+        WHERE ${room_id ? 'room_id = $1 AND' : ''} creator_id = $${room_id ? '2' : '1'}
       `;
       
       const billStatsResult = await client.query(
@@ -103,12 +103,13 @@ class StatsController {
       // 获取费用类型统计
       const expenseTypesQuery = `
         SELECT 
-          category,
+          ec.name as category,
           COUNT(*) as count,
-          COALESCE(SUM(amount), 0) as total_amount
-        FROM expenses 
-        WHERE ${room_id ? 'room_id = $1 AND' : ''} user_id = $${room_id ? '2' : '1'}
-        GROUP BY category
+          COALESCE(SUM(e.amount), 0) as total_amount
+        FROM expenses e
+        LEFT JOIN expense_categories ec ON e.category_id = ec.id
+        WHERE ${room_id ? 'e.room_id = $1 AND' : ''} e.payer_id = $${room_id ? '2' : '1'}
+        GROUP BY ec.name
         ORDER BY total_amount DESC
       `;
       
@@ -121,12 +122,12 @@ class StatsController {
       // 获取最近30天的每日费用趋势
       const dailyTrendQuery = `
         SELECT 
-          DATE(created_at) as date,
+          DATE(expense_date) as date,
           COALESCE(SUM(amount), 0) as total_amount
         FROM expenses 
-        WHERE ${room_id ? 'room_id = $1 AND' : ''} user_id = $${room_id ? '2' : '1'}
-        AND created_at >= CURRENT_DATE - INTERVAL '30 days'
-        GROUP BY DATE(created_at)
+        WHERE ${room_id ? 'room_id = $1 AND' : ''} payer_id = $${room_id ? '2' : '1'}
+        AND expense_date >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY DATE(expense_date)
         ORDER BY date
       `;
       
@@ -238,7 +239,7 @@ class StatsController {
           COUNT(CASE WHEN status = 'settled' THEN 1 END) as settled_splits,
           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_splits,
           COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount
-        FROM splits 
+        FROM expense_splits 
         WHERE room_id = $1
       `;
       
@@ -262,12 +263,13 @@ class StatsController {
       // 获取寝室费用类型统计
       const expenseTypesQuery = `
         SELECT 
-          category,
+          ec.name as category,
           COUNT(*) as count,
-          COALESCE(SUM(amount), 0) as total_amount
-        FROM expenses 
-        WHERE room_id = $1
-        GROUP BY category
+          COALESCE(SUM(e.amount), 0) as total_amount
+        FROM expenses e
+        LEFT JOIN expense_categories ec ON e.category_id = ec.id
+        WHERE e.room_id = $1
+        GROUP BY ec.name
         ORDER BY total_amount DESC
       `;
       
@@ -286,7 +288,7 @@ class StatsController {
           COALESCE(SUM(p.amount), 0) as total_payment_amount
         FROM users u
         LEFT JOIN room_members rm ON u.id = rm.user_id
-        LEFT JOIN expenses e ON u.id = e.user_id AND e.room_id = $1
+        LEFT JOIN expenses e ON u.id = e.payer_id AND e.room_id = $1
         LEFT JOIN payments p ON u.id = p.user_id AND p.room_id = $1
         WHERE rm.room_id = $1
         GROUP BY u.id, u.username, u.nickname
@@ -299,12 +301,12 @@ class StatsController {
       // 获取最近30天的每日费用趋势
       const dailyTrendQuery = `
         SELECT 
-          DATE(created_at) as date,
+          DATE(expense_date) as date,
           COALESCE(SUM(amount), 0) as total_amount
         FROM expenses 
         WHERE room_id = $1
-        AND created_at >= CURRENT_DATE - INTERVAL '30 days'
-        GROUP BY DATE(created_at)
+        AND expense_date >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY DATE(expense_date)
         ORDER BY date
       `;
       
@@ -688,7 +690,7 @@ class StatsController {
           amount,
           due_date,
           status,
-          created_by
+          creator_id
         FROM bills
         WHERE room_id = $1 AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
         ORDER BY due_date
@@ -728,7 +730,7 @@ class StatsController {
           amount: PrecisionCalculator.round(parseFloat(bill.amount), 2),
           due_date: bill.due_date,
           status: bill.status,
-          created_by: bill.created_by
+          created_by: bill.creator_id
         }))
       });
     } catch (error) {

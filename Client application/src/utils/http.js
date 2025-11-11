@@ -81,7 +81,10 @@ http.interceptors.request.use(
     }
 
     // 路径去重：若 baseURL 已含 /api，且 url 以 /api/ 开头则去掉前缀
-    if (typeof config.url === 'string' && config.url.startsWith('/api/')) {
+    // 但认证相关的URL不去重
+    if (typeof config.url === 'string' && 
+        config.url.startsWith('/api/') && 
+        !config.url.startsWith('/api/auth/')) {
       config.url = config.url.replace(/^\/api\//, '/')
     }
 
@@ -118,6 +121,12 @@ http.interceptors.response.use(
     console.log(`[HTTP响应] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data)
 
     const raw = response?.data
+
+    // 对于认证相关接口，直接返回后端原始数据结构，不做额外包装
+    if (shouldSkipCaseConvert(response?.config?.url)) {
+      console.log('认证接口直接返回原始数据:', raw)
+      return raw
+    }
 
     // 标准化：优先解包 { success, data }；否则包裹为 success=true
     let success = true

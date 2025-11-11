@@ -8,14 +8,14 @@ const { adminValidationRules } = require('../middleware/validation-middleware');
 // 获取用户列表 - 需要管理员权限
 router.get('/users', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   userController.getUsers
 );
 
 // 获取用户详情 - 需要管理员权限
 router.get('/users/:id', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.getUserById,
   handleValidationErrors,
   userController.getUserById
@@ -24,7 +24,7 @@ router.get('/users/:id',
 // 创建用户 - 需要管理员权限
 router.post('/users', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.createUser,
   handleValidationErrors,
   userController.createUser
@@ -33,7 +33,7 @@ router.post('/users',
 // 更新用户信息 - 需要管理员权限
 router.put('/users/:id', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.updateUser,
   handleValidationErrors,
   userController.updateUser
@@ -42,7 +42,7 @@ router.put('/users/:id',
 // 更新用户状态 - 需要管理员权限
 router.patch('/users/:id/status', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.updateUserStatus,
   handleValidationErrors,
   userController.updateUserStatus
@@ -51,7 +51,7 @@ router.patch('/users/:id/status',
 // 重置用户密码 - 需要管理员权限
 router.post('/users/:id/reset-password', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.resetUserPassword,
   handleValidationErrors,
   userController.resetUserPassword
@@ -60,7 +60,7 @@ router.post('/users/:id/reset-password',
 // 更新用户角色 - 需要管理员权限
 router.put('/users/:id/role', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.updateUserRole,
   handleValidationErrors,
   userController.updateUserRole
@@ -69,7 +69,7 @@ router.put('/users/:id/role',
 // 删除用户 - 需要管理员权限
 router.delete('/users/:id', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.deleteUser,
   handleValidationErrors,
   userController.deleteUser
@@ -78,7 +78,7 @@ router.delete('/users/:id',
 // 批量更新用户状态 - 需要管理员权限
 router.patch('/users/batch/status', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   adminValidationRules.batchUpdateUserStatus,
   handleValidationErrors,
   userController.batchUpdateUserStatus
@@ -87,7 +87,7 @@ router.patch('/users/batch/status',
 // 获取用户统计信息 - 需要管理员权限
 router.get('/users/statistics', 
   authenticateToken,
-  checkRole(['admin', 'system_admin']),
+  checkRole(['admin', '系统管理员']),
   userController.getUserStatistics
 );
 

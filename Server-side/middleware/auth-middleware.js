@@ -55,7 +55,7 @@ async function isAdmin(req, res, next) {
     const userRole = await TokenManager.getUserRole(req.user.sub);
 
     // 检查用户是否为管理员
-    if (userRole !== 'admin' && userRole !== '系统管理员') {
+    if (userRole !== 'admin' && userRole !== 'system_admin') {
       return res.status(403).json({
         success: false,
         message: '需要管理员权限'

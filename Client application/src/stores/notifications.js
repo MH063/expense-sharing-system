@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import websocketClient from '@/utils/websocket-client'
+import websocketService from '@/services/websocket-service'
 import { useAuthStore } from '@/stores/auth'
 
 const MAX_NOTIFICATIONS = 50
@@ -54,17 +54,20 @@ export const useNotificationStore = defineStore('notifications', () => {
     notifications.value = notifications.value.filter(item => item.id !== notificationId)
   }
 
-  const connect = () => {
+  const connect = async () => {
     if (isConnected.value || isConnecting.value) {
+      console.log('通知Store: 连接已在进行中或已连接')
       return
     }
 
+    console.log('通知Store: 初始化WebSocket连接')
     isConnecting.value = true
     const authStore = useAuthStore()
 
     try {
-      // WebSocket连接事件处理
-      websocketClient.on('connected', () => {
+      // 设置全局WebSocket连接事件处理
+      websocketService.on('connected', () => {
+        console.log('✅ 通知Store: WebSocket连接成功')
         isConnected.value = true
         isConnecting.value = false
         connectionAttempts.value = 0
@@ -73,113 +76,153 @@ export const useNotificationStore = defineStore('notifications', () => {
         
         // 重新订阅之前订阅的事件
         if (channels.value.size > 0) {
-          websocketClient.subscribe([...channels.value])
+          console.log(`📡 通知Store: 重新订阅 ${channels.value.size} 个事件`)
+          websocketService.subscribe([...channels.value])
         }
       })
 
-      websocketClient.on('disconnected', () => {
+      websocketService.on('disconnected', () => {
+        console.log('🔌 通知Store: WebSocket连接断开')
         isConnected.value = false
         isConnecting.value = false
       })
 
-      websocketClient.on('reconnecting', () => {
+      websocketService.on('reconnecting', (data) => {
+        console.log('🔄 通知Store: 正在重连', data)
         isReconnecting.value = true
         isConnecting.value = false
       })
 
-      websocketClient.on('reconnect_failed', () => {
+      websocketService.on('reconnect_failed', (data) => {
+        console.log('❌ 通知Store: 重连失败', data)
         isReconnecting.value = false
         isConnecting.value = false
-        lastError.value = new Error('WebSocket重连失败，已达到最大重试次数')
+        lastError.value = new Error(`WebSocket重连失败，已达到最大重试次数 (${data.maxAttempts}次)`)
       })
 
-      websocketClient.on('error', (error) => {
+      websocketService.on('error', (error) => {
+        console.error('❌ 通知Store: WebSocket错误', error)
         lastError.value = error
         isConnecting.value = false
       })
 
-      const handlePayload = (payload) => {
+      // 监听通知消息
+      websocketService.on('notification', (notification) => {
+        console.log('📢 通知Store: 收到通知消息', notification)
         addNotification({
-          id: payload.data?.id,
-          title: payload.data?.title || '系统通知',
-          message: payload.data?.message,
-          type: payload.data?.type || 'info',
-          timestamp: payload.timestamp || new Date().toISOString(),
+          id: notification.id || `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+          title: notification.title || '系统通知',
+          message: notification.message,
+          type: notification.type || 'info',
+          timestamp: notification.timestamp || new Date().toISOString(),
           read: false,
-          payload
+          data: notification.data,
+          url: notification.url
         })
-      }
+      })
 
+      // 订阅常见的事件类型
       const eventTypes = [
         'expense_created',
-        'expense_updated',
+        'expense_updated', 
+        'expense_deleted',
         'bill_created',
+        'bill_updated',
         'payment_created',
+        'payment_completed',
+        'payment_failed',
         'review_status_updated',
         'dispute_processed',
-        'notification',
+        'dormitory_invitation',
+        'dormitory_joined',
+        'dormitory_left',
+        'member_added',
         'payment_confirmed',
         'qr_code_uploaded',
         'payment_status_changed'
       ]
 
-      eventTypes.forEach(eventType => {
-        websocketClient.on(eventType, (data) => {
-          handlePayload({ ...data, type: data.data?.type || eventType })
-        })
-      })
+      // 订阅所有事件类型
+      console.log('📡 通知Store: 订阅事件类型', eventTypes)
+      websocketService.subscribe(eventTypes)
 
-      // 使用认证令牌连接WebSocket
-      websocketClient.connect(authStore.accessToken).catch(error => {
-        console.error('WebSocket连接失败:', error)
-        lastError.value = error
-        connectionAttempts.value += 1
-        isConnecting.value = false
-      })
+      // 使用认证令牌连接全局WebSocket服务
+      await websocketService.connect(authStore.accessToken)
+      console.log('✅ 通知Store: WebSocket连接初始化完成')
     } catch (error) {
+      console.error('❌ 通知Store: WebSocket连接失败', error)
       lastError.value = error
       connectionAttempts.value += 1
       isConnecting.value = false
+      isReconnecting.value = false
     }
   }
 
   const disconnect = () => {
-    websocketClient.disconnect()
+    console.log('🔌 通知Store: 手动断开WebSocket连接')
+    websocketService.disconnect()
     isConnected.value = false
     isReconnecting.value = false
+    isConnecting.value = false
   }
 
   const subscribeChannels = (newChannels) => {
     const normalizedChannels = Array.isArray(newChannels) ? newChannels : [newChannels]
+    console.log('📡 通知Store: 订阅频道', normalizedChannels)
+    
     normalizedChannels.forEach(channel => channels.value.add(channel))
+    
     if (isConnected.value) {
-      websocketClient.subscribe(normalizedChannels)
+      websocketService.subscribe(normalizedChannels)
     }
   }
 
   const unsubscribeChannels = (removedChannels) => {
     const normalizedChannels = Array.isArray(removedChannels) ? removedChannels : [removedChannels]
+    console.log('📡 通知Store: 取消订阅频道', normalizedChannels)
+    
     normalizedChannels.forEach(channel => channels.value.delete(channel))
+    
     if (isConnected.value) {
-      websocketClient.unsubscribe(normalizedChannels)
+      websocketService.unsubscribe(normalizedChannels)
     }
   }
 
-  const retryConnection = () => {
+  const retryConnection = async () => {
+    console.log('🔄 通知Store: 重试WebSocket连接')
     const authStore = useAuthStore()
     connectionAttempts.value = 0
     lastError.value = null
     isConnecting.value = true
-    websocketClient.connect(authStore.accessToken).catch(error => {
-      console.error('WebSocket重连失败:', error)
+    
+    try {
+      await websocketService.retryConnection()
+      console.log('✅ 通知Store: 重连成功')
+    } catch (error) {
+      console.error('❌ 通知Store: 重连失败', error)
       lastError.value = error
       connectionAttempts.value += 1
       isConnecting.value = false
-    })
+      isReconnecting.value = false
+    }
   }
 
   const updateWebSocketConfig = (config = {}) => {
-    websocketClient.updateConfig(config)
+    console.log('⚙️ 通知Store: 更新WebSocket配置', config)
+    websocketService.updateConfig(config)
+  }
+
+  /**
+   * 初始化通知Store（应用启动时自动调用）
+   */
+  const initialize = async () => {
+    console.log('🚀 通知Store: 初始化通知服务')
+    try {
+      await connect()
+      console.log('✅ 通知Store: 初始化完成')
+    } catch (error) {
+      console.error('❌ 通知Store: 初始化失败', error)
+    }
   }
 
   return {
@@ -200,6 +243,7 @@ export const useNotificationStore = defineStore('notifications', () => {
     subscribeChannels,
     unsubscribeChannels,
     retryConnection,
-    updateWebSocketConfig
+    updateWebSocketConfig,
+    initialize
   }
 })

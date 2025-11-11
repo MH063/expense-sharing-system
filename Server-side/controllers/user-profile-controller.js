@@ -213,9 +213,9 @@ class UserProfileController {
       }
 
       // 删除旧头像文件（如果存在）
-      if (user.avatar) {
+      if (user.avatar_url) {
         try {
-          const oldAvatarPath = path.join(__dirname, '..', 'uploads', path.basename(user.avatar));
+          const oldAvatarPath = path.join(__dirname, '..', 'uploads', path.basename(user.avatar_url));
           await fs.unlink(oldAvatarPath);
         } catch (err) {
           logger.warn('删除旧头像文件失败:', err);
@@ -224,7 +224,7 @@ class UserProfileController {
 
       // 更新用户头像URL
       const avatarUrl = `${config.server.baseUrl}/uploads/${req.file.filename}`;
-      user.avatar = avatarUrl;
+      user.avatar_url = avatarUrl;
       await user.save();
 
       logger.info('更新用户头像成功', { userId, avatarUrl });

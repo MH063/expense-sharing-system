@@ -48,6 +48,9 @@
           <!-- 通知组件 -->
           <NotificationsContainer v-if="isAuthenticated" />
           
+          <!-- 全局连接状态指示器 -->
+          <NotificationConnectionStatus v-if="isAuthenticated" />
+          
           <!-- 用户菜单 -->
           <div class="user-menu" v-if="isAuthenticated">
             <div class="user-avatar" @click="toggleUserMenu">
@@ -132,6 +135,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import NotificationsContainer from '@/components/NotificationsContainer.vue'
+import NotificationConnectionStatus from '@/components/NotificationConnectionStatus.vue'
 
 // 响应式数据
 const showUserMenu = ref(false)

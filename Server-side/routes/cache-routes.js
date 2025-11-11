@@ -17,7 +17,7 @@ const cacheWarmupService = new CacheWarmupService();
  * 获取缓存统计信息
  * GET /api/cache/stats
  */
-router.get('/stats', authenticateToken, checkRole(['admin', '系统管理员']), async (req, res) => {
+router.get('/stats', authenticateToken, checkRole(['admin', 'system_admin']), async (req, res) => {
   try {
     const stats = enhancedCacheService.getStats();
     

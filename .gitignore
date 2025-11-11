@@ -92,6 +92,23 @@ docker-compose.override.yml
 *.tar.gz
 dump.rdb
 
+# 项目特定 - 客户端组件和功能
+# 注意：确保新的Vue组件和服务不被忽略
+
+# 开发工具
+.vite/
+
+# 特定的Node.js版本文件
+.node-version
+
+# 缓存文件
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
 # 安全提示
 # 如果您需要分享项目配置，请使用 .env.example 文件作为模板
 # 不要将包含真实值的 .env 文件提交到版本控制系统

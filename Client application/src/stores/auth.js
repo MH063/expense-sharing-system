@@ -166,8 +166,17 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await refreshPromise.value
       
       // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-      if (res.success && res.payload) {
-        const { token: newAccessToken, refreshToken: newRefreshToken } = res.payload
+      // 注意：根据规则，后端数据是双层嵌套，可能需要访问 res.data.data.xxx
+      let responseData = res.data
+      
+      // 如果数据是双层嵌套，尝试访问 res.data.data
+      if (responseData && responseData.data) {
+        responseData = responseData.data
+        console.log('检测到双层嵌套数据结构，使用res.data.data')
+      }
+      
+      if (res.success && responseData) {
+        const { token: newAccessToken, refreshToken: newRefreshToken } = responseData
         
         // 获取当前用户名，确保Token刷新时使用正确的用户上下文
         const currentUsername = tokenManager.getCurrentUser()
@@ -253,9 +262,14 @@ export const useAuthStore = defineStore('auth', () => {
   // 连接WebSocket
   const connectWebSocket = () => {
     if (accessToken.value) {
+      console.log('尝试连接WebSocket...')
       websocketClient.connect(accessToken.value).catch(error => {
         console.error('WebSocket连接失败:', error)
+        // WebSocket连接失败不应该影响登录流程
+        console.log('WebSocket连接失败，但登录流程继续')
       })
+    } else {
+      console.log('没有accessToken，跳过WebSocket连接')
     }
   }
 
@@ -276,12 +290,22 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('调用登录API:', credentials)
       
       // 使用http客户端调用后端登录接口
+      console.log('发送登录请求...')
       const res = await http.post('/auth/login', credentials)
+      console.log('收到完整响应:', JSON.stringify(res, null, 2))
+      console.log('响应类型:', typeof res)
+      console.log('响应success属性:', res.success)
+      console.log('响应data属性:', res.data)
       
-      // 处理后端返回的数据结构 {success: true, data: {token, refreshToken, user}}
-      // 从response.data.data获取实际数据
-      if (res.success && res.payload) {
-        const { token, refreshToken: refreshTkn, user: userData } = response.data.data
+      // 处理后端返回的数据结构 {success: true, data: {user, accessToken, refreshToken}}
+      console.log('登录API响应:', res)
+      
+      // 后端返回的是单层嵌套：res.data 包含 {user, accessToken, refreshToken}
+      let responseData = res.data
+      console.log('使用res.data作为响应数据:', responseData)
+      
+      if (res.success && responseData) {
+        const { accessToken: token, refreshToken: refreshTkn, user: userData } = responseData
         
         console.log('登录成功，收到Token:', {
           hasToken: !!token,
@@ -313,13 +337,37 @@ export const useAuthStore = defineStore('auth', () => {
           hasRefreshToken: !!refreshToken.value
         })
         
-        return { success: true, user: userData }
+        // 返回完整的响应信息给前端组件
+        return { 
+          success: true, 
+          user: userData,
+          message: '登录成功'
+        }
       } else {
         throw new Error(res.message || '登录失败')
       }
     } catch (error) {
       console.error('登录失败:', error)
-      throw new Error(error.response?.data?.message || '登录失败，请稍后重试')
+      
+      // 处理后端错误响应的双层嵌套结构
+      let errorMessage = '登录失败，请稍后重试'
+      
+      if (error.response?.data) {
+        let errorData = error.response.data
+        
+        // 如果是双层嵌套结构，尝试访问 res.data.data
+        if (errorData && errorData.data) {
+          errorData = errorData.data
+        }
+        
+        if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+      }
+      
+      throw new Error(errorMessage)
     }
   }
   

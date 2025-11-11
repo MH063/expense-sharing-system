@@ -227,13 +227,20 @@ function globalErrorHandler(error, req, res, next) {
  * @param {Function} next - 下一步函数
  */
 function notFoundHandler(req, res, next) {
-  const error = new AppError(
-    ERROR_CODES.ROUTE_NOT_FOUND,
-    `无法找到路由: ${req.originalUrl}`,
-    404
-  );
+  // 直接返回404，不使用next传递错误，避免被sanitizeInput等中间件干扰
+  logger.warn('404路由未找到:', {
+    url: req.originalUrl,
+    method: req.method,
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  });
   
-  next(error);
+  return res.status(404).json({
+    success: false,
+    code: ERROR_CODES.ROUTE_NOT_FOUND,
+    message: `无法找到路由: ${req.originalUrl}`,
+    timestamp: new Date().toISOString()
+  });
 }
 
 /**

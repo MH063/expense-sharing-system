@@ -202,9 +202,11 @@ export default {
     
     const getRoleLabel = (role) => {
       const roleLabels = {
+        [ROLES.SYSTEM_ADMIN]: '系统管理员',
         [ROLES.ADMIN]: '管理员',
         [ROLES.ROOM_OWNER]: '寝室长',
-        [ROLES.ROOM_MEMBER]: '寝室成员',
+        [ROLES.PAYER]: '缴费人',
+        [ROLES.USER]: '普通用户',
         [ROLES.GUEST]: '访客'
       }
       return roleLabels[role] || '未知角色'
@@ -212,9 +214,11 @@ export default {
     
     const getRoleTagType = (role) => {
       const roleTypes = {
+        [ROLES.SYSTEM_ADMIN]: 'danger',
         [ROLES.ADMIN]: 'danger',
         [ROLES.ROOM_OWNER]: 'warning',
-        [ROLES.ROOM_MEMBER]: 'primary',
+        [ROLES.PAYER]: 'primary',
+        [ROLES.USER]: 'primary',
         [ROLES.GUEST]: 'info'
       }
       return roleTypes[role] || 'info'

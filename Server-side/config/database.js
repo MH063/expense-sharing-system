@@ -21,10 +21,12 @@ const sequelize = new Sequelize(
     dialect: 'postgres',
     logging: false,
     pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
+      max: 20,      // 增加最大连接数，支持更多并发请求
+      min: 2,       // 保持最小连接数，避免频繁建立连接
+      acquire: 60000, // 增加获取连接的超时时间到60秒
+      idle: 30000,   // 增加空闲连接超时时间为30秒
+      evict: 5000,   // 添加连接回收检查间隔
+      handleDisconnects: true // 自动处理连接断开
     }
   }
 );

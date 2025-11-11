@@ -114,7 +114,7 @@ class UserController extends BaseController {
        FROM users u 
        JOIN user_roles ur ON u.id = ur.user_id 
        JOIN roles r ON ur.role_id = r.id 
-       WHERE u.username = $1 AND r.name = '系统管理员'`,
+       WHERE u.username = $1 AND r.name = 'admin'`,
       [username],
       requestId
     );

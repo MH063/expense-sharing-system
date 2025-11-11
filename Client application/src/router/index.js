@@ -7,7 +7,7 @@ import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
 import ForgotPassword from '@/views/auth/ForgotPassword.vue'
 import Profile from '@/views/auth/Profile.vue'
-import Notifications from '@/views/NotificationsPage.vue'
+
 import RoomDashboard from '@/views/rooms/RoomDashboard.vue'
 import RoomDetail from '@/views/rooms/RoomDetail.vue'
 import RoomCreate from '@/views/rooms/RoomCreate.vue'
@@ -103,14 +103,7 @@ const routes = [
       requiresPermission: PERMISSIONS.PROFILE_VIEW
     }
   },
-  {
-    path: '/notifications',
-    name: 'Notifications',
-    component: Notifications,
-    meta: { 
-      requiresAuth: true
-    }
-  },
+
   {
     path: '/notifications/center',
     name: 'NotificationCenter',

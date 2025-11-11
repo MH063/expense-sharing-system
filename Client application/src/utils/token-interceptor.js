@@ -62,10 +62,13 @@ export const createTokenInterceptor = (
   axiosInstance.interceptors.response.use(
     (response) => {
       // 计算请求耗时
-      const endTime = new Date()
-      const duration = endTime - response.config.metadata.startTime
-      console.log(`请求 ${response.config.url} 耗时: ${duration}ms`)
+      if (response.config.metadata && response.config.metadata.startTime) {
+        const endTime = new Date()
+        const duration = endTime - response.config.metadata.startTime
+        console.log(`请求 ${response.config.url} 耗时: ${duration}ms`)
+      }
       
+      // 直接返回响应，不修改结构，由后续拦截器处理
       return response
     },
     async (error) => {

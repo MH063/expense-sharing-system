@@ -342,7 +342,7 @@ class BillController {
         SELECT b.id, b.title, b.amount, b.category, b.due_date, b.status, b.created_at, b.updated_at, b.room_id,
                u.username as creator_name, r.name as room_name
         FROM bills b
-        JOIN users u ON b.created_by = u.id
+        JOIN users u ON b.creator_id = u.id
         JOIN rooms r ON b.room_id = r.id
         JOIN room_members rm ON b.room_id = rm.room_id
         WHERE rm.user_id = $1
@@ -1111,7 +1111,7 @@ class BillController {
       const memberRole = bill.member_role;
       
       // 只有寝室管理员或账单创建者可以修改分摊
-      if (memberRole !== 'admin' && bill.created_by !== user_id) {
+      if (memberRole !== 'admin' && bill.creator_id !== user_id) {
         return res.error(403, '只有寝室管理员或账单创建者可以修改分摊');
       }
       
@@ -1799,7 +1799,7 @@ BillController.prototype.getBillSplits = async function getBillSplits(req, res) 
       
       // 获取账单分摊详情
       const splitsQuery = `
-        SELECT bs.*, u.username, u.avatar
+        SELECT bs.*, u.username, u.avatar_url
         FROM bill_splits bs
         JOIN users u ON bs.user_id = u.id
         WHERE bs.bill_id = $1
@@ -2141,7 +2141,7 @@ BillController.prototype.getBillSplits = async function getBillSplits(req, res) 
       
       // 获取账单分摊详情
       const splitsQuery = `
-        SELECT bs.*, u.username, u.avatar
+        SELECT bs.*, u.username, u.avatar_url
         FROM bill_splits bs
         JOIN users u ON bs.user_id = u.id
         WHERE bs.bill_id = $1

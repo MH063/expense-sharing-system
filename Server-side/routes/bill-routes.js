@@ -12,6 +12,63 @@ const billController = require('../controllers/bill-controller');
 const router = express.Router();
 
 /**
+ * 获取用户所在房间的账单列表（通用接口）
+ * GET /api/bills
+ * 支持参数：status, limit, page, search
+ */
+router.get('/', authenticateToken, enhancedCacheMiddleware.smartBillCache.getBills, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // 获取用户所属的房间
+    const userService = require('../services/database/user-service');
+    const userRooms = await userService.getUserRooms(userId);
+    
+    if (userRooms.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          bills: [],
+          pagination: {
+            page: 1,
+            limit: parseInt(req.query.limit) || 20,
+            total: 0,
+            totalPages: 0
+          }
+        }
+      });
+    }
+    
+    // 如果用户属于多个房间，默认取第一个房间
+    // 可以在前端后续扩展为支持选择特定房间
+    const roomId = userRooms[0].id;
+    
+    const options = {
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 20,
+      status: req.query.status,
+      search: req.query.search,
+      sort_by: req.query.sort_by || 'created_at',
+      sort_order: req.query.sort_order || 'DESC'
+    };
+    
+    const result = await billService.getRoomBills(roomId, options);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('获取账单列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取账单列表失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * 获取房间账单列表
  * GET /api/bills/room/:roomId
  */
@@ -121,7 +178,7 @@ router.post('/', authenticateToken, enhancedCacheMiddleware.smartBillCache.clear
       description,
       amount,
       due_date,
-      created_by: req.user.id,
+      creator_id: req.user.id,
       is_recurring,
       recurring_type,
       recurring_end_date

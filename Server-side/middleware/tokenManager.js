@@ -371,7 +371,7 @@ class TokenManager {
       const rolePermissions = {
         'system_admin': ['read', 'write', 'delete', 'manage_users', 'manage_system'],
         'admin': ['read', 'write', 'manage_users'],
-        '系统管理员': ['read', 'write', 'delete', 'manage_users', 'manage_system'],
+        'system_admin': ['read', 'write', 'delete', 'manage_users', 'manage_system'],
         '寝室长': ['read', 'write', 'manage_room'],
         'payer': ['read', 'write', 'make_payments'],
         'user': ['read', 'write']
@@ -471,20 +471,31 @@ function authenticateToken(req, res, next) {
 function checkRole(allowedRoles) {
   return async (req, res, next) => {
     try {
+      console.log('=== 权限检查中间件执行 ===');
+      console.log('请求用户ID:', req.user.sub);
+      console.log('允许的角色:', allowedRoles);
+      
       // 从数据库动态获取用户角色
       const userRole = await TokenManager.getUserRole(req.user.sub);
+      console.log('数据库返回的用户角色:', userRole);
+      console.log('角色类型:', typeof userRole);
+      console.log('角色长度:', userRole.length);
+      console.log('角色是否在允许列表中:', allowedRoles.includes(userRole));
       
       if (!allowedRoles.includes(userRole)) {
+        console.log('❌ 权限检查失败 - 角色不匹配');
         return res.status(403).json({
           success: false,
           message: '权限不足'
         });
       }
       
+      console.log('✅ 权限检查通过');
       // 更新req.user中的角色信息
       req.user.roles = [userRole];
       next();
     } catch (error) {
+      console.error('❌ 角色检查异常:', error.message);
       logger.error('角色检查失败:', error);
       return res.status(500).json({
         success: false,

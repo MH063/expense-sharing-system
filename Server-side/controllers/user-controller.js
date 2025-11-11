@@ -113,11 +113,11 @@ class UserController {
       
       // 查询管理员用户信息 - 从users表查询具有管理员角色的用户
       const userResult = await pool.query(
-        `SELECT u.id, u.username, u.password_hash 
+        `SELECT u.id, u.username, u.password_hash, r.name as role_name
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.username = $1 AND r.name = '系统管理员'`,
+         WHERE u.username = $1 AND r.name IN ('系统管理员', 'admin')`,
         [username]
       );
       
@@ -142,7 +142,7 @@ class UserController {
       }
       
       // 使用TokenService生成JWT令牌
-      const tokens = TokenService.generateTokens(user.id.toString(), 'admin', ['read', 'write', 'admin'], user.username);
+      const tokens = TokenService.generateTokens(user.id.toString(), user.role_name, ['read', 'write', 'admin'], user.username);
       
       // 更新最后登录时间
       try {
@@ -165,7 +165,7 @@ class UserController {
         user: {
           id: user.id,
           username: user.username,
-          role: 'admin'
+          role: user.role_name // 使用数据库中的真实中文角色名称
         },
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken
@@ -184,11 +184,11 @@ class UserController {
       
       // 查询管理员用户信息 - 从users表查询具有管理员角色的用户
       const userResult = await pool.query(
-        `SELECT u.id, u.username, u.password_hash 
+        `SELECT u.id, u.username, u.password_hash, r.name as role_name
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.username = $1 AND r.name = '系统管理员'`,
+         WHERE u.username = $1 AND r.name IN ('系统管理员', 'admin')`,
         [username]
       );
       
@@ -216,7 +216,7 @@ class UserController {
       const payload = {
         userId: user.id,
         username: user.username,
-        role: 'admin' // 管理员角色
+        role: user.role_name // 使用数据库中的真实中文角色名称
       };
       
       // 使用TokenManager生成JWT token，与普通用户登录保持一致
@@ -224,7 +224,7 @@ class UserController {
       const accessToken = TokenManager.generateAccessToken({
         sub: user.id.toString(),
         username: user.username,
-        roles: ['admin'], // 管理员角色
+        roles: [user.role_name], // 使用数据库中的真实中文角色名称
         permissions: ['read', 'write', 'admin']
       });
       
@@ -251,7 +251,7 @@ class UserController {
         user: {
           id: user.id,
           username: user.username,
-          role: 'admin'
+          role: user.role_name // 使用数据库中的真实中文角色名称
         },
         accessToken,
         refreshToken
@@ -836,16 +836,18 @@ class UserController {
       }
       
       if (status) {
-        conditions.push(`u.is_active = $${paramIndex++}`);
-        queryParams.push(status === 'active' ? true : false);
+        conditions.push(`u.status = $${paramIndex++}`);
+        queryParams.push(status);
       }
       
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       
       // 查询用户列表
       const usersQuery = `
-        SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.is_active, u.created_at, u.updated_at, r.name as role
+        SELECT u.id, u.username, u.email, u.avatar_url, u.status, u.created_at, u.updated_at, r.name as role,
+               COALESCE(up.full_name, up.nickname, u.username) as display_name
         FROM users u
+        LEFT JOIN user_profiles up ON u.id = up.user_id
         LEFT JOIN user_roles ur ON u.id = ur.user_id
         LEFT JOIN roles r ON ur.role_id = r.id
         ${whereClause}
@@ -882,6 +884,7 @@ class UserController {
         const countQuery = `
           SELECT COUNT(*) 
           FROM users u
+          LEFT JOIN user_profiles up ON u.id = up.user_id
           LEFT JOIN user_roles ur ON u.id = ur.user_id
           LEFT JOIN roles r ON ur.role_id = r.id
           ${whereClause}
@@ -1520,7 +1523,7 @@ class UserController {
       }
       
       // 查询用户角色
-      let userRole = 'user'; // 默认角色
+      let userRole = '普通用户'; // 默认角色（根据需求文档标准）
       try {
         const roleResult = await pool.query(
           `SELECT r.name as role 
@@ -5118,7 +5121,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name = '系统管理员'`,
+         WHERE u.id = $1 AND r.name = 'admin'`,
         [userId]
       );
       
@@ -5221,7 +5224,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name = '系统管理员'`,
+         WHERE u.id = $1 AND r.name = 'admin'`,
         [decoded.userId]
       );
       
@@ -5297,12 +5300,12 @@ class UserController {
       
       // 验证用户是否为管理员并获取详细信息
       const adminResult = await pool.query(
-        `SELECT u.id, u.username, u.email, u.avatar, u.created_at, u.updated_at, u.last_login,
+        `SELECT u.id, u.username, u.email, u.avatar_url, u.created_at, u.updated_at, u.last_login,
          r.name as role_name
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+         WHERE u.id = $1 AND r.name IN ('admin', 'system_admin')`,
         [userId]
       );
       
@@ -5357,7 +5360,7 @@ class UserController {
         id: admin.id,
         username: admin.username,
         email: admin.email,
-        avatar: admin.avatar,
+        avatar: admin.avatar_url,
         role: admin.role_name,
         permissions: permissions,
         stats: {
@@ -5438,7 +5441,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+         WHERE u.id = $1 AND r.name IN ('admin', 'system_admin')`,
         [userId]
       );
       
@@ -5539,7 +5542,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+         WHERE u.id = $1 AND r.name IN ('admin', 'system_admin')`,
         [userId]
       );
       
@@ -5671,7 +5674,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+         WHERE u.id = $1 AND r.name IN ('admin', 'system_admin')`,
         [userId]
       );
       
@@ -5757,7 +5760,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+         WHERE u.id = $1 AND r.name IN ('admin', 'system_admin')`,
         [userId]
       );
       
@@ -5872,7 +5875,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.id = $1 AND r.name IN ('系统管理员', '管理员')`,
+         WHERE u.id = $1 AND r.name IN ('admin', 'system_admin')`,
         [userId]
       );
       
@@ -5953,10 +5956,12 @@ class UserController {
       let user;
       try {
         const userResult = await pool.query(
-          `SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.is_active, 
+          `SELECT u.id, u.username, u.email, u.avatar_url, u.status as is_active, 
                   u.created_at, u.updated_at, u.mfa_enabled, u.last_login,
-                  r.name as role
+                  r.name as role,
+                  COALESCE(up.full_name, up.nickname, u.username) as display_name
            FROM users u
+           LEFT JOIN user_profiles up ON u.id = up.user_id
            LEFT JOIN user_roles ur ON u.id = ur.user_id
            LEFT JOIN roles r ON ur.role_id = r.id
            WHERE u.id = $1`,
@@ -6026,7 +6031,7 @@ class UserController {
           email: user.email,
           displayName: user.display_name,
           avatarUrl: user.avatar_url,
-          isActive: user.is_active,
+          isActive: user.status === 'active',
           role: user.role,
           mfaEnabled: user.mfa_enabled,
           lastLogin: user.last_login,

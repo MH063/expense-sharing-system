@@ -260,8 +260,8 @@ export const useUserStore = defineStore('user', () => {
   function hasPermission(permission) {
     if (!user.value) return false
     
-    // 管理员拥有所有权限
-    if (user.value.role === 'admin') return true
+    // 管理员和系统管理员拥有所有权限
+    if (user.value.role === '管理员' || user.value.role === '系统管理员') return true
     
     // 检查用户权限列表
     return user.value.permissions?.includes(permission) || false

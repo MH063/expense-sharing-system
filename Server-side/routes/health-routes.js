@@ -4,8 +4,7 @@
  */
 
 const express = require('express');
-const { sequelize } = require('../models');
-const { logger } = require('../config/logger');
+const path = require('path');
 const router = express.Router();
 
 /**
@@ -14,28 +13,26 @@ const router = express.Router();
  */
 router.get('/', async (req, res) => {
   try {
-    // 检查数据库连接
-    await sequelize.authenticate();
-    
-    // 基本系统信息
+    // 简化健康检查，避免循环导入
     const healthStatus = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       version: process.env.npm_package_version || '1.0.0',
-      memory: process.memoryUsage(),
+      memory: {
+        rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`,
+        heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+        heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`
+      },
       services: {
-        database: 'connected',
-        redis: 'connected' // 假设Redis已连接，实际项目中应检查Redis连接
+        server: 'running',
+        database: process.env.DB_HOST ? 'configured' : 'not configured'
       }
     };
 
     res.status(200).json(healthStatus);
-    logger.info('Health check passed');
   } catch (error) {
-    logger.error('Health check failed:', error);
-    
     const errorStatus = {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -53,20 +50,29 @@ router.get('/', async (req, res) => {
  */
 router.get('/detailed', async (req, res) => {
   try {
-    // 检查数据库连接
-    await sequelize.authenticate();
-    
-    // 获取数据库统计信息
-    const dbStats = await sequelize.query(`
-      SELECT 
-        schemaname,
-        tablename,
-        attname,
-        n_distinct,
-        correlation
-      FROM pg_stats
-      LIMIT 10
-    `, { type: sequelize.QueryTypes.SELECT });
+    // 检查数据库连接状态
+    let dbStatus = 'unknown';
+    try {
+      // 直接创建临时连接检查数据库
+      const { Sequelize } = require('sequelize');
+      const tempSequelize = new Sequelize(
+        process.env.DB_NAME || 'expense_dev',
+        process.env.DB_USER || 'postgres',
+        process.env.DB_PASSWORD || 'postgres',
+        {
+          host: process.env.DB_HOST || 'localhost',
+          port: process.env.DB_PORT || 5432,
+          dialect: 'postgres',
+          logging: false
+        }
+      );
+      
+      await tempSequelize.authenticate();
+      dbStatus = 'connected';
+      await tempSequelize.close();
+    } catch (dbError) {
+      dbStatus = `error: ${dbError.message}`;
+    }
     
     // 详细系统信息
     const detailedStatus = {
@@ -85,24 +91,25 @@ router.get('/detailed', async (req, res) => {
         usage: process.cpuUsage()
       },
       services: {
+        server: 'running',
         database: {
-          status: 'connected',
-          dialect: sequelize.getDialect(),
-          stats: dbStats.length > 0 ? 'Available' : 'No stats'
-        },
-        redis: {
-          status: 'connected', // 实际项目中应检查Redis连接
-          host: process.env.REDIS_HOST || 'localhost',
-          port: process.env.REDIS_PORT || 6379
+          status: dbStatus,
+          host: process.env.DB_HOST || 'localhost',
+          port: process.env.DB_PORT || 5432,
+          database: process.env.DB_NAME || 'expense_dev',
+          user: process.env.DB_USER || 'postgres'
         }
+      },
+      process: {
+        pid: process.pid,
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch
       }
     };
 
     res.status(200).json(detailedStatus);
-    logger.info('Detailed health check passed');
   } catch (error) {
-    logger.error('Detailed health check failed:', error);
-    
     const errorStatus = {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),

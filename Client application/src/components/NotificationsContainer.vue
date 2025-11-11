@@ -63,6 +63,9 @@
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
           </svg>
           <p>暂无通知</p>
+          <div class="notification-footer-actions">
+            <button @click="viewAllNotifications" class="view-all-btn">查看所有通知</button>
+          </div>
         </div>
       </div>
     </div>
@@ -124,6 +127,14 @@ const deleteNotification = (id) => {
 
 const retryConnection = () => {
   notificationStore.retryConnection()
+}
+
+const viewAllNotifications = () => {
+  // 关闭当前通知面板
+  showNotifications.value = false
+  
+  // 导航到通知中心页面
+  window.location.href = '/notifications/center'
 }
 
 // 点击外部关闭通知面板
@@ -319,6 +330,26 @@ onUnmounted(() => {
 .notification-empty p {
   margin: 0;
   font-size: 14px;
+}
+
+.notification-footer-actions {
+  margin-top: 16px;
+}
+
+.view-all-btn {
+  background: none;
+  border: 1px solid #ddd;
+  color: #4a6cf7;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.view-all-btn:hover {
+  background-color: #f8f9ff;
+  border-color: #4a6cf7;
 }
 
 /* 响应式设计 */

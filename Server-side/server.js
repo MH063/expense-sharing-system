@@ -118,6 +118,16 @@ console.log('即将加载token管理中间件...');
 const { TokenManager, authenticateToken, checkRole, checkPermission, checkRequestBodySize, checkTokenLength, aiTokenHandler } = require('./middleware/tokenManager');
 console.log('token管理中间件加载完成');
 
+// 导入输入验证中间件
+console.log('即将加载输入验证中间件...');
+const { completeInputValidation, basicValidation, safeJsonParser, sanitizeInput, preventSQLInjection, preventXSS } = require('./middleware/input-validator');
+console.log('输入验证中间件加载完成');
+
+// 导入速率限制中间件
+console.log('即将加载高级速率限制中间件...');
+const { ipLimiter, userLimiter, apiLimiter, loginLimiter } = require('./middleware/rate-limiter');
+console.log('高级速率限制中间件加载完成');
+
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -313,6 +323,12 @@ const performanceRoutes = require('./routes/performance-routes');
 
 // 安全中间件
 setupSecurityHeaders(app);
+
+// 全局输入安全验证中间件（必须在路由之前应用）
+app.use(safeJsonParser);        // 安全的JSON解析
+app.use(sanitizeInput);         // 输入清理和标准化
+app.use(preventSQLInjection);   // SQL注入防护
+app.use(preventXSS);           // XSS攻击防护
 
 // 统一响应处理中间件
 app.use(standardResponseMiddleware);

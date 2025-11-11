@@ -10,55 +10,53 @@
         <div class="form-group">
           <label for="username" class="form-label">用户名</label>
           <div class="input-wrapper">
-            <div class="input-with-dropdown">
-              <!-- 记住用户下拉选择器 -->
-              <div v-if="rememberedUsers.length > 0" class="remembered-users-dropdown">
-                <button 
-                  type="button"
-                  class="dropdown-toggle"
-                  @click="toggleDropdown"
-                >
-                  <span v-if="selectedRememberedUser">{{ selectedRememberedUser.username }}</span>
-                  <span v-else>选择已记住的用户</span>
-                  <svg class="dropdown-arrow" :class="{ 'open': isDropdownOpen }" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </button>
-                <div v-if="isDropdownOpen" class="dropdown-menu">
-                  <div 
+            <!-- 用户名输入区域 -->
+            <div class="username-input-section">
+              <!-- 记住的用户快捷选择（当存在记住用户且输入框为空或内容匹配时显示） -->
+              <div v-if="rememberedUsers.length > 0 && shouldShowQuickSelect" class="quick-select-bar">
+                <span class="quick-select-label">快速选择:</span>
+                <div class="quick-select-buttons">
+                  <button 
                     v-for="user in rememberedUsers" 
                     :key="user.username"
-                    class="dropdown-item"
+                    type="button"
+                    class="quick-select-btn"
                     @click="selectRememberedUser(user.username)"
+                    :class="{ 'active': loginForm.username === user.username }"
                   >
-                    <div class="dropdown-user-info">
-                      <span class="dropdown-user-name">{{ user.username }}</span>
-                      <span class="dropdown-last-login">上次登录: {{ formatDate(user.lastLogin) }}</span>
-                    </div>
-                    <button 
-                      type="button"
-                      class="dropdown-remove-btn"
-                      @click.stop="removeFromRememberedUsers(user.username)"
-                      title="移除此用户"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                  </div>
+                    {{ user.username }}
+                  </button>
                 </div>
               </div>
               
-              <input
-                id="username"
-                v-model="loginForm.username"
-                type="text"
-                class="form-input"
-                :class="{ 'error': errors.username, 'with-dropdown': rememberedUsers.length > 0 }"
-                placeholder="请输入用户名"
-                required
-              />
+              <!-- 用户名输入框 -->
+              <div class="input-container">
+                <input
+                  id="username"
+                  v-model="loginForm.username"
+                  type="text"
+                  class="form-input"
+                  :class="{ 'error': errors.username }"
+                  placeholder="请输入用户名（可选择下方已记住的用户或手动输入）"
+                  @input="onUsernameInput"
+                  @focus="onUsernameFocus"
+                  required
+                />
+                <div v-if="rememberedUsers.length > 0" class="input-actions">
+                  <button 
+                    type="button"
+                    class="clear-input-btn"
+                    v-if="loginForm.username"
+                    @click="clearUsername"
+                    title="清空输入"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
             <span v-if="errors.username" class="error-message">{{ errors.username }}</span>
           </div>
@@ -140,8 +138,6 @@ const isLoading = ref(false)
 const showPassword = ref(false)
 const errorMessage = ref('')
 const rememberedUsers = ref([])
-const isDropdownOpen = ref(false)
-const selectedRememberedUser = ref(null)
 
 // 表单数据
 const loginForm = reactive({
@@ -159,14 +155,19 @@ const errors = reactive({
 // 页面初始化时检查是否有记住的用户名
 onMounted(() => {
   loadRememberedUsers()
-  
-  // 添加全局点击事件监听器
-  document.addEventListener('click', handleClickOutside)
 })
 
-onUnmounted(() => {
-  // 移除全局点击事件监听器
-  document.removeEventListener('click', handleClickOutside)
+// 计算属性：是否显示快速选择
+const shouldShowQuickSelect = computed(() => {
+  // 如果输入框为空，或者当前输入的内容匹配记住的用户名，则显示快速选择
+  if (!loginForm.username.trim()) {
+    return rememberedUsers.value.length > 0
+  }
+  
+  // 检查当前输入的内容是否匹配记住的用户名
+  return rememberedUsers.value.some(user => 
+    user.username.toLowerCase().includes(loginForm.username.toLowerCase())
+  )
 })
 
 // 加载记住的用户列表
@@ -191,8 +192,6 @@ const loadRememberedUsers = () => {
 const selectRememberedUser = (username) => {
   loginForm.username = username
   loginForm.remember = true
-  selectedRememberedUser.value = rememberedUsers.value.find(user => user.username === username)
-  isDropdownOpen.value = false
   
   // 添加用户选择反馈
   console.log(`已选择记住的用户: ${username}`)
@@ -211,16 +210,34 @@ const selectRememberedUser = (username) => {
   }, 100)
 }
 
-// 切换下拉菜单
-const toggleDropdown = () => {
-  isDropdownOpen.value = !isDropdownOpen.value
+// 用户名输入事件处理
+const onUsernameInput = () => {
+  // 清除之前的错误信息
+  errors.username = ''
+  errorMessage.value = ''
+  
+  // 触发响应式更新以显示/隐藏快速选择
+  console.log('用户名输入:', loginForm.username)
 }
 
-// 点击外部关闭下拉菜单
-const handleClickOutside = (event) => {
-  if (!event.target.closest('.remembered-users-dropdown')) {
-    isDropdownOpen.value = false
-  }
+// 用户名输入框获得焦点事件
+const onUsernameFocus = () => {
+  // 聚焦时显示快速选择
+  console.log('用户名输入框获得焦点')
+}
+
+// 清空用户名输入
+const clearUsername = () => {
+  loginForm.username = ''
+  loginForm.remember = false
+  
+  // 聚焦到用户名输入框
+  setTimeout(() => {
+    const usernameInput = document.querySelector('input[id="username"]')
+    if (usernameInput) {
+      usernameInput.focus()
+    }
+  }, 100)
 }
 
 // 添加用户到记住列表
@@ -439,97 +456,97 @@ const handleLogin = async () => {
   padding: 30px;
 }
 
-/* 用户选择器样式 */
-.input-with-dropdown {
-  position: relative;
-  width: 100%;
+/* 用户名输入区域样式 */
+.username-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.remembered-users-dropdown {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-}
-
-.dropdown-toggle {
-  width: 100%;
+/* 快速选择栏样式 */
+.quick-select-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  background-color: white;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
   border: 1px solid #e9ecef;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  flex-wrap: wrap;
+}
+
+.quick-select-label {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.quick-select-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quick-select-btn {
+  padding: 6px 12px;
+  background-color: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 13px;
   color: #495057;
   cursor: pointer;
   transition: all 0.2s ease;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  border-bottom: none;
+  white-space: nowrap;
 }
 
-.dropdown-toggle:hover {
-  background-color: #f8f9fa;
-  border-color: #dee2e6;
+.quick-select-btn:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
 }
 
-.dropdown-arrow {
-  transition: transform 0.2s ease;
+.quick-select-btn.active {
+  background-color: #6a11cb;
+  border-color: #6a11cb;
+  color: white;
 }
 
-.dropdown-arrow.open {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  background-color: white;
-  border: 1px solid #e9ecef;
-  border-top: none;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.dropdown-item {
+/* 输入框容器样式 */
+.input-container {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
 }
 
-.dropdown-item:hover {
-  background-color: #f8f9fa;
+.form-input {
+  width: 100%;
+  padding: 12px 40px 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.dropdown-user-info {
+.form-input:focus {
+  outline: none;
+  border-color: #6a11cb;
+  box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.1);
+}
+
+.form-input.error {
+  border-color: #e74c3c;
+}
+
+/* 输入框操作按钮样式 */
+.input-actions {
+  position: absolute;
+  right: 8px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
 }
 
-.dropdown-user-name {
-  font-weight: 500;
-  color: #212529;
-}
-
-.dropdown-last-login {
-  font-size: 12px;
-  color: #6c757d;
-}
-
-.dropdown-remove-btn {
+.clear-input-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -543,16 +560,9 @@ const handleLogin = async () => {
   transition: all 0.2s ease;
 }
 
-.dropdown-remove-btn:hover {
-  background-color: #f8d7da;
-  color: #dc3545;
-}
-
-.form-input.with-dropdown {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  border-top: none;
-  margin-top: -1px; /* 覆盖下拉菜单的底部边框 */
+.clear-input-btn:hover {
+  background-color: #f8f9fa;
+  color: #495057;
 }
 
 .form-group {
@@ -571,24 +581,7 @@ const handleLogin = async () => {
   position: relative;
 }
 
-.form-input {
-  width: 100%;
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 16px;
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
 
-.form-input:focus {
-  outline: none;
-  border-color: #6a11cb;
-  box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.1);
-}
-
-.form-input.error {
-  border-color: #e74c3c;
-}
 
 .error-message {
   display: block;

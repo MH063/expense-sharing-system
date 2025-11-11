@@ -171,6 +171,7 @@
 import { ref, reactive, onMounted, nextTick, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useRoomStore } from '@/stores/rooms'
 import { ElMessage } from 'element-plus'
 import { 
   User, Money, ArrowDown, ArrowUp, Plus, List, Document, House,
@@ -184,6 +185,7 @@ import { billApi } from '@/api/bills'
 // 路由和状态管理
 const router = useRouter()
 const authStore = useAuthStore()
+const roomStore = useRoomStore()
 
 // 响应式数据
 const chartLoading = ref(false)
@@ -390,9 +392,19 @@ const loadChartData = async () => {
   try {
     chartLoading.value = true
     console.log('开始加载图表数据，周期:', trendPeriod.value)
+    console.log('当前活跃房间ID:', roomStore.activeRoomId)
+    
+    // 检查是否有活跃房间
+    if (!roomStore.activeRoomId) {
+      console.log('没有活跃房间，跳过图表数据加载')
+      ElMessage.warning('请先选择一个活跃的寝室')
+      chartLoading.value = false
+      return
+    }
     
     // 获取房间统计数据，用于图表展示
     const response = await statsApi.getRoomStats({
+      roomId: roomStore.activeRoomId,
       startDate: getDateRange(trendPeriod.value).start,
       endDate: getDateRange(trendPeriod.value).end
     })
@@ -405,11 +417,13 @@ const loadChartData = async () => {
       updateChartData(response.data)
     } else {
       console.error('图表数据响应格式错误:', response)
+      ElMessage.error('图表数据加载失败')
     }
     
     chartLoading.value = false
   } catch (error) {
     console.error('加载图表数据失败:', error)
+    ElMessage.error('加载图表数据失败: ' + (error.message || '未知错误'))
     chartLoading.value = false
   }
 }

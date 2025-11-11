@@ -11,7 +11,7 @@ const {
   checkPermission, 
   checkRole, 
   checkAnyPermission 
-} = require('../middleware/permission-middleware');
+} = require('../middleware/enhanced-permission-middleware');
 
 // 获取角色列表 - 需要认证和查看角色权限
 router.get('/', 

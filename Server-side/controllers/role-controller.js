@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const { logger } = require('../config/logger');
+const PermissionEventHandler = require('../services/permission-event-handler');
 
 class RoleController {
   // 获取所有角色
@@ -393,6 +394,9 @@ class RoleController {
         [id, permissionId]
       );
       
+      // 触发角色权限变更事件
+      await PermissionEventHandler.handleRolePermissionChange(id);
+      
       logger.info(`分配权限给角色成功: ${role.name} -> ${permission.name}`);
       
       res.success(201, '分配权限给角色成功', {
@@ -452,6 +456,9 @@ class RoleController {
         'DELETE FROM role_permissions WHERE role_id = $1 AND permission_id = $2',
         [id, permissionId]
       );
+      
+      // 触发角色权限变更事件
+      await PermissionEventHandler.handleRolePermissionChange(id);
       
       logger.info(`从角色移除权限成功: ${role.name} -> ${permission.name}`);
       

@@ -3,11 +3,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const winston = require('winston');
 const { TokenManager } = require('../middleware/tokenManager');
+const TokenService = require('../services/token-service');
 const crypto = require('crypto');
 const { recordFailedLoginAttempt, resetFailedLoginAttempts, isAccountLocked } = require('../middleware/securityEnhancements');
 const { recordFailure, recordSuccess } = require('../middleware/bruteForceRedis');
+const { recordLoginFailure, recordLoginSuccess } = require('../middleware/bruteForce');
 const { newResponseMiddleware } = require('../middleware/newResponseHandler');
-const { logUserActivity, logSystemEvent, logSecurityEvent } = require('../middleware/enhanced-audit-logger');
+const { enhancedAuditLogger, logUserActivity, logSystemEvent, logSecurityEvent } = require('../middleware/enhanced-audit-logger');
+const { recordLoginResult } = require('../middleware/enhancedBruteForceProtection');
 
 // 创建日志记录器
 const logger = winston.createLogger({
@@ -58,77 +61,14 @@ class UserController {
         return res.error(400, '用户名、密码和邮箱为必填项');
       }
       
-      // 密码强度：至少8位，包含大小写、数字、特殊字符各一
-      const strongPwd = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
-      if (!strongPwd.test(password)) {
-        logger.warn(`用户注册失败：密码强度不足 [${requestId}]`, {
-          requestId,
-          username,
-          email,
-          passwordLength: password.length,
-          timestamp: new Date().toISOString()
-        });
-        
-        return res.error(400, '密码需包含大小写、数字、特殊字符且至少8位');
-      }
-
-      // 检查用户名是否已存在
-      const existingUserResult = await pool.query(
-        'SELECT id FROM users WHERE username = $1',
-        [username]
-      );
-      const existingUser = existingUserResult.rows;
-
-      if (existingUser.length > 0) {
-        logger.warn(`用户注册失败：用户名已存在 [${requestId}]`, {
-          requestId,
-          username,
-          email,
-          timestamp: new Date().toISOString()
-        });
-        
-        return res.error(409, '用户名已被注册');
-      }
-
-      // 检查邮箱是否已存在
-      const existingEmailResult = await pool.query(
-        'SELECT id FROM users WHERE email = $1',
-        [email]
-      );
-      const existingEmail = existingEmailResult.rows;
-
-      if (existingEmail.length > 0) {
-        logger.warn(`用户注册失败：邮箱已存在 [${requestId}]`, {
-          requestId,
-          username,
-          email,
-          timestamp: new Date().toISOString()
-        });
-        
-        return res.error(409, '邮箱已被注册');
-      }
-
-      // 加密密码
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-      // 插入用户记录并返回ID
-      const result = await pool.query(
-        `INSERT INTO users (username, password_hash, email, display_name, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id`,
-        [username, hashedPassword, email, displayName || username]
-      );
-
-      const userId = result.rows[0].id;
-
-      // 获取创建的用户记录
-      const userRowsResult = await pool.query(
-        'SELECT id, username, email, display_name, created_at FROM users WHERE id = $1',
-        [userId]
-      );
-      const userRows = userRowsResult.rows;
-
-      const user = userRows[0];
+      // 使用业务服务处理注册
+      const userBusinessService = require('../services/user-business-service');
+      const user = await userBusinessService.register({
+        username,
+        password,
+        email,
+        name: displayName
+      });
       
       const duration = Date.now() - startTime;
       logger.info(`用户注册成功 [${requestId}]`, {
@@ -154,6 +94,85 @@ class UserController {
         timestamp: new Date().toISOString()
       });
       
+      // 根据错误类型返回相应的错误码
+      if (error.message.includes('已被注册')) {
+        return res.error(409, error.message);
+      } else if (error.message.includes('密码')) {
+        return res.error(400, error.message);
+      }
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+
+  // 管理员登录
+  async adminLogin(req, res) {
+    try {
+      const { username, password } = req.body;
+      
+      // 查询管理员用户信息 - 从users表查询具有管理员角色的用户
+      const userResult = await pool.query(
+        `SELECT u.id, u.username, u.password_hash 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.username = $1 AND r.name = '系统管理员'`,
+        [username]
+      );
+      
+      if (userResult.rows.length === 0) {
+        // 记录Redis暴力破解防护失败
+        if (req.ip && username) {
+          await recordFailure(req.ip, username);
+        }
+        return res.error(401, '用户名或密码错误');
+      }
+      
+      const user = userResult.rows[0];
+      
+      // 验证密码
+      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      if (!isPasswordValid) {
+        // 记录Redis暴力破解防护失败
+        if (req.ip && username) {
+          await recordFailure(req.ip, username);
+        }
+        return res.error(401, '用户名或密码错误');
+      }
+      
+      // 使用TokenService生成JWT令牌
+      const tokens = TokenService.generateTokens(user.id.toString(), 'admin', ['read', 'write', 'admin'], user.username);
+      
+      // 更新最后登录时间
+      try {
+        await pool.query(
+          'UPDATE users SET updated_at = NOW() WHERE id = $1',
+          [user.id]
+        );
+      } catch (error) {
+        logger.warn('无法更新users表的updated_at字段:', error.message);
+      }
+      
+      logger.info(`管理员登录成功: ${user.username}`);
+      
+      // 记录Redis暴力破解防护成功
+      if (req.ip && username) {
+        await recordSuccess(req.ip, username);
+      }
+      
+      res.success(200, '管理员登录成功', {
+        user: {
+          id: user.id,
+          username: user.username,
+          role: 'admin'
+        },
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      });
+      
+    } catch (error) {
+      logger.error('管理员登录失败:', error);
       res.error(500, '服务器内部错误');
     }
   }
@@ -269,10 +288,12 @@ class UserController {
         });
         
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
-    // 记录Redis暴力破解防护失败
-    if (req.ip && req.body.username) {
-      await recordFailure(req.ip, req.body.username);
-    }
+      // 记录Redis暴力破解防护失败
+      if (req.ip && req.body.username) {
+        await recordFailure(req.ip, req.body.username);
+        // 使用增强版防护记录失败
+        await recordLoginResult(false)(req, res, () => {});
+      }
         return res.error(400, '登录信息不完整');
       }
 
@@ -291,6 +312,8 @@ class UserController {
         });
         
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
+        // 使用增强版防护记录失败
+        await recordLoginResult(false)(req, res, () => {});
         return res.error(401, '登录信息不正确');
       }
 
@@ -358,6 +381,8 @@ class UserController {
         if (typeof req._recordLoginFailure === 'function') req._recordLoginFailure();
         // 记录登录失败尝试
         await recordFailedLoginAttempt(user.id);
+        // 使用增强版防护记录失败
+        await recordLoginResult(false)(req, res, () => {});
         return res.error(401, '登录信息不正确');
       }
 
@@ -367,51 +392,23 @@ class UserController {
       // 移除密码字段
       const { password_hash: userPassword, ...userWithoutPassword } = user;
 
-      // 查询用户角色
+      // 使用权限服务获取用户角色和权限
+      const permissionService = require('../services/permission-service');
       let userRole = 'user'; // 默认角色
-      try {
-        const roleResult = await pool.query(
-          `SELECT r.name as role 
-           FROM user_roles ur 
-           JOIN roles r ON ur.role_id = r.id 
-           WHERE ur.user_id = $1`,
-          [user.id]
-        );
-        
-        if (roleResult.rows.length > 0) {
-          userRole = roleResult.rows[0].role;
-        }
-      } catch (error) {
-        logger.warn(`获取用户角色失败，使用默认角色 [${requestId}]`, {
-          requestId,
-          userId: user.id,
-          username,
-          error: error.message,
-          timestamp: new Date().toISOString()
-        });
-      }
-
-      // 查询用户权限
       let userPermissions = ['read', 'write']; // 默认权限
+      
       try {
-        const permissionResult = await pool.query(
-          `SELECT p.code as permission 
-           FROM role_permissions rp 
-           JOIN permissions p ON rp.permission_id = p.id 
-           JOIN roles r ON rp.role_id = r.id 
-           WHERE r.name = $1`,
-          [userRole]
-        );
-        
-        if (permissionResult.rows.length > 0) {
-          userPermissions = permissionResult.rows.map(row => row.permission);
+        const roles = await permissionService.getUserRoles(user.id);
+        if (roles.length > 0) {
+          userRole = roles[0];
         }
+        
+        userPermissions = await permissionService.getUserPermissions(user.id);
       } catch (error) {
-        logger.warn(`获取用户权限失败，使用默认权限 [${requestId}]`, {
+        logger.warn(`获取用户角色和权限失败，使用默认值 [${requestId}]`, {
           requestId,
           userId: user.id,
           username,
-          userRole,
           error: error.message,
           timestamp: new Date().toISOString()
         });
@@ -436,6 +433,8 @@ class UserController {
       // 记录Redis暴力破解防护成功
       if (req.ip && username) {
         await recordSuccess(req.ip, username);
+        // 使用增强版防护记录成功
+        await recordLoginResult(true)(req, res, () => {});
       }
 
       const duration = Date.now() - startTime;
@@ -448,10 +447,10 @@ class UserController {
         timestamp: new Date().toISOString()
       });
 
-      res.success(200, '登录成功', {
-        token: accessToken,
-        refreshToken: refreshToken,
-        user: userWithoutPassword
+      res.success(200, '用户登录成功', {
+        user: userWithoutPassword,
+        accessToken,
+        refreshToken
       });
 
     } catch (error) {
@@ -464,7 +463,8 @@ class UserController {
         duration: `${duration}ms`,
         timestamp: new Date().toISOString()
       });
-      
+      // 使用增强版防护记录失败
+      await recordLoginResult(false)(req, res, () => {});
       res.error(500, '服务器内部错误');
     }
   }
@@ -538,9 +538,10 @@ class UserController {
 
       // 使用TokenManager生成新的JWT token
       
-      // 从数据库获取最新的用户角色和权限
-      const userRole = await TokenManager.getUserRole(user.id);
-      const userPermissions = await TokenManager.getUserPermissions(user.id);
+      // 从权限服务获取最新的用户角色和权限
+      const permissionService = require('../services/permission-service');
+      const userRole = (await permissionService.getUserRoles(user.id))[0] || 'user';
+      const userPermissions = await permissionService.getUserPermissions(user.id);
       
       const newAccessToken = TokenManager.generateAccessToken({
         sub: user.id.toString(),
@@ -4834,6 +4835,141 @@ class UserController {
     }
   }
 
+  // 用户注册
+  async register(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      const { username, password, email, displayName } = req.body;
+
+      logger.info('开始处理用户注册请求 [' + requestId + ']', {
+        requestId: requestId,
+        username: username,
+        email: email,
+        displayName: displayName || '未提供',
+        timestamp: new Date().toISOString()
+      });
+
+      // 基于 express-validator 的校验已在路由层，额外后备校验
+      if (!username || !password || !email) {
+        logger.warn('用户注册失败：缺少必填字段 [' + requestId + ']', {
+          requestId: requestId,
+          username: username || '未提供',
+          email: email || '未提供',
+          hasPassword: !!password,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.error(400, '用户名、密码和邮箱为必填项');
+      }
+      
+      // 使用业务服务处理注册
+      const userBusinessService = require('../services/user-business-service');
+      const user = await userBusinessService.register({
+        username: username,
+        password: password,
+        email: email,
+        name: displayName
+      });
+      
+      const duration = Date.now() - startTime;
+      logger.info('用户注册成功 [' + requestId + ']', {
+        requestId: requestId,
+        userId: user.id,
+        username: username,
+        email: email,
+        duration: duration + 'ms',
+        timestamp: new Date().toISOString()
+      });
+
+      res.success(201, '用户注册成功', user);
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('用户注册失败 [' + requestId + ']', {
+        requestId: requestId,
+        error: error.message,
+        stack: error.stack,
+        username: req.body.username,
+        email: req.body.email,
+        duration: duration + 'ms',
+        timestamp: new Date().toISOString()
+      });
+      
+      // 根据错误类型返回相应的错误码
+      if (error.message.includes('已被注册')) {
+        return res.error(409, error.message);
+      } else if (error.message.includes('密码')) {
+        return res.error(400, error.message);
+      }
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 用户登出
+  async logout(req, res) {
+    // 生成请求ID用于日志追踪
+    const requestId = req.id || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    try {
+      // 从JWT token中获取用户ID
+      const userId = req.user.sub;
+      const username = req.user.username;
+      
+      // 从请求头中提取访问令牌
+      const accessToken = req.headers.authorization?.split(' ')[1];
+      
+      // 从请求体中获取刷新令牌（可选）
+      const refreshToken = req.body?.refreshToken;
+      
+      logger.info(`开始处理用户登出请求 [${requestId}]`, {
+        requestId,
+        userId,
+        username,
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 使用业务服务处理登出
+      const userBusinessService = require('../services/user-business-service');
+      await userBusinessService.logout({
+        userId: userId,
+        username: username,
+        accessToken: accessToken,
+        refreshToken: refreshToken
+      });
+
+      const duration = Date.now() - startTime;
+      logger.info(`处理用户登出请求成功 [${requestId}]`, {
+        requestId,
+        userId,
+        username,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+
+      res.success(200, '用户登出成功');
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`处理用户登出请求失败 [${requestId}]`, {
+        requestId,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user ? req.user.sub : 'unknown',
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
+
+      res.error(500, '服务器内部错误');
+    }
+  }
+
   // 解绑第三方账号
   async unbindThirdParty(req, res) {
     // 生成请求ID用于日志追踪
@@ -4997,20 +5133,20 @@ class UserController {
         return res.error(403, '无权限访问');
       }
       
-      // 将令牌加入黑名单
-      const token = req.headers.authorization?.split(' ')[1];
-      if (token) {
-        // 使用TokenManager将令牌加入黑名单
-        const tokenManager = new TokenManager();
-        await tokenManager.addToBlacklist(token);
-        
-        logger.info(`令牌已加入黑名单 [${requestId}]`, {
-          requestId,
-          userId,
-          username,
-          timestamp: new Date().toISOString()
-        });
-      }
+      // 从请求头中提取访问令牌
+      const accessToken = req.headers.authorization?.split(' ')[1];
+      
+      // 从请求体中获取刷新令牌（可选）
+      const refreshToken = req.body?.refreshToken;
+      
+      // 使用业务服务处理登出
+      const userBusinessService = require('../services/user-business-service');
+      await userBusinessService.logout({
+        userId: userId,
+        username: username,
+        accessToken: accessToken,
+        refreshToken: refreshToken
+      });
       
       const duration = Date.now() - startTime;
       logger.info(`管理员登出成功 [${requestId}]`, {
@@ -6065,11 +6201,10 @@ class UserController {
       const duration = Date.now() - startTime;
       logger.error(`创建用户失败 [${requestId}]`, {
         requestId,
-        username: req.body.username,
-        email: req.body.email,
-        operatorId: req.user?.sub,
         error: error.message,
         stack: error.stack,
+        username: req.body.username,
+        email: req.body.email,
         duration: `${duration}ms`,
         timestamp: new Date().toISOString()
       });

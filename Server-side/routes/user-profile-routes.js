@@ -9,6 +9,34 @@ const userProfileController = require('../controllers/user-profile-controller');
 const { authenticateToken } = require('../middleware/auth-middleware');
 const checkRole = require('../middleware/role-middleware');
 const { roleAwareRateLimiter } = require('../middleware/rateLimiter');
+const multer = require('multer');
+const { checkFileContent, strictFileTypeValidation, advancedFileContentCheck } = require('../middleware/fileSecurity');
+const path = require('path');
+const fs = require('fs');
+
+// 创建上传目录
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// 配置multer存储
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    cb(null, uniqueSuffix + '-' + safeName);
+  }
+});
+
+// 创建multer实例，限制文件大小为5MB
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  }
+});
 
 // 获取当前用户资料
 router.get('/profile', authenticateToken, userProfileController.getUserProfile);
@@ -16,8 +44,8 @@ router.get('/profile', authenticateToken, userProfileController.getUserProfile);
 // 更新用户资料
 router.put('/profile', authenticateToken, roleAwareRateLimiter('update-profile'), userProfileController.updateUserProfile);
 
-// 更新用户头像
-router.put('/avatar', authenticateToken, userProfileController.updateUserAvatar);
+// 更新用户头像 - 添加文件上传和安全检查中间件
+router.put('/avatar', authenticateToken, upload.single('avatar'), checkFileContent, strictFileTypeValidation, advancedFileContentCheck, userProfileController.updateUserAvatar);
 
 // 更改密码
 router.put('/change-password', authenticateToken, roleAwareRateLimiter('change-password'), userProfileController.changePassword);

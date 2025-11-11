@@ -11,6 +11,7 @@ const notificationService = require('../utils/notification-service');
 const paymentQueryService = require('../services/payment-query-service');
 const { collectSystemMetrics, collectBusinessMetrics } = require('../middleware/enhanced-metrics');
 const { cleanupExpiredLogs, generateSystemHealthReport } = require('../services/monitoring-service');
+const alertService = require('../services/alert-service');
 
 // 存储已启动的定时任务（生产环境使用）
 const scheduledTasks = {};
@@ -197,6 +198,20 @@ const tasks = {
         return { success: false, message: `系统健康报告生成失败: ${error.message}` };
       }
     }
+  },
+  systemAlertCheck: {
+    name: 'systemAlertCheck',
+    // 每10分钟
+    interval: 10 * 60 * 1000,
+    running: false,
+    task: async function systemAlertCheckTask() {
+      try {
+        await alertService.checkSystemAndTriggerAlerts();
+        return { success: true, message: '系统告警检查完成' };
+      } catch (error) {
+        return { success: false, message: `系统告警检查失败: ${error.message}` };
+      }
+    }
   }
 };
 
@@ -260,6 +275,10 @@ const startAllTasks = () => {
       const t = cron.schedule('0 5 * * *', () => runWithLock('generateHealthReport', tasks.generateHealthReport.task), { scheduled: true });
       scheduledTasks.generateHealthReport = t;
     }
+    if (!scheduledTasks.systemAlertCheck) {
+      const t = cron.schedule('*/10 * * * *', () => runWithLock('systemAlertCheck', tasks.systemAlertCheck.task), { scheduled: true });
+      scheduledTasks.systemAlertCheck = t;
+    }
   }
   Object.keys(tasks).forEach((k) => { tasks[k].running = true; });
   return { success: true, message: '所有定时任务已启动', tasks: Object.keys(tasks) };
@@ -311,7 +330,8 @@ const getTaskStatus = () => {
       collectSystemMetrics: { name: tasks.collectSystemMetrics.name, interval: tasks.collectSystemMetrics.interval, running: tasks.collectSystemMetrics.running },
       collectBusinessMetrics: { name: tasks.collectBusinessMetrics.name, interval: tasks.collectBusinessMetrics.interval, running: tasks.collectBusinessMetrics.running },
       cleanupExpiredLogs: { name: tasks.cleanupExpiredLogs.name, interval: tasks.cleanupExpiredLogs.interval, running: tasks.cleanupExpiredLogs.running },
-      generateHealthReport: { name: tasks.generateHealthReport.name, interval: tasks.generateHealthReport.interval, running: tasks.generateHealthReport.running }
+      generateHealthReport: { name: tasks.generateHealthReport.name, interval: tasks.generateHealthReport.interval, running: tasks.generateHealthReport.running },
+      systemAlertCheck: { name: tasks.systemAlertCheck.name, interval: tasks.systemAlertCheck.interval, running: tasks.systemAlertCheck.running }
     }
   };
 };
@@ -319,7 +339,7 @@ const getTaskStatus = () => {
 // 为向后兼容，保留原 getTasksStatus 名称
 const getTasksStatus = getTaskStatus;
 
-// 直接暴露便于测试覆盖自定义任务函数
+// 直接暴露便于测试覆盖自定义任务函数（与测试名称一致）
 module.exports = {
   tasks,
   startAllTasks,
@@ -335,5 +355,6 @@ module.exports = {
   collectSystemMetrics: tasks.collectSystemMetrics.task,
   collectBusinessMetrics: tasks.collectBusinessMetrics.task,
   cleanupExpiredLogs: tasks.cleanupExpiredLogs.task,
-  generateHealthReport: tasks.generateHealthReport.task
+  generateHealthReport: tasks.generateHealthReport.task,
+  systemAlertCheck: tasks.systemAlertCheck.task
 };

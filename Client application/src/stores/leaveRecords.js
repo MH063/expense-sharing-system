@@ -12,6 +12,8 @@ export const useLeaveRecordsStore = defineStore('leaveRecords', {
     roomMembersLeaveRecords: {},
     // 请假记录详情 {recordId: record}
     leaveRecordDetails: {},
+    // 请假类型列表
+    leaveTypes: [],
     // 加载状态
     loading: false,
     // 错误信息
@@ -148,6 +150,31 @@ export const useLeaveRecordsStore = defineStore('leaveRecords', {
       }
     },
     
+    // 获取请假记录详情
+    async fetchLeaveRecordDetail(recordId) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await leaveRecordsApi.getLeaveRecordDetail(recordId)
+        
+        if (response.success) {
+          const record = response.data
+          this.leaveRecordDetails[recordId] = record
+          return record
+        } else {
+          this.error = response.message || '获取请假记录详情失败'
+          return null
+        }
+      } catch (error) {
+        this.error = error.message || '获取请假记录详情时发生错误'
+        console.error('获取请假记录详情失败:', error)
+        return null
+      } finally {
+        this.loading = false
+      }
+    },
+    
     // 创建请假记录
     async createLeaveRecord(data) {
       this.loading = true
@@ -275,6 +302,53 @@ export const useLeaveRecordsStore = defineStore('leaveRecords', {
         this.error = error.message || '删除请假记录时发生错误'
         console.error('删除请假记录失败:', error)
         return false
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 获取请假类型列表
+    async fetchLeaveTypes() {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await leaveRecordsApi.getLeaveTypes()
+        
+        if (response.success) {
+          this.leaveTypes = response.data
+          return response.data
+        } else {
+          this.error = response.message || '获取请假类型列表失败'
+          return []
+        }
+      } catch (error) {
+        this.error = error.message || '获取请假类型列表时发生错误'
+        console.error('获取请假类型列表失败:', error)
+        return []
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // 获取请假统计
+    async fetchLeaveStats(params) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await leaveRecordsApi.getLeaveStats(params)
+        
+        if (response.success) {
+          return response.data
+        } else {
+          this.error = response.message || '获取请假统计失败'
+          return null
+        }
+      } catch (error) {
+        this.error = error.message || '获取请假统计时发生错误'
+        console.error('获取请假统计失败:', error)
+        return null
       } finally {
         this.loading = false
       }

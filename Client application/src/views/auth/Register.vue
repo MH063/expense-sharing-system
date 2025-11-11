@@ -78,6 +78,28 @@
               </div>
               <span class="strength-text">{{ passwordStrengthText }}</span>
             </div>
+            
+            <!-- 密码要求提示 -->
+            <div class="password-requirements" v-if="registerForm.password">
+              <div class="requirements-title">密码要求：</div>
+              <div class="requirements-list">
+                <div class="requirement-item" :class="{ met: registerForm.password.length >= 8 }">
+                  ✓ 至少8个字符
+                </div>
+                <div class="requirement-item" :class="{ met: /[a-z]/.test(registerForm.password) }">
+                  ✓ 包含小写字母
+                </div>
+                <div class="requirement-item" :class="{ met: /[A-Z]/.test(registerForm.password) }">
+                  ✓ 包含大写字母
+                </div>
+                <div class="requirement-item" :class="{ met: /[0-9]/.test(registerForm.password) }">
+                  ✓ 包含数字
+                </div>
+                <div class="requirement-item" :class="{ met: /[^a-zA-Z0-9]/.test(registerForm.password) }">
+                  ✓ 包含特殊字符
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -201,7 +223,8 @@ const passwordStrengthClass = computed(() => {
   if (strength <= 1) return 'weak'
   if (strength === 2) return 'fair'
   if (strength === 3) return 'good'
-  return 'strong'
+  if (strength >= 4) return 'strong'
+  return 'weak'
 })
 
 // 密码强度宽度百分比
@@ -255,8 +278,11 @@ const validateForm = () => {
   if (!registerForm.password) {
     errors.password = '请输入密码'
     isValid = false
-  } else if (registerForm.password.length < 6) {
-    errors.password = '密码至少需要6个字符'
+  } else if (registerForm.password.length < 8) {
+    errors.password = '密码至少需要8个字符'
+    isValid = false
+  } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}/.test(registerForm.password)) {
+    errors.password = '密码需包含大小写字母、数字和特殊字符'
     isValid = false
   }
   
@@ -450,6 +476,40 @@ const handleRegister = async () => {
   font-size: 12px;
   color: #666;
   min-width: 30px;
+}
+
+.password-requirements {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.requirements-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 8px;
+}
+
+.requirements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.requirement-item {
+  font-size: 12px;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.requirement-item.met {
+  color: #28a745;
+  font-weight: 500;
 }
 
 .checkbox-label {

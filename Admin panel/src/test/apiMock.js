@@ -157,7 +157,9 @@ export const mockApiRequest = vi.fn((config) => {
     // 根据URL和方法返回模拟数据
     if (url === '/admin/auth/login' && method === 'post') {
       // 根据请求参数决定返回成功或失败
-      if (config.data.username === 'admin' && config.data.password === 'password') {
+      // 使用环境变量配置测试密码，未设置时使用默认测试密码
+      const testPassword = process.env.TEST_PASSWORD || 'test123456';
+      if (config.data.username === 'admin' && config.data.password === testPassword) {
         setTimeout(() => resolve(mockApiResponses.auth.login.success), 100)
       } else {
         setTimeout(() => reject(mockApiResponses.auth.login.error), 100)

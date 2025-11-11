@@ -1265,6 +1265,47 @@ class SystemMaintenanceController {
       }
     };
   }
+
+  /**
+   * 重启系统
+   */
+  static async restartSystem(req, res) {
+    try {
+      // 记录重启操作
+      logger.info('系统重启请求', { userId: req.user.sub });
+      
+      // 在实际应用中，这里应该执行系统重启逻辑
+      // 例如：关闭服务器、重新初始化等
+      
+      // 记录维护日志
+      await pool.query(
+        `INSERT INTO system_maintenance_logs (action, description, result, created_by, created_at) 
+         VALUES ($1, $2, $3, $4, NOW())`,
+        ['system_restart', '系统重启请求', 'success', req.user.sub]
+      );
+      
+      // 返回响应
+      res.success(200, '系统重启命令已发送');
+      
+      // 在实际应用中，这里应该执行实际的重启操作
+      // 例如：process.exit(0) 或者使用 PM2 等进程管理工具
+      // 为了安全起见，这里只是模拟操作
+      setTimeout(() => {
+        logger.info('系统重启完成');
+      }, 5000);
+    } catch (error) {
+      logger.error('系统重启失败:', error);
+      
+      // 记录维护日志
+      await pool.query(
+        `INSERT INTO system_maintenance_logs (action, description, result, error, created_by, created_at) 
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        ['system_restart', '系统重启请求', 'failed', error.message, req.user.sub]
+      );
+      
+      res.error(500, '服务器内部错误');
+    }
+  }
 }
 
 module.exports = SystemMaintenanceController;

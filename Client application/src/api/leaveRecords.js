@@ -35,6 +35,18 @@ export const leaveRecordsApi = {
   },
 
   /**
+   * 获取请假记录详情
+   * @param {string} recordId - 记录ID
+   * @returns {Promise} API响应
+   */
+  getLeaveRecordDetail(recordId) {
+    return request({
+      url: `/api/leave-records/${recordId}`,
+      method: 'get'
+    })
+  },
+
+  /**
    * 创建请假记录
    * @param {Object} data - 请假记录数据
    * @param {string} data.memberId - 成员ID
@@ -77,6 +89,33 @@ export const leaveRecordsApi = {
     return request({
       url: `/api/leave-records/${recordId}`,
       method: 'delete'
+    })
+  },
+
+  /**
+   * 获取请假类型列表
+   * @returns {Promise} API响应
+   */
+  getLeaveTypes() {
+    return request({
+      url: '/api/leave-records/types',
+      method: 'get'
+    })
+  },
+
+  /**
+   * 获取请假统计
+   * @param {Object} params - 查询参数
+   * @param {string} params.startDate - 开始日期 (YYYY-MM-DD)
+   * @param {string} params.endDate - 结束日期 (YYYY-MM-DD)
+   * @param {string} params.roomId - 房间ID
+   * @returns {Promise} API响应
+   */
+  getLeaveStats(params) {
+    return request({
+      url: '/api/leave-records/stats',
+      method: 'get',
+      params
     })
   },
 

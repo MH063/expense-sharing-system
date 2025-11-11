@@ -4,6 +4,7 @@ const docsController = require('../controllers/docs-controller');
 const { authenticateToken } = require('../middleware/tokenManager');
 const { checkPermission } = require('../middleware/permission-middleware');
 const { upload } = require('../middleware/upload');
+const { checkFileContent, strictFileTypeValidation } = require('../middleware/fileSecurity');
 
 // 文档管理相关路由
 
@@ -44,6 +45,8 @@ router.get('/tags', authenticateToken, docsController.getDocsTags);
 router.post('/upload', 
   authenticateToken, 
   checkPermission('docs:upload'), 
+  checkFileContent,
+  strictFileTypeValidation,
   upload.single('file'), 
   docsController.uploadDocsAttachment
 );

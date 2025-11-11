@@ -1,6 +1,8 @@
 const { Permission, Role, User, UserPermission, RolePermission, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { logger } = require('../config/logger');
+const permissionService = require('../services/permission-service');
+const PermissionEventHandler = require('../services/permission-event-handler');
 
 /**
  * 权限管理控制器
@@ -463,6 +465,9 @@ const permissionController = {
         }
       });
       
+      // 触发角色权限变更事件，清除相关用户的缓存
+      await PermissionEventHandler.handleRolePermissionChange(roleId);
+      
       logger.info(`用户 ${req.user.id} 更新了角色 ${roleId} 的权限映射`);
       
       res.json({
@@ -637,6 +642,9 @@ const permissionController = {
         }
       });
       
+      // 清除用户的权限缓存
+      await permissionService.clearUserPermissionCache(userId);
+      
       logger.info(`用户 ${req.user.id} 给用户 ${userId} 分配了权限`);
       
       res.json({
@@ -686,6 +694,9 @@ const permissionController = {
           where: { userId }
         });
       }
+      
+      // 清除用户的权限缓存
+      await permissionService.clearUserPermissionCache(userId);
       
       logger.info(`用户 ${req.user.id} 移除了用户 ${userId} 的权限`);
       

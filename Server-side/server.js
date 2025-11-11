@@ -108,10 +108,10 @@ console.log('即将加载CORS配置...');
 const { setupCors } = require('./config/cors');
 console.log('CORS配置加载完成');
 
-// 导入响应处理中间件
-console.log('即将加载响应处理中间件...');
-const { newResponseMiddleware } = require('./middleware/newResponseHandler');
-console.log('响应处理中间件加载完成');
+// 导入统一响应处理中间件
+console.log('即将加载统一响应处理中间件...');
+const { standardResponseMiddleware } = require('./middleware/standard-response-handler');
+console.log('统一响应处理中间件加载完成');
 
 // 导入token管理中间件
 console.log('即将加载token管理中间件...');
@@ -126,6 +126,12 @@ const crypto = require('crypto');
 // 导入数据库配置
 console.log('即将加载数据库配置...');
 const { pool, testConnection, ensureMfaColumns } = require('./config/db');
+const enhancedDatabaseManager = require('./config/enhanced-database');
+
+// 初始化增强版数据库管理器
+const dbConfig = require('./config/db').getConfig();
+enhancedDatabaseManager.initialize(dbConfig);
+
 console.log('数据库配置加载完成');
 
 // 导入WebSocket管理器
@@ -141,7 +147,6 @@ console.log('定时任务服务加载完成');
 // 导入Redis配置
 console.log('即将加载Redis配置...');
 const { initRedis, isRedisConnected } = require('./config/redis');
-const cacheTestRoutes = require('./routes/cache-test-routes');
 console.log('Redis配置加载完成');
 
 // 导入缓存预热服务
@@ -192,19 +197,20 @@ const systemConfigRoutes = require('./routes/system-config-routes');
 const fileRoutes = require('./routes/file-routes');
 const websocketManagementRoutes = require('./routes/websocket-management-routes');
 const roleRoutes = require('./routes/role-routes');
-const leaveRecordRoutes = require('./routes/leave-record-routes');
-const stayDaysRoutes = require('./routes/stay-days-routes');
-const cacheRoutes = require('./routes/cache-routes');
-const bruteForceMonitorRoutes = require('./routes/brute-force-monitor');
 const monitoringRoutes = require('./routes/monitoring-routes');
-const otherRoutes = require('./routes/other-routes');
-const docsRoutes = require('./routes/docs-routes');
-const adminSessionRoutes = require('./routes/adminSession-routes');
-const adminPermissionHistoryRoutes = require('./routes/adminPermissionHistory-routes');
-const adminOperationRestrictionRoutes = require('./routes/adminOperationRestriction-routes');
-const adminOperationStatisticsRoutes = require('./routes/adminOperationStatistics-routes');
-const systemPerformanceRoutes = require('./routes/systemPerformance-routes');
-const systemMaintenanceRoutes = require('./routes/system-maintenance-routes');
+const metricsRoutes = require('./routes/metrics-routes');
+
+// 新增的管理端路由
+const adminSystemConfigRoutes = require('./routes/admin-system-config-routes');
+const adminRolePermissionRoutes = require('./routes/admin-role-permission-routes');
+const adminMonitoringRoutes = require('./routes/admin-monitoring-routes');
+const adminBatchJobRoutes = require('./routes/admin-batch-job-routes');
+const adminDisputeRoutes = require('./routes/admin-dispute-routes');
+const adminDormRoutes = require('./routes/admin-dorm-routes');
+const adminDocsRoutes = require('./routes/admin-docs-routes');
+const adminReviewRoutes = require('./routes/admin-review-routes');
+const adminActivityRoutes = require('./routes/admin-activity-routes');
+const adminSpecialPaymentRuleRoutes = require('./routes/admin-special-payment-rule-routes');
 
 // 导入数据导出路由
 const dataExportRoutes = require('./routes/data-export-routes');
@@ -214,12 +220,34 @@ const cacheManagementRoutes = require('./routes/cache-management-routes');
 
 // 导入用户资料和设置路由
 const userProfileRoutes = require('./routes/user-profile-routes');
-
+const leaveRecordRoutes = require('./routes/leave-record-routes');
+const stayDaysRoutes = require('./routes/stay-days-routes');
+const cacheRoutes = require('./routes/cache-routes');
+const bruteForceMonitorRoutes = require('./routes/brute-force-monitor');
+const otherRoutes = require('./routes/other-routes');
+const docsRoutes = require('./routes/docs-routes');
+const adminSessionRoutes = require('./routes/adminSession-routes');
+const adminPermissionHistoryRoutes = require('./routes/adminPermissionHistory-routes');
+const adminOperationRestrictionRoutes = require('./routes/adminOperationRestriction-routes');
+const adminOperationStatisticsRoutes = require('./routes/adminOperationStatistics-routes');
+const systemPerformanceRoutes = require('./routes/performance-routes');
 // 导入第三方账号管理路由
 const thirdPartyAccountRoutes = require('./routes/third-party-account-routes');
 
 // 导入密码重置路由
 const passwordResetRoutes = require('./routes/password-reset-routes');
+
+// 导入健康检查路由
+const healthRoutes = require('./routes/health-routes');
+
+// 导入系统维护路由
+const systemMaintenanceRoutes = require('./routes/system-maintenance-routes');
+
+// 导入告警路由
+const alertRoutes = require('./routes/alert-routes');
+
+// 导入增强健康检查路由
+const enhancedHealthRoutes = require('./routes/enhanced-health-routes');
 
 // 导入增强的审计日志路由
 console.log('即将加载增强的审计日志路由...');
@@ -227,10 +255,14 @@ const enhancedAuditRoutes = require('./routes/enhanced-audit-routes');
 console.log('增强的审计日志路由加载完成');
 
 // 导入错误处理中间件
-const { errorHandler, notFoundHandler } = require('./middleware/error-handler');
+const { globalErrorHandler, notFoundHandler, sanitizeRequestResponse } = require('./middleware/global-error-handler');
 
 // 创建Express应用
 const app = express();
+
+// 应用日志脱敏中间件（在所有其他中间件之前）
+app.use(sanitizeRequestResponse);
+
 const PORT = config.port;
 
 // 安全与代理设置
@@ -263,6 +295,18 @@ setupCors(app);
 // 指标采集在早期挂载
 app.use(metricsMiddleware);
 
+// 导入性能监控中间件
+const performanceMonitorMiddleware = require('./middleware/performance-monitor-middleware');
+
+// 导入智能缓存中间件
+const smartCacheMiddleware = require('./middleware/smart-cache-middleware');
+
+// 导入批量操作路由
+const batchOperationRoutes = require('./routes/batch-operation-routes');
+
+// 导入性能监控路由
+const performanceRoutes = require('./routes/performance-routes');
+
 // 请求签名与 IP 白名单（如启用）
 // app.use(verifyRequestSignature);
 // app.use(ipWhitelist);
@@ -270,8 +314,8 @@ app.use(metricsMiddleware);
 // 安全中间件
 setupSecurityHeaders(app);
 
-// 响应处理中间件
-app.use(newResponseMiddleware);
+// 统一响应处理中间件
+app.use(standardResponseMiddleware);
 
 // Token 相关中间件（长度/大小校验应早于限流）
 app.use(checkRequestBodySize);
@@ -338,6 +382,9 @@ try {
 }
 
 // API路由
+// 在现有路由之后添加新路由
+app.use('/api/batch-operations', batchOperationRoutes);
+app.use('/api/performance', performanceRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/system', systemConfigRoutes);
@@ -371,7 +418,6 @@ app.use('/api/user-preferences', userPreferencesRoutes);
 app.use('/api/abnormal-expenses', abnormalExpenseRoutes);
 app.use('/api/leave-records', leaveRecordRoutes);
 app.use('/api/stay-days', stayDaysRoutes);
-app.use('/api/cache-test', cacheTestRoutes);
 app.use('/api/cache', cacheRoutes);
 app.use('/api/brute-force-monitor', bruteForceMonitorRoutes);
 app.use('/api/admin/leave-records', adminLeaveRecordRoutes);
@@ -388,6 +434,18 @@ app.use('/api/admin/operation-restriction', adminOperationRestrictionRoutes);
 app.use('/api/admin/operation-statistics', adminOperationStatisticsRoutes);
 app.use('/api/admin/system-performance', systemPerformanceRoutes);
 app.use('/api/system-maintenance', systemMaintenanceRoutes);
+
+// 新增的管理端路由
+app.use('/api/admin/system', adminSystemConfigRoutes);
+app.use('/api/admin', adminRolePermissionRoutes);
+app.use('/api/admin/monitoring', adminMonitoringRoutes);
+app.use('/api/admin', adminBatchJobRoutes);
+app.use('/api/admin/disputes', adminDisputeRoutes);
+app.use('/api/admin/dorms', adminDormRoutes);
+app.use('/api/admin/docs', adminDocsRoutes);
+app.use('/api/admin/reviews', adminReviewRoutes);
+app.use('/api/admin/activities', adminActivityRoutes);
+app.use('/api/admin', adminSpecialPaymentRuleRoutes);
 
 // 数据导出路由
 app.use('/api/data-export', dataExportRoutes);
@@ -407,6 +465,18 @@ app.use('/api/password-reset', passwordResetRoutes);
 // 增强的审计日志路由
 app.use('/api/enhanced-audit', enhancedAuditRoutes);
 app.use('/api/monitoring', monitoringRoutes);
+
+// 增强健康检查路由
+app.use('/api', enhancedHealthRoutes);
+
+// 监控指标路由
+app.use('/api/metrics', metricsRoutes);
+
+// 健康检查路由
+app.use('/api/health', healthRoutes);
+
+// 告警路由
+app.use('/api/alerts', alertRoutes);
 
 // 前端应用路由（使用绝对路径，兼容空格路径；目录不存在则跳过挂载并记录日志）
 const clientDistPath = path.resolve(__dirname, '..', 'Client application', 'dist');
@@ -532,7 +602,7 @@ app.get('/health-page', async (req, res) => {
 app.use(notFoundHandler);
 
 // 全局错误处理中间件（必须在所有其他中间件和路由之后）
-app.use(errorHandler);
+app.use(globalErrorHandler);
 
 // 测试数据库连接
 async function startServer() {
@@ -693,7 +763,10 @@ process.on('SIGINT', async () => {
   // 停止定时任务
   scheduler.stopAllTasks();
   
+  // 关闭数据库连接池
   await pool.end();
+  await enhancedDatabaseManager.close();
+  
   console.log('数据库连接已关闭');
   process.exit(0);
 });

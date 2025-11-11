@@ -4,16 +4,13 @@ const { query, param, body, validationResult } = require('express-validator');
 const db = require('../config/db');
 const { authenticateToken, isAdmin } = require('../middleware/auth-middleware');
 const { logger } = require('../config/logger');
+const { COMMON_ERRORS, USER_ERRORS, ROOM_ERRORS } = require('../constants/error-codes');
 
 // 中间件：验证请求参数
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      message: '请求参数验证失败',
-      errors: errors.array()
-    });
+    return res.clientError('请求参数验证失败', COMMON_ERRORS.VALIDATION_FAILED, { errors: errors.array() });
   }
   next();
 };
@@ -85,27 +82,20 @@ router.get('/',
       const countResult = await db.query(countQuery, queryParams);
       const total = parseInt(countResult.rows[0].total);
 
+      // 构建分页信息对象
+      const pagination = {
+        page: parseInt(page),
+        pageSize: parseInt(limit),
+        total: total,
+        totalPages: Math.ceil(total / parseInt(limit))
+      };
+
       logger.info(`管理员获取请假记录列表，共${result.rowCount}条记录`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取请假记录列表成功',
-        data: {
-          records: result.rows,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            totalPages: Math.ceil(total / limit)
-          }
-        }
-      });
+      return res.paginate(result.rows, pagination, '获取请假记录列表成功');
     } catch (error) {
       logger.error('获取请假记录列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('获取请假记录列表失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -144,10 +134,7 @@ router.get('/:id',
       const result = await db.query(queryText, [id]);
 
       if (result.rowCount === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '请假记录不存在'
-        });
+        return res.notFound('请假记录不存在', COMMON_ERRORS.NOT_FOUND);
       }
 
       const leaveRecord = result.rows[0];
@@ -165,19 +152,10 @@ router.get('/:id',
 
       logger.info(`管理员获取请假记录详情，记录ID: ${id}`);
 
-      res.status(200).json({
-        success: true,
-        message: '获取请假记录详情成功',
-        data: {
-          leave_record: leaveRecord
-        }
-      });
+      return res.success({ leave_record: leaveRecord }, '获取请假记录详情成功');
     } catch (error) {
       logger.error('获取请假记录详情失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('获取请假记录详情失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -213,19 +191,13 @@ router.post('/:id/approve',
       const checkResult = await db.query(checkQuery, [id]);
 
       if (checkResult.rowCount === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '请假记录不存在'
-        });
+        return res.notFound('请假记录不存在', COMMON_ERRORS.NOT_FOUND);
       }
 
       const leaveRecord = checkResult.rows[0];
 
       if (leaveRecord.status !== 'pending') {
-        return res.status(409).json({
-          success: false,
-          message: '请假记录状态不是待审批，不能进行审批操作'
-        });
+        return res.conflict('请假记录状态不是待审批，不能进行审批操作', COMMON_ERRORS.OPERATION_NOT_ALLOWED);
       }
 
       // 更新请假记录状态
@@ -250,19 +222,10 @@ router.post('/:id/approve',
 
       logger.info(`管理员${adminName}审批了请假记录，记录ID: ${id}，审批结果: ${status}`);
 
-      res.status(200).json({
-        success: true,
-        message: '审批操作成功',
-        data: {
-          leave_record: updateResult.rows[0]
-        }
-      });
+      return res.success({ leave_record: updateResult.rows[0] }, '审批操作成功');
     } catch (error) {
       logger.error('审批请假记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('审批请假记录失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -362,15 +325,11 @@ router.post('/batch-approve',
 
         logger.info(`管理员${adminName}批量审批了${record_ids.length}条请假记录，成功: ${successCount}，失败: ${failureCount}`);
 
-        res.status(200).json({
-          success: true,
-          message: '批量审批操作完成',
-          data: {
-            success_count: successCount,
-            failure_count: failureCount,
-            failed_items: failedItems
-          }
-        });
+        return res.success({
+          success_count: successCount,
+          failure_count: failureCount,
+          failed_items: failedItems
+        }, '批量审批操作完成');
       } catch (error) {
         await client.query('ROLLBACK');
         throw error;
@@ -379,10 +338,7 @@ router.post('/batch-approve',
       }
     } catch (error) {
       logger.error('批量审批请假记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('批量审批请假记录失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -433,19 +389,10 @@ router.get('/types',
 
       logger.info('管理员获取请假类型列表');
 
-      res.status(200).json({
-        success: true,
-        message: '获取请假类型列表成功',
-        data: {
-          leave_types: leaveTypes
-        }
-      });
+      return res.success({ leave_types: leaveTypes }, '获取请假类型列表成功');
     } catch (error) {
       logger.error('获取请假类型列表失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('获取请假类型列表失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -553,19 +500,10 @@ router.get('/stats',
 
       logger.info('管理员获取请假统计数据');
 
-      res.status(200).json({
-        success: true,
-        message: '获取请假统计数据成功',
-        data: {
-          ...stats
-        }
-      });
+      return res.success(stats, '获取请假统计数据成功');
     } catch (error) {
       logger.error('获取请假统计数据失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('获取请假统计数据失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -602,10 +540,7 @@ router.post('/',
       const userCheckResult = await db.query(userCheckQuery, [user_id]);
 
       if (userCheckResult.rowCount === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+        return res.notFound('用户不存在', USER_ERRORS.USER_NOT_FOUND);
       }
 
       const user = userCheckResult.rows[0];
@@ -620,10 +555,7 @@ router.post('/',
       const roomResult = await db.query(roomQuery, [user_id]);
 
       if (roomResult.rowCount === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '用户未分配寝室'
-        });
+        return res.clientError('用户未分配寝室', ROOM_ERRORS.ROOM_MEMBER_NOT_FOUND);
       }
 
       const roomId = roomResult.rows[0].room_id;
@@ -655,19 +587,10 @@ router.post('/',
 
       logger.info(`管理员为用户${user.username}创建了请假记录，记录ID: ${newLeaveRecord.id}`);
 
-      res.status(201).json({
-        success: true,
-        message: '创建请假记录成功',
-        data: {
-          leave_record: newLeaveRecord
-        }
-      });
+      return res.success({ leave_record: newLeaveRecord }, '创建请假记录成功', 201);
     } catch (error) {
       logger.error('创建请假记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('创建请假记录失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -705,20 +628,14 @@ router.put('/:id',
       const recordCheckResult = await db.query(recordCheckQuery, [id]);
 
       if (recordCheckResult.rowCount === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '请假记录不存在'
-        });
+        return res.notFound('请假记录不存在', COMMON_ERRORS.NOT_FOUND);
       }
 
       const existingRecord = recordCheckResult.rows[0];
 
       // 检查记录状态，只有pending状态的记录才能更新
       if (existingRecord.status !== 'pending') {
-        return res.status(400).json({
-          success: false,
-          message: '只有待审批的请假记录才能更新'
-        });
+        return res.clientError('只有待审批的请假记录才能更新', COMMON_ERRORS.OPERATION_NOT_ALLOWED);
       }
 
       // 构建更新语句
@@ -748,10 +665,7 @@ router.put('/:id',
 
       // 如果没有提供任何更新字段，则返回错误
       if (updateFields.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '至少需要提供一个更新字段'
-        });
+        return res.clientError('至少需要提供一个更新字段', COMMON_ERRORS.VALIDATION_FAILED);
       }
 
       // 添加更新时间和更新人
@@ -773,19 +687,10 @@ router.put('/:id',
 
       logger.info(`管理员更新了用户${existingRecord.username}的请假记录，记录ID: ${id}`);
 
-      res.status(200).json({
-        success: true,
-        message: '更新请假记录成功',
-        data: {
-          leave_record: updatedRecord
-        }
-      });
+      return res.success({ leave_record: updatedRecord }, '更新请假记录成功');
     } catch (error) {
       logger.error('更新请假记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('更新请假记录失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -817,20 +722,14 @@ router.delete('/:id',
       const recordCheckResult = await db.query(recordCheckQuery, [id]);
 
       if (recordCheckResult.rowCount === 0) {
-        return res.status(404).json({
-          success: false,
-          message: '请假记录不存在'
-        });
+        return res.notFound('请假记录不存在', COMMON_ERRORS.NOT_FOUND);
       }
 
       const existingRecord = recordCheckResult.rows[0];
 
       // 检查记录状态，只有pending状态的记录才能删除
       if (existingRecord.status !== 'pending') {
-        return res.status(400).json({
-          success: false,
-          message: '只有待审批的请假记录才能删除'
-        });
+        return res.clientError('只有待审批的请假记录才能删除', COMMON_ERRORS.OPERATION_NOT_ALLOWED);
       }
 
       // 删除请假记录
@@ -844,16 +743,10 @@ router.delete('/:id',
 
       logger.info(`管理员删除了用户${existingRecord.username}的请假记录，记录ID: ${id}`);
 
-      res.status(200).json({
-        success: true,
-        message: '删除请假记录成功'
-      });
+      return res.success(null, '删除请假记录成功');
     } catch (error) {
       logger.error('删除请假记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('删除请假记录失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );
@@ -950,10 +843,7 @@ router.get('/export',
       res.status(200).send(csvContent);
     } catch (error) {
       logger.error('导出请假记录失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '服务器内部错误'
-      });
+      return res.error('导出请假记录失败', COMMON_ERRORS.INTERNAL_ERROR);
     }
   }
 );

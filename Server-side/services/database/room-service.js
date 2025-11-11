@@ -241,6 +241,63 @@ class RoomService extends BaseService {
     const result = await this.query(sql, values);
     return result.rows.length > 0 ? result.rows[0] : null;
   }
+
+  /**
+   * 获取活跃房间列表
+   * @param {number} limit - 限制数量
+   * @returns {Promise<Array>} 活跃房间列表
+   */
+  async getActiveRooms(limit = 50) {
+    const sql = `
+      SELECT id, name, description, code, creator_id, created_at, updated_at
+      FROM rooms 
+      WHERE is_active = $1 
+      ORDER BY created_at DESC 
+      LIMIT $2
+    `;
+    const result = await this.query(sql, [true, limit]);
+    return result.rows;
+  }
+
+  /**
+   * 根据ID查找房间
+   * @param {string} roomId - 房间ID
+   * @returns {Promise<Object|null>} 房间信息
+   */
+  async getRoomById(roomId) {
+    const sql = `SELECT * FROM rooms WHERE id = $1 AND is_active = $2`;
+    const result = await this.query(sql, [roomId, true]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  /**
+   * 获取房间用户列表（为了兼容性，保留此方法作为getRoomMembers的别名）
+   * @param {string} roomId - 房间ID
+   * @returns {Promise<Array>} 房间用户列表
+   */
+  async getRoomUsers(roomId) {
+    return this.getRoomMembers(roomId);
+  }
+
+  /**
+   * 获取房间账单列表
+   * @param {string} roomId - 房间ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Array>} 房间账单列表
+   */
+  async getRoomBills(roomId, options = {}) {
+    const { limit = 20 } = options;
+    const sql = `
+      SELECT b.*, u.username as creator_username
+      FROM bills b
+      LEFT JOIN users u ON b.creator_id = u.id
+      WHERE b.room_id = $1 AND b.is_active = $2
+      ORDER BY b.created_at DESC 
+      LIMIT $3
+    `;
+    const result = await this.query(sql, [roomId, true, limit]);
+    return result.rows;
+  }
 }
 
 module.exports = new RoomService();

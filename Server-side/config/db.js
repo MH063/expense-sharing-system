@@ -34,7 +34,13 @@ if (fs.existsSync(localEnvPath)) {
   require('dotenv').config({ path: localEnvPath, override: true });
 }
 
-// 检查密码是否为占位符，如果是则警告
+// 验证数据库密码配置
+if (!process.env.DB_PASSWORD || process.env.DB_PASSWORD.trim() === '') {
+  console.error('错误: DB_PASSWORD环境变量未设置或为空');
+  console.error('请在.env文件中设置DB_PASSWORD，或使用环境变量');
+  throw new Error('数据库密码未配置');
+}
+
 if (process.env.DB_PASSWORD === 'development_password_placeholder') {
   console.warn('警告: 使用了开发环境占位符密码，请在.env文件中设置真实密码');
 }

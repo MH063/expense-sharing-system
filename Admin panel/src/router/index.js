@@ -84,6 +84,21 @@ const routes = [
         path: 'abnormal',
         name: 'AbnormalExpense',
         component: () => import('../views/system/AbnormalExpense.vue')
+      },
+      {
+        path: 'alerts',
+        name: 'MonitoringAlerts',
+        component: () => import('../views/system/MonitoringAlerts.vue')
+      },
+      {
+        path: 'maintenance',
+        name: 'SystemMaintenance',
+        component: () => import('../views/system/SystemMaintenance.vue')
+      },
+      {
+        path: 'config',
+        name: 'SystemConfigManagement',
+        component: () => import('../views/system/SystemConfig.vue')
       }
     ]
   },

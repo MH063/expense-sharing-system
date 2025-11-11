@@ -1,5 +1,6 @@
 const winston = require('winston');
 const path = require('path');
+const { sanitizeMessage } = require('../middleware/logSanitizer');
 
 // 确保日志目录存在
 const fs = require('fs');
@@ -15,16 +16,26 @@ const customFormat = winston.format.combine(
   }),
   winston.format.errors({ stack: true }),
   winston.format.printf(({ level, message, timestamp, stack, ...meta }) => {
-    let log = `${timestamp} [${level.toUpperCase()}]: ${message}`;
+    // 对消息进行脱敏处理
+    let logMessage = sanitizeMessage(message);
     
-    // 如果有堆栈信息，添加到日志中
+    let log = `${timestamp} [${level.toUpperCase()}]: ${logMessage}`;
+    
+    // 如果有堆栈信息，添加到日志中（也需要脱敏）
     if (stack) {
-      log += `\n${stack}`;
+      const sanitizedStack = sanitizeMessage(stack);
+      log += `\n${sanitizedStack}`;
     }
     
-    // 如果有元数据，添加到日志中
+    // 如果有元数据，添加到日志中（也需要脱敏）
     if (Object.keys(meta).length > 0) {
-      log += `\n${JSON.stringify(meta, null, 2)}`;
+      try {
+        const metaString = JSON.stringify(meta, null, 2);
+        const sanitizedMeta = sanitizeMessage(metaString);
+        log += `\n${sanitizedMeta}`;
+      } catch (error) {
+        log += `\n[无法序列化元数据: ${error.message}]`;
+      }
     }
     
     return log;

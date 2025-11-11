@@ -188,6 +188,7 @@ class UserProfileController {
     try {
       const userId = req.user.id;
       
+      // 检查是否有上传的文件
       if (!req.file) {
         return res.status(400).json({
           success: false,
@@ -198,6 +199,13 @@ class UserProfileController {
       // 获取用户信息
       const user = await User.findByPk(userId);
       if (!user) {
+        // 删除已上传的文件
+        try {
+          await fs.unlink(req.file.path);
+        } catch (err) {
+          logger.warn('删除未使用的头像文件失败:', err);
+        }
+        
         return res.status(404).json({
           success: false,
           message: '用户不存在'
@@ -229,6 +237,15 @@ class UserProfileController {
         }
       });
     } catch (error) {
+      // 删除可能已上传的文件
+      if (req.file && req.file.path) {
+        try {
+          await fs.unlink(req.file.path);
+        } catch (err) {
+          logger.warn('删除问题头像文件失败:', err);
+        }
+      }
+      
       logger.error('更新用户头像失败:', error);
       return res.status(500).json({
         success: false,

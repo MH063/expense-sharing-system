@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const permissionController = require('../controllers/permission-controller');
-const { authenticateToken, checkRole } = require('../middleware/auth-middleware');
+const { authenticateToken } = require('../middleware/auth-middleware');
+const { checkRole } = require('../middleware/enhanced-permission-middleware');
 
 /**
  * 权限管理路由

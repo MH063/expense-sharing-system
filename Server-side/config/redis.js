@@ -10,7 +10,8 @@ const { logger } = require('./logger');
 const redisConfig = {
   host: process.env.REDIS_HOST || 'localhost',
   port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
+  // 只有当环境变量存在且不为空字符串时才设置密码
+  password: process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '' ? process.env.REDIS_PASSWORD : null,
   db: process.env.REDIS_DB || 0,
   // 连接超时时间（毫秒）
   connectTimeout: 10000,
@@ -50,7 +51,8 @@ const initRedis = async () => {
         family: redisConfig.family,
         keepAlive: redisConfig.keepAlive,
       },
-      password: redisConfig.password,
+      // 只有当密码不为null时才设置密码
+      ...(redisConfig.password && { password: redisConfig.password }),
       database: redisConfig.db,
     });
 

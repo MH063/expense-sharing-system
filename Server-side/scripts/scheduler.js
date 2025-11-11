@@ -28,16 +28,16 @@ const config = {
     email: {
       enabled: false, // 需要配置SMTP服务器
       smtp: {
-        host: 'smtp.example.com',
-        port: 587,
+        host: process.env.SMTP_HOST || 'smtp.example.com',
+        port: parseInt(process.env.SMTP_PORT) || 587,
         secure: false,
         auth: {
-          user: 'your-email@example.com',
-          pass: 'your-password'
+          user: process.env.SMTP_USER || 'your-email@example.com',
+          pass: process.env.SMTP_PASSWORD || 'your-password'
         }
       },
-      from: 'your-email@example.com',
-      to: 'admin@example.com'
+      from: process.env.SMTP_FROM || 'your-email@example.com',
+      to: process.env.ADMIN_EMAIL || 'admin@example.com'
     },
     webhook: {
       enabled: false, // 需要配置webhook URL

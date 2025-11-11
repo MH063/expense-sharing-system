@@ -1929,11 +1929,27 @@ INSERT INTO permissions (code, name, description, module) VALUES
 -- 缴费人角色管理权限
 ('payer.role.manage', '缴费人角色管理', '管理缴费人角色', 'role');
 
--- 为系统管理员分配所有权限
+-- 为系统管理员分配系统维护相关权限
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r, permissions p
-WHERE r.name = '系统管理员';
+WHERE r.name = '系统管理员'
+AND p.code IN (
+  -- 系统设置权限
+  'system.config',
+  -- 日志查看权限
+  'system.logs',
+  -- 权限管理权限
+  'permission.manage',
+  -- 角色分配权限
+  'role.assign',
+  -- 角色申请审批权限
+  'role.approve',
+  -- 数据导出权限
+  'data.export',
+  -- 通知管理权限
+  'notification.manage'
+);
 
 -- 为管理员分配除系统设置外的所有权限
 INSERT INTO role_permissions (role_id, permission_id)
@@ -1973,7 +1989,9 @@ AND p.code IN (
   -- 统计分析权限
   'statistics.view',
   -- 个人信息权限
-  'personal.info.view', 'personal.info.edit'
+  'personal.info.view', 'personal.info.edit',
+  -- 缴费人角色管理权限
+  'payer.role.manage'
 );
 
 -- 为缴费人分配支付相关权限

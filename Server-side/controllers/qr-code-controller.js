@@ -41,110 +41,110 @@ class QrCodeController {
   }
 
   /**
-   * 上传收款码
-   * @param {Object} req - 请求对象
-   * @param {Object} res - 响应对象
-   */
-  async uploadQrCode(req, res) {
-    const client = await this.pool.connect();
-    try {
-      const { qr_type } = req.body;
-      const user_id = req.user.id;
+ * 上传收款码
+ * @param {Object} req - 请求对象
+ * @param {Object} res - 响应对象
+ */
+async uploadQrCode(req, res) {
+  const client = await this.pool.connect();
+  try {
+    const { qr_type } = req.body;
+    const user_id = req.user.id;
+    
+    // 验证收款码类型
+    if (!qr_type || !['wechat', 'alipay'].includes(qr_type)) {
+      return res.error(400, '收款码类型必须是wechat或alipay');
+    }
+    
+    // 检查是否有上传的文件
+    if (!req.file) {
+      return res.error(400, '请上传收款码图片');
+    }
+    
+    // 验证文件类型
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      // 删除已上传的文件
+      fs.unlinkSync(req.file.path);
+      return res.error(400, '只支持JPEG、JPG和PNG格式的图片');
+    }
+    
+    // 检查文件大小（限制为5MB）
+    if (req.file.size > 5 * 1024 * 1024) {
+      // 删除已上传的文件
+      fs.unlinkSync(req.file.path);
+      return res.error(400, '图片大小不能超过5MB');
+    }
+    
+    // 生成文件名
+    const fileName = `${user_id}_${qr_type}_${Date.now()}${path.extname(req.file.originalname)}`;
+    const filePath = path.join(this.uploadDir, fileName);
+    
+    // 移动文件到目标位置
+    fs.renameSync(req.file.path, filePath);
+    
+    // 生成访问URL
+    const qr_image_url = `/uploads/qr-codes/${fileName}`;
+    
+    // 检查用户是否已有同类型的收款码
+    const existingQrCode = await client.query(
+      'SELECT id FROM user_qr_codes WHERE user_id = $1 AND qr_type = $2',
+      [user_id, qr_type]
+    );
+    
+    let qrCode;
+    
+    if (existingQrCode.rows.length > 0) {
+      // 更新现有收款码
+      const updateResult = await client.query(
+        `UPDATE user_qr_codes 
+         SET qr_image_url = $1, is_active = TRUE, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [qr_image_url, existingQrCode.rows[0].id]
+      );
+      qrCode = updateResult.rows[0];
       
-      // 验证收款码类型
-      if (!qr_type || !['wechat', 'alipay'].includes(qr_type)) {
-        return res.error(400, '收款码类型必须是wechat或alipay');
-      }
-      
-      // 检查是否有上传的文件
-      if (!req.file) {
-        return res.error(400, '请上传收款码图片');
-      }
-      
-      // 验证文件类型
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-      if (!allowedTypes.includes(req.file.mimetype)) {
-        // 删除已上传的文件
-        fs.unlinkSync(req.file.path);
-        return res.error(400, '只支持JPEG、JPG和PNG格式的图片');
-      }
-      
-      // 检查文件大小（限制为5MB）
-      if (req.file.size > 5 * 1024 * 1024) {
-        // 删除已上传的文件
-        fs.unlinkSync(req.file.path);
-        return res.error(400, '图片大小不能超过5MB');
-      }
-      
-      // 生成文件名
-      const fileName = `${user_id}_${qr_type}_${Date.now()}${path.extname(req.file.originalname)}`;
-      const filePath = path.join(this.uploadDir, fileName);
-      
-      // 移动文件到目标位置
-      fs.renameSync(req.file.path, filePath);
-      
-      // 生成访问URL
-      const qr_image_url = `/uploads/qr-codes/${fileName}`;
-      
-      // 检查用户是否已有同类型的收款码
-      const existingQrCode = await client.query(
-        'SELECT id FROM user_qr_codes WHERE user_id = $1 AND qr_type = $2',
-        [user_id, qr_type]
+      // 删除旧图片文件
+      const oldQrCode = await client.query(
+        'SELECT qr_image_url FROM user_qr_codes WHERE id = $1',
+        [existingQrCode.rows[0].id]
       );
       
-      let qrCode;
-      
-      if (existingQrCode.rows.length > 0) {
-        // 更新现有收款码
-        const updateResult = await client.query(
-          `UPDATE user_qr_codes 
-           SET qr_image_url = $1, is_active = TRUE, updated_at = NOW()
-           WHERE id = $2
-           RETURNING *`,
-          [qr_image_url, existingQrCode.rows[0].id]
-        );
-        qrCode = updateResult.rows[0];
-        
-        // 删除旧图片文件
-        const oldQrCode = await client.query(
-          'SELECT qr_image_url FROM user_qr_codes WHERE id = $1',
-          [existingQrCode.rows[0].id]
-        );
-        
-        if (oldQrCode.rows.length > 0 && oldQrCode.rows[0].qr_image_url) {
-          const oldFilePath = path.join(__dirname, '../public', oldQrCode.rows[0].qr_image_url);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-          }
+      if (oldQrCode.rows.length > 0 && oldQrCode.rows[0].qr_image_url) {
+        const oldFilePath = path.join(__dirname, '../public', oldQrCode.rows[0].qr_image_url);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
         }
-      } else {
-        // 创建新收款码
-        const insertResult = await client.query(
-          `INSERT INTO user_qr_codes (user_id, qr_type, qr_image_url, is_active, is_default)
-           VALUES ($1, $2, $3, TRUE, TRUE)
-           RETURNING *`,
-          [user_id, qr_type, qr_image_url]
-        );
-        qrCode = insertResult.rows[0];
       }
-      
-      logger.info(`用户 ${user_id} 上传了 ${qr_type} 收款码: ${qrCode.id}`);
-      
-      res.success(201, '收款码上传成功', {
-        qr_code: qrCode
-      });
-    } catch (error) {
-      // 删除已上传的文件（如果有）
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-      
-      logger.error('上传收款码失败:', error);
-      res.error(500, '上传收款码失败', error.message);
-    } finally {
-      client.release();
+    } else {
+      // 创建新收款码
+      const insertResult = await client.query(
+        `INSERT INTO user_qr_codes (user_id, qr_type, qr_image_url, is_active, is_default)
+         VALUES ($1, $2, $3, TRUE, TRUE)
+         RETURNING *`,
+        [user_id, qr_type, qr_image_url]
+      );
+      qrCode = insertResult.rows[0];
     }
+    
+    logger.info(`用户 ${user_id} 上传了 ${qr_type} 收款码: ${qrCode.id}`);
+    
+    res.success(201, '收款码上传成功', {
+      qr_code: qrCode
+    });
+  } catch (error) {
+    // 删除已上传的文件（如果有）
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    logger.error('上传收款码失败:', error);
+    res.error(500, '上传收款码失败', error.message);
+  } finally {
+    client.release();
   }
+}
 
   /**
    * 获取用户收款码列表

@@ -77,13 +77,7 @@ router.delete('/third-party/:id', authenticateToken, userController.unbindThirdP
 router.get('/third-party', authenticateToken, userController.getThirdPartyAccounts);
 
 // 用户登出 - 需要认证
-router.post('/logout', authenticateToken, (req, res) => {
-  // 这里可以添加登出逻辑，比如将token加入黑名单
-  res.status(200).json({
-    success: true,
-    message: '登出成功'
-  });
-});
+router.post('/logout', authenticateToken, userController.logout);
 
 // 刷新token
 router.post('/refresh-token', userController.refreshToken);

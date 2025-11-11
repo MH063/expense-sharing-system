@@ -61,7 +61,7 @@ const shouldSkipCaseConvert = (url) => {
 
 // 创建axios实例
 const request = axios.create({
-  baseURL: '/api', // 统一设置 baseURL 为 /api
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api', // 使用环境变量或默认值
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' }
 })

@@ -1,9 +1,9 @@
 /**
  * 增强版缓存中间件
- * 使用增强版缓存服务实现更高效的缓存策略
+ * 使用多级缓存服务实现更高效的缓存策略
  */
 
-const enhancedCacheService = require('../services/enhanced-cache-service');
+const multiLevelCacheService = require('../services/multi-level-cache-service');
 const { logger } = require('../config/logger');
 
 /**
@@ -62,7 +62,7 @@ const getSmartCache = (prefix, options = {}) => {
         : generateSmartCacheKey(prefix, req);
       
       // 尝试从缓存获取数据
-      const cachedData = await enhancedCacheService.get(cacheKey);
+      const cachedData = await multiLevelCacheService.get(cacheKey);
       
       if (cachedData) {
         logger.debug(`智能缓存命中: ${cacheKey}`);
@@ -85,7 +85,7 @@ const getSmartCache = (prefix, options = {}) => {
         // 只缓存成功的响应
         if (data && data.success && data.data) {
           // 异步缓存数据，不阻塞响应
-          enhancedCacheService.set(cacheKey, data.data, ttl, tags).catch(err => {
+          multiLevelCacheService.set(cacheKey, data.data, ttl, tags).catch(err => {
             logger.error('智能缓存数据失败:', err);
           });
         }
@@ -126,17 +126,17 @@ const smartClearCache = (patterns, options = {}) => {
                 // 批量清除
                 for (const pattern of patterns) {
                   if (useTags) {
-                    await enhancedCacheService.delByTag(pattern);
+                    await multiLevelCacheService.delByTag(pattern);
                   } else {
-                    await enhancedCacheService.delPattern(pattern);
+                    await multiLevelCacheService.delPattern(pattern);
                   }
                 }
               } else {
                 // 单个清除
                 if (useTags) {
-                  await enhancedCacheService.delByTag(patterns);
+                  await multiLevelCacheService.delByTag(patterns);
                 } else {
-                  await enhancedCacheService.delPattern(patterns);
+                  await multiLevelCacheService.delPattern(patterns);
                 }
               }
             } catch (err) {
@@ -290,7 +290,7 @@ const smartStatsCache = {
  */
 const cacheStats = (req, res) => {
   try {
-    const stats = enhancedCacheService.getStats();
+    const stats = multiLevelCacheService.getStats();
     res.json({
       success: true,
       data: stats
@@ -309,7 +309,7 @@ const cacheStats = (req, res) => {
  */
 const resetCacheStats = (req, res) => {
   try {
-    enhancedCacheService.resetStats();
+    multiLevelCacheService.resetStats();
     res.json({
       success: true,
       message: '缓存统计已重置'

@@ -13,6 +13,21 @@ class UserService extends BaseService {
   }
 
   /**
+   * 查找管理员用户
+   * @param {string} username - 用户名
+   * @returns {Promise<Object|null>} 管理员用户信息
+   */
+  async findAdminUser(username) {
+    const sql = `SELECT u.id, u.username, u.password_hash 
+         FROM users u 
+         JOIN user_roles ur ON u.id = ur.user_id 
+         JOIN roles r ON ur.role_id = r.id 
+         WHERE u.username = $1 AND r.name = '系统管理员'`;
+    const result = await this.query(sql, [username]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  /**
    * 根据用户名查找用户
    * @param {string} username - 用户名
    * @returns {Promise<Object|null>} 查找结果
@@ -66,21 +81,25 @@ class UserService extends BaseService {
    * @returns {Promise<Object>} 创建的用户
    */
   async createUser(userData) {
-    const id = uuidv4();
     const { username, email, password, name, avatar, phone } = userData;
 
-    // 统一使用 password-service 进行哈希
-    const { hashPassword } = require('../../password-service');
-    const passwordHash = await hashPassword(password);
+    // 密码已经在user-business-service.js中哈希过，直接使用
+    const passwordHash = password;
     
     const sql = `
-      INSERT INTO users (id, username, email, password_hash, name, avatar, phone, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO users (username, email, password_hash, avatar_url, phone, status)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
     
-    const values = [id, username, email, passwordHash, name, avatar, phone, true];
+    const values = [username, email, passwordHash, avatar, phone, 'active'];
     const result = await this.query(sql, values);
+    
+    // 检查是否成功创建用户
+    if (!result || !result.rows || result.rows.length === 0) {
+      throw new Error('创建用户失败：数据库未返回用户数据');
+    }
+    
     const user = result.rows[0];
     delete user.password_hash;
     
@@ -97,15 +116,15 @@ class UserService extends BaseService {
    * @returns {Promise<Object|null>} 验证结果
    */
   async validateLogin(username, password) {
-    const sql = `SELECT * FROM users WHERE (username = $1 OR email = $1) AND is_active = $2`;
-    const result = await this.query(sql, [username, true]);
+    const sql = `SELECT * FROM users WHERE (username = $1 OR email = $1) AND status = $2`;
+    const result = await this.query(sql, [username, 'active']);
     
     if (result.rows.length === 0) {
       return null;
     }
     
     const user = result.rows[0];
-    const { verifyPassword } = require('../../password-service');
+    const { verifyPassword } = require('../password-service');
     const isValidPassword = await verifyPassword(password, user.password_hash);
     
     if (!isValidPassword) {
@@ -124,12 +143,16 @@ class UserService extends BaseService {
    * @returns {Promise<boolean>} 是否更新成功
    */
   async updatePassword(userId, newPassword) {
+    // 如果传入的是明文密码，需要先哈希
+    const { hashPassword } = require('../password-service');
+    const passwordHash = await hashPassword(newPassword);
+    
     const sql = `
       UPDATE users 
-      SET password = $1, updated_at = CURRENT_TIMESTAMP 
+      SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
       WHERE id = $2
     `;
-    const result = await this.query(sql, [newPassword, userId]);
+    const result = await this.query(sql, [passwordHash, userId]);
     return result.rowCount > 0;
   }
 
@@ -321,6 +344,38 @@ class UserService extends BaseService {
     
     // 使用标签批量清除所有用户房间列表缓存
     await enhancedCacheService.delByTag('user:rooms');
+  }
+
+  /**
+   * 获取活跃用户列表
+   * @param {number} limit - 限制数量
+   * @returns {Promise<Array>} 活跃用户列表
+   */
+  async getActiveUsers(limit = 100) {
+    const sql = `
+      SELECT id, username, email, name, avatar, phone, created_at 
+      FROM users 
+      WHERE is_active = $1 
+      ORDER BY created_at DESC 
+      LIMIT $2
+    `;
+    const result = await this.query(sql, [true, limit]);
+    return result.rows;
+  }
+
+  /**
+   * 根据ID查找用户
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Object|null>} 用户信息
+   */
+  async getUserById(userId) {
+    const cacheKey = `user:id:${userId}`;
+    
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      const sql = `SELECT id, username, email, name, avatar, phone, created_at, updated_at FROM users WHERE id = $1 AND is_active = $2`;
+      const result = await this.query(sql, [userId, true]);
+      return result.rows.length > 0 ? result.rows[0] : null;
+    }, enhancedCacheService.getDefaultTTL('user'), ['user']);
   }
 }
 

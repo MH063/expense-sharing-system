@@ -29,42 +29,20 @@ function generateSecureKey(length = 32) {
 }
 
 /**
- * 从环境变量或文件加载密钥
+ * 从环境变量加载密钥
  * @param {string} envVarName - 环境变量名称
- * @param {string} fileName - 文件名（相对于config目录）
  * @param {number} keyLength - 密钥长度（字节）
  * @returns {string} 密钥
  */
-function loadKey(envVarName, fileName, keyLength = 32) {
-  // 首先尝试从环境变量加载
+function loadKey(envVarName, keyLength = 32) {
+  // 从环境变量加载
   if (process.env[envVarName]) {
     return process.env[envVarName];
   }
 
-  // 如果环境变量不存在，尝试从文件加载
-  const filePath = path.join(__dirname, fileName);
-  try {
-    if (fs.existsSync(filePath)) {
-      const key = fs.readFileSync(filePath, 'utf8').trim();
-      if (key) {
-        logger.info(`${envVarName}密钥从文件加载成功`);
-        return key;
-      }
-    }
-  } catch (error) {
-    logger.warn(`从文件加载${envVarName}密钥失败:`, error.message);
-  }
-
-  // 如果都不存在，生成新的密钥并保存到文件
+  // 如果环境变量不存在，生成新的密钥（但不保存到文件）
   const newKey = generateSecureKey(keyLength);
-  try {
-    fs.writeFileSync(filePath, newKey, 'utf8');
-    fs.chmodSync(filePath, 0o600); // 设置文件权限为仅所有者可读写
-    logger.info(`新的${envVarName}密钥已生成并保存到文件`);
-  } catch (error) {
-    logger.error(`保存${envVarName}密钥到文件失败:`, error.message);
-  }
-
+  logger.warn(`${envVarName}环境变量未设置，生成临时密钥。请设置${envVarName}环境变量以避免密钥重新生成`);
   return newKey;
 }
 
@@ -89,27 +67,19 @@ function generateRsaKeyPair() {
 }
 
 /**
- * 从文件加载RSA密钥对
+ * 从环境变量加载RSA密钥对
  * @returns {Object|null} 包含公钥和私钥的对象，如果不存在则返回null
  */
 function loadRsaKeyPair() {
-  const publicKeyPath = path.join(__dirname, 'rsa-public.key');
-  const privateKeyPath = path.join(__dirname, 'rsa-private.key');
+  const publicKey = process.env.RSA_PUBLIC_KEY;
+  const privateKey = process.env.RSA_PRIVATE_KEY;
   
-  try {
-    if (fs.existsSync(publicKeyPath) && fs.existsSync(privateKeyPath)) {
-      const publicKey = fs.readFileSync(publicKeyPath, 'utf8').trim();
-      const privateKey = fs.readFileSync(privateKeyPath, 'utf8').trim();
-      
-      if (publicKey && privateKey) {
-        logger.info('RSA密钥对从文件加载成功');
-        return { publicKey, privateKey };
-      }
-    }
-  } catch (error) {
-    logger.warn('从文件加载RSA密钥对失败:', error.message);
+  if (publicKey && privateKey) {
+    logger.info('RSA密钥对从环境变量加载成功');
+    return { publicKey, privateKey };
   }
   
+  logger.warn('RSA密钥对未在环境变量中配置');
   return null;
 }
 
@@ -207,7 +177,7 @@ class EnhancedKeyRotationManager {
   }
 
   /**
-   * 从本地加载密钥
+   * 从环境变量加载密钥
    */
   async loadKeysFromLocal() {
     try {
@@ -216,7 +186,7 @@ class EnhancedKeyRotationManager {
       if (accessTokenSecrets.length > 0) {
         this.keys.accessTokens = accessTokenSecrets;
       } else {
-        this.keys.accessTokens = [loadKey('JWT_SECRET', 'jwt-secret.key', 32)];
+        this.keys.accessTokens = [loadKey('JWT_SECRET', 32)];
       }
 
       // 加载JWT刷新令牌密钥
@@ -224,7 +194,7 @@ class EnhancedKeyRotationManager {
       if (refreshTokenSecrets.length > 0) {
         this.keys.refreshTokens = refreshTokenSecrets;
       } else {
-        this.keys.refreshTokens = [loadKey('JWT_REFRESH_SECRET', 'jwt-refresh-secret.key', 32)];
+        this.keys.refreshTokens = [loadKey('JWT_REFRESH_SECRET', 32)];
       }
 
       // 加载RSA密钥对
@@ -232,13 +202,15 @@ class EnhancedKeyRotationManager {
       if (rsaKeyPair) {
         this.keys.rsa = rsaKeyPair;
       } else {
-        // 如果RSA密钥不存在，生成并保存到本地
-        await this.generateAndSaveRsaKeys();
+        // 如果RSA密钥不存在，仅生成在内存中
+        const { publicKey, privateKey } = generateRsaKeyPair();
+        this.keys.rsa = { publicKey, privateKey };
+        logger.warn('RSA密钥对未配置，将在内存中生成临时密钥对。请设置RSA_PUBLIC_KEY和RSA_PRIVATE_KEY环境变量');
       }
       
-      logger.info('从本地加载密钥成功');
+      logger.info('从环境变量加载密钥成功');
     } catch (error) {
-      logger.error('从本地加载密钥失败:', error.message);
+      logger.error('从环境变量加载密钥失败:', error.message);
       throw error;
     }
   }

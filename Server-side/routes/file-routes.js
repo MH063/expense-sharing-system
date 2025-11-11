@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/tokenManager');
 const { roleAwareRateLimiter } = require('../middleware/rateLimiter');
+const { checkFileContent, strictFileTypeValidation, advancedFileContentCheck } = require('../middleware/fileSecurity');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +22,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-router.post('/upload', authenticateToken, roleAwareRateLimiter('strict'), upload.single('file'), async (req, res) => {
+router.post('/upload', authenticateToken, roleAwareRateLimiter('strict'), checkFileContent, strictFileTypeValidation, advancedFileContentCheck, upload.single('file'), async (req, res) => {
   if (!req.file) return res.clientError('未接收到文件');
   res.success(201, '文件上传成功', { filename: req.file.filename, size: req.file.size });
 });

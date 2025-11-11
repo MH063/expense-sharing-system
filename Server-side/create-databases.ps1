@@ -3,7 +3,13 @@ Write-Host "正在创建记账系统的开发、测试和生产环境数据库..
 Write-Host ""
 
 # 获取PostgreSQL密码
-$pgPassword = "123456789"  # 从.env文件中获取的默认密码
+# 从环境变量获取密码，未设置时提示用户输入
+if ($env:DB_PASSWORD) {
+    $pgPassword = $env:DB_PASSWORD
+} else {
+    Write-Host "请输入PostgreSQL数据库密码:" -ForegroundColor Yellow -NoNewline
+    $pgPassword = Read-Host -AsSecureString | ConvertFrom-SecureString -AsPlainText
+}
 
 # 设置环境变量以便psql使用
 $env:PGPASSWORD = $pgPassword

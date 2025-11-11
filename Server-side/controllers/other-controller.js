@@ -143,6 +143,7 @@ exports.uploadFile = async (req, res) => {
   try {
     console.log('上传文件');
     
+    // 使用带安全检查的上传中间件
     upload.single('file')(req, res, async (err) => {
       if (err) {
         console.error('文件上传失败:', err);

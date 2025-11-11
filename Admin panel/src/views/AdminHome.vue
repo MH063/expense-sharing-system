@@ -65,6 +65,18 @@
               <el-icon><Warning /></el-icon>
               <span>异常费用识别</span>
             </el-menu-item>
+            <el-menu-item index="/system/alerts">
+              <el-icon><Bell /></el-icon>
+              <span>监控告警</span>
+            </el-menu-item>
+            <el-menu-item index="/system/maintenance">
+              <el-icon><Tools /></el-icon>
+              <span>系统维护</span>
+            </el-menu-item>
+            <el-menu-item index="/system/config">
+              <el-icon><Setting /></el-icon>
+              <span>系统配置</span>
+            </el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="review">
             <template #title>

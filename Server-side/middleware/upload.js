@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { logger } = require('../config/logger');
+const { checkFileContent, strictFileTypeValidation } = require('./fileSecurity');
 
 /**
  * 确保上传目录存在
@@ -32,16 +33,28 @@ const receiptStorage = multer.diskStorage({
 
 /**
  * 收据文件过滤器
+ * 加强文件类型验证，同时检查MIME类型和文件扩展名
  */
 const receiptFileFilter = (req, file, cb) => {
   // 允许的文件类型
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+  
+  // 允许的文件扩展名
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.pdf'];
+  
+  // 检查MIME类型
+  const isMimeTypeAllowed = allowedTypes.includes(file.mimetype);
+  
+  // 检查文件扩展名
+  const ext = path.extname(file.originalname).toLowerCase();
+  const isExtAllowed = allowedExts.includes(ext);
 
-  if (allowedTypes.includes(file.mimetype)) {
+  if (isMimeTypeAllowed && isExtAllowed) {
     cb(null, true);
   } else {
     logger.warn('不支持的文件类型上传尝试', {
       mimetype: file.mimetype,
+      extension: ext,
       originalname: file.originalname,
       ip: req.ip,
       user: req.user ? req.user.id : '未认证'
@@ -79,15 +92,25 @@ const storage = multer.diskStorage({
 
 /**
  * 通用文件过滤器
+ * 加强文件类型验证，同时检查MIME类型和文件扩展名
  */
 const fileFilter = (req, file, cb) => {
-  // 允许的文件扩展名
-  const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx'];
+  // 允许的文件扩展名和对应的MIME类型
+  const allowedTypes = {
+    '.jpg': ['image/jpeg'],
+    '.jpeg': ['image/jpeg'],
+    '.png': ['image/png'],
+    '.gif': ['image/gif'],
+    '.pdf': ['application/pdf'],
+    '.doc': ['application/msword'],
+    '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  };
+  
   const ext = path.extname(file.originalname).toLowerCase();
+  const allowedMimeTypes = allowedTypes[ext];
 
-  if (allowedExts.includes(ext)) {
-    cb(null, true);
-  } else {
+  // 检查扩展名是否被允许
+  if (!allowedMimeTypes) {
     logger.warn('不支持的文件扩展名上传尝试', {
       extension: ext,
       originalname: file.originalname,
@@ -95,7 +118,23 @@ const fileFilter = (req, file, cb) => {
       user: req.user ? req.user.id : '未认证'
     });
     cb(new Error(`不支持的文件类型: ${ext}`), false);
+    return;
   }
+
+  // 检查MIME类型是否匹配
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    logger.warn('文件MIME类型与扩展名不匹配', {
+      extension: ext,
+      mimetype: file.mimetype,
+      originalname: file.originalname,
+      ip: req.ip,
+      user: req.user ? req.user.id : '未认证'
+    });
+    cb(new Error(`文件类型 ${file.mimetype} 与扩展名 ${ext} 不匹配`), false);
+    return;
+  }
+
+  cb(null, true);
 };
 
 /**
@@ -192,5 +231,7 @@ module.exports = {
   uploadReceipt,
   upload,
   handleUploadError,
-  logUploadSuccess
+  logUploadSuccess,
+  checkFileContent,
+  strictFileTypeValidation
 };

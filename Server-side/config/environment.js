@@ -5,6 +5,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { logger } = require('./logger');
+const { validateAndReportConfig } = require('./config-validator');
 
 // 加载环境特定的配置文件
 function loadEnvironmentConfig() {
@@ -22,13 +24,13 @@ function loadEnvironmentConfig() {
   envFiles.forEach(envPath => {
     try {
       if (fs.existsSync(envPath)) {
-        console.log(`加载环境变量文件: ${envPath}`);
+        logger.info(`加载环境变量文件: ${envPath}`);
         // 本地.env文件使用override=true，其他文件使用override=false
         const isLocalEnv = envPath.endsWith('.env') && !envPath.endsWith('.env.development') && !envPath.includes('.env.');
         require('dotenv').config({ path: envPath, override: isLocalEnv });
       }
     } catch (error) {
-      console.warn(`警告: 加载环境变量文件失败: ${envPath}`, error.message);
+      logger.warn(`警告: 加载环境变量文件失败: ${envPath}`, error.message);
     }
   });
 }
@@ -117,6 +119,9 @@ function initializeEnvironment() {
   console.log(`应用端口: ${config.port}`);
   console.log(`数据库: ${config.db.host}:${config.db.port}/${config.db.name}`);
 
+  // 验证配置安全性
+  validateAndReportConfig(config);
+
   // 基础配置校验（生产环境严格）
   const isProd = (config.nodeEnv === 'production');
   const missing = [];
@@ -125,7 +130,7 @@ function initializeEnvironment() {
   if ((!config.jwtKeys.refreshSecrets || config.jwtKeys.refreshSecrets.length === 0) && isProd) missing.push('JWT_REFRESH_SECRETS');
   if (missing.length) {
     const msg = `关键环境变量缺失: ${missing.join(', ')}`;
-    console.error(msg);
+    logger.error(msg);
     throw new Error(msg);
   }
 

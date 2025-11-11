@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const qrCodeController = require('../controllers/qr-code-controller');
 const { authenticateToken } = require('../middleware/tokenManager');
+const { checkFileContent, strictFileTypeValidation } = require('../middleware/fileSecurity');
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ if (!fs.existsSync(tempDir)) {
  */
 
 // 上传收款码
-router.post('/upload', authenticateToken, upload.single('qr_image'), qrCodeController.uploadQrCode);
+router.post('/upload', authenticateToken, checkFileContent, strictFileTypeValidation, upload.single('qr_image'), qrCodeController.uploadQrCode);
 
 // 获取用户收款码列表
 router.get('/', authenticateToken, qrCodeController.getUserQrCodes);

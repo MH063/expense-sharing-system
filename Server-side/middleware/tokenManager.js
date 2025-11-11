@@ -18,8 +18,8 @@ const secrets = getSecrets();
 const tokenConfig = {
   // JWT配置
   jwt: {
-    accessSecrets: secrets.jwt.accessSecrets.length ? secrets.jwt.accessSecrets : [(process.env.JWT_SECRET || 'change-me-please-change-me-32chars-minimum')],
-    refreshSecrets: secrets.jwt.refreshSecrets.length ? secrets.jwt.refreshSecrets : [(process.env.JWT_REFRESH_SECRET || 'change-me-please-change-me-32chars-minimum-refresh')],
+    accessSecrets: secrets.jwt.accessSecrets,
+    refreshSecrets: secrets.jwt.refreshSecrets,
     accessTokenExpiry: process.env.JWT_EXPIRES_IN || '1h',
     refreshTokenExpiry: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     algorithm: secrets.jwt.algorithm || 'HS512'
@@ -74,6 +74,16 @@ class TokenManager {
   static generateAccessToken(payload) {
     const { sub, username, roles = ['user'], permissions = ['read', 'write'] } = payload;
     const currentSecret = tokenConfig.jwt.accessSecrets[0];
+    
+    // 检查密钥是否存在
+    if (!currentSecret) {
+      logger.error('JWT访问令牌密钥未配置', {
+        accessSecretsConfigured: tokenConfig.jwt.accessSecrets.length,
+        environment: envConfig.nodeEnv
+      });
+      throw new Error('JWT访问令牌密钥未配置');
+    }
+    
     const kid = crypto.createHash('sha256').update(currentSecret).digest('hex').slice(0, 16);
     const jti = crypto.randomUUID();
     
@@ -361,6 +371,7 @@ class TokenManager {
       const rolePermissions = {
         'system_admin': ['read', 'write', 'delete', 'manage_users', 'manage_system'],
         'admin': ['read', 'write', 'manage_users'],
+        '系统管理员': ['read', 'write', 'delete', 'manage_users', 'manage_system'],
         '寝室长': ['read', 'write', 'manage_room'],
         'payer': ['read', 'write', 'make_payments'],
         'user': ['read', 'write']

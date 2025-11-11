@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 const { logger } = require('../config/logger');
-const { collectSystemMetrics } = require('./enhanced-metrics');
+const { collectSystemMetrics, saveMetricsToDatabase } = require('./enhanced-metrics');
 
 /**
  * 性能监控和审计日志调度服务
@@ -274,7 +274,9 @@ class SchedulerTasks {
   static async collectSystemMetricsTask() {
     try {
       logger.info('开始执行系统性能指标收集任务');
-      await collectSystemMetrics();
+      const metrics = await collectSystemMetrics();
+      // 保存指标到数据库
+      await saveMetricsToDatabase(metrics);
       logger.info('系统性能指标收集任务执行完成');
     } catch (error) {
       logger.error('系统性能指标收集任务执行失败:', error);

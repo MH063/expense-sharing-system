@@ -145,7 +145,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=expense_dev
 DB_USER=postgres
-DB_PASSWORD=your_real_password
+DB_PASSWORD=your_real_password_here
 DB_SSL=false
 ```
 

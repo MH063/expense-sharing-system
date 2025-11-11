@@ -4,12 +4,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# 环境变量
+# 环境变量（包含真实值，不应提交）
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.development
+.env.production
 
 # 日志
 logs/
@@ -47,3 +49,49 @@ Thumbs.db
 # 临时文件
 tmp/
 temp/
+
+# 密钥文件（可能包含敏感信息）
+*.key
+*.pem
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# 数据库相关
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# 上传文件
+uploads/
+files/
+attachments/
+
+# 备份文件
+*.bak
+*.backup
+*.old
+
+# 测试输出
+test-results/
+test-reports/
+
+# 密钥管理工具相关
+.vault/
+.secrets/
+vault/
+
+# Docker相关
+.dockerignore
+docker-compose.override.yml
+
+# 其他
+*.tgz
+*.tar.gz
+dump.rdb
+
+# 安全提示
+# 如果您需要分享项目配置，请使用 .env.example 文件作为模板
+# 不要将包含真实值的 .env 文件提交到版本控制系统

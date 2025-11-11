@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { logger } = require('./logger');
+const vaultManager = require('./vault');
 
 // 密钥轮换配置
 const KEY_ROTATION_CONFIG = {
@@ -26,42 +27,21 @@ function generateSecureKey(length = 32) {
 }
 
 /**
- * 从环境变量或文件加载密钥
+ * 从环境变量加载密钥（移除了对文件系统的依赖）
  * @param {string} envVarName - 环境变量名称
- * @param {string} fileName - 文件名（相对于config目录）
+ * @param {string} fileName - 文件名（仅保留参数兼容性，不实际使用）
  * @param {number} keyLength - 密钥长度（字节）
  * @returns {string} 密钥
  */
 function loadKey(envVarName, fileName, keyLength = 32) {
-  // 首先尝试从环境变量加载
+  // 从环境变量加载
   if (process.env[envVarName]) {
     return process.env[envVarName];
   }
 
-  // 如果环境变量不存在，尝试从文件加载
-  const filePath = path.join(__dirname, fileName);
-  try {
-    if (fs.existsSync(filePath)) {
-      const key = fs.readFileSync(filePath, 'utf8').trim();
-      if (key) {
-        logger.info(`${envVarName}密钥从文件加载成功`);
-        return key;
-      }
-    }
-  } catch (error) {
-    logger.warn(`从文件加载${envVarName}密钥失败:`, error.message);
-  }
-
-  // 如果都不存在，生成新的密钥并保存到文件
+  // 如果环境变量不存在，生成新的密钥（但不保存到文件）
   const newKey = generateSecureKey(keyLength);
-  try {
-    fs.writeFileSync(filePath, newKey, 'utf8');
-    fs.chmodSync(filePath, 0o600); // 设置文件权限为仅所有者可读写
-    logger.info(`新的${envVarName}密钥已生成并保存到文件`);
-  } catch (error) {
-    logger.error(`保存${envVarName}密钥到文件失败:`, error.message);
-  }
-
+  logger.warn(`${envVarName}环境变量未设置，生成临时密钥。请设置${envVarName}环境变量以避免密钥重新生成`);
   return newKey;
 }
 
@@ -81,7 +61,7 @@ class KeyRotationManager {
   }
 
   /**
-   * 初始化密钥轮换管理器
+   * 初始化密钥轮换管理器（仅使用环境变量）
    */
   initialize() {
     // 加载JWT访问令牌密钥
@@ -89,7 +69,7 @@ class KeyRotationManager {
     if (accessTokenSecrets.length > 0) {
       this.keys.accessTokens = accessTokenSecrets;
     } else {
-      // 如果没有配置，使用默认密钥
+      // 如果没有配置，从环境变量JWT_SECRET加载或生成临时密钥
       this.keys.accessTokens = [loadKey('JWT_SECRET', 'jwt-secret.key', 32)];
     }
 
@@ -98,7 +78,7 @@ class KeyRotationManager {
     if (refreshTokenSecrets.length > 0) {
       this.keys.refreshTokens = refreshTokenSecrets;
     } else {
-      // 如果没有配置，使用默认密钥
+      // 如果没有配置，从环境变量JWT_REFRESH_SECRET加载或生成临时密钥
       this.keys.refreshTokens = [loadKey('JWT_REFRESH_SECRET', 'jwt-refresh-secret.key', 32)];
     }
 
@@ -106,7 +86,7 @@ class KeyRotationManager {
     this.lastRotation.accessTokens = Date.now();
     this.lastRotation.refreshTokens = Date.now();
 
-    logger.info('密钥轮换管理器初始化完成');
+    logger.info('密钥轮换管理器初始化完成（仅使用环境变量）');
   }
 
   /**
@@ -153,7 +133,7 @@ class KeyRotationManager {
   }
 
   /**
-   * 轮换密钥
+   * 轮换密钥（仅使用内存，不保存到文件系统）
    * @param {string} keyType - 密钥类型 ('accessTokens' | 'refreshTokens')
    */
   rotateKeys(keyType) {
@@ -178,6 +158,7 @@ class KeyRotationManager {
     this.lastRotation[keyType] = Date.now();
     
     logger.info(`${keyType}密钥轮换完成，当前密钥数量: ${this.keys[keyType].length}`);
+    logger.info(`请更新环境变量以反映新的密钥值`);
   }
 }
 
@@ -185,7 +166,34 @@ class KeyRotationManager {
 const keyRotationManager = new KeyRotationManager();
 
 // 初始化密钥轮换管理器
+async function initializeSecrets() {
+  // 尝试初始化Vault
+  const isVaultAvailable = await vaultManager.initialize();
+  
+  if (isVaultAvailable) {
+    try {
+      // 从Vault获取JWT密钥
+      const vaultSecrets = await vaultManager.getJWTSecrets();
+      keyRotationManager.keys.accessTokens = vaultSecrets.accessSecrets;
+      keyRotationManager.keys.refreshTokens = vaultSecrets.refreshSecrets;
+      logger.info('从Vault加载JWT密钥成功');
+    } catch (error) {
+      logger.error('从Vault获取JWT密钥失败，使用环境变量配置:', error);
+      keyRotationManager.initialize();
+    }
+  } else {
+    // 使用环境变量或文件加载密钥
+    keyRotationManager.initialize();
+  }
+}
+
+// 立即初始化（同步执行以确保及时可用）
 keyRotationManager.initialize();
+
+// 异步重新初始化（如果需要可以覆盖初始值）
+initializeSecrets().catch(error => {
+  logger.error('密钥初始化失败:', error);
+});
 
 /**
  * 获取当前密钥配置

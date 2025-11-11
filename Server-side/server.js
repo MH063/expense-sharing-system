@@ -83,11 +83,6 @@ console.log('即将加载安全配置...');
 const { setupSecurityHeaders } = require('./config/security');
 console.log('安全配置加载完成');
 
-// 导入速率限制中间件
-console.log('即将加载速率限制中间件...');
-const { defaultRateLimiter } = require('./middleware/rateLimiter');
-console.log('速率限制中间件加载完成');
-
 // 导入指标中间件
 console.log('即将加载指标中间件...');
 const { metricsMiddleware } = require('./middleware/metrics');
@@ -125,7 +120,10 @@ console.log('输入验证中间件加载完成');
 
 // 导入速率限制中间件
 console.log('即将加载高级速率限制中间件...');
-const { ipLimiter, userLimiter, apiLimiter, loginLimiter } = require('./middleware/rate-limiter');
+const { defaultRateLimiter, strictRateLimiter, looseRateLimiter, loginRateLimiter, roleAwareRateLimiter } = require('./middleware/rateLimiter');
+const ipLimiter = defaultRateLimiter;
+const userLimiter = looseRateLimiter;
+const apiLimiter = strictRateLimiter;
 console.log('高级速率限制中间件加载完成');
 
 const path = require('path');

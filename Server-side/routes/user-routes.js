@@ -9,7 +9,10 @@ const userService = require('../services/database/user-service');
 const { authenticateToken } = require('../middleware/tokenManager');
 const enhancedCacheMiddleware = require('../middleware/enhanced-cache-middleware');
 const { completeInputValidation, basicValidation } = require('../middleware/input-validator');
-const { ipLimiter, userLimiter, apiLimiter } = require('../middleware/rate-limiter');
+const { defaultRateLimiter, strictRateLimiter, looseRateLimiter } = require('../middleware/rateLimiter');
+const ipLimiter = defaultRateLimiter;
+const userLimiter = looseRateLimiter;
+const apiLimiter = strictRateLimiter;
 
 const router = express.Router();
 

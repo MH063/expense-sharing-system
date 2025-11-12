@@ -704,7 +704,10 @@ const expenseValidationRules = {
   createExpense: [
     body('title').exists({ checkFalsy: true }).withMessage('title 为必填项').isString(),
     body('amount').exists().isFloat({ gt: 0 }).withMessage('amount 必须为正数'),
-    body('roomId').exists().isInt().withMessage('roomId 必须为整数'),
+    body('room_id').exists().isInt().withMessage('room_id 必须为整数'),
+    body('expense_type_id').exists().isInt().withMessage('expense_type_id 必须为整数'),
+    body('payer_id').exists().isInt().withMessage('payer_id 必须为整数'),
+    body('split_type').exists().isString().withMessage('split_type 为必填项'),
     body('selected_members').optional().isArray().withMessage('selected_members 必须是数组')
   ],
   updateExpense: [

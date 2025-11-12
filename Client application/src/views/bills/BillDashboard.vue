@@ -144,9 +144,29 @@ const loadStats = async () => {
   }
   
   try {
-    const response = await billApi.getStats()
+    // 获取用户所属的房间
+    const { default: userApi } = await import('@/api/user')
+    const userResp = await userApi.getUserRooms()
+    
+    // 检查响应是否成功且包含房间数据
+    if (!userResp.success || !userResp.data || !Array.isArray(userResp.data) || userResp.data.length === 0) {
+      console.warn('用户没有关联的房间')
+      return
+    }
+    
+    // 使用第一个房间ID获取统计数据
+    const roomId = userResp.data[0].id
+    const response = await billApi.getBillStats(roomId)
+    
     if (response.success) {
-      Object.assign(stats, response.data)
+      // 处理后端返回的双层嵌套数据结构 {success: true, data: {xxx: []}}
+      const statsData = response.data.data || response.data
+      
+      // 更新统计数据
+      stats.pendingCount = statsData.byStatus?.pending?.count || 0
+      stats.pendingAmount = statsData.byStatus?.pending?.amount || 0
+      stats.overdueCount = statsData.byStatus?.overdue?.count || 0
+      stats.overdueAmount = statsData.byStatus?.overdue?.amount || 0
     } else {
       ElMessage.error('加载统计数据失败')
     }

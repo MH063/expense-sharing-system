@@ -88,6 +88,16 @@ export const billApi = {
   },
 
   /**
+   * 获取账单统计数据
+   * @param {string} roomId - 房间ID
+   * @param {Object} params - 查询参数
+   * @returns {Promise} 统计数据
+   */
+  getBillStats(roomId, params = {}) {
+    return http.get(`/bills/room/${roomId}/stats`, { params });
+  },
+
+  /**
    * 导出账单
    * @param {string} billId - 账单ID
    * @param {Object} params - 导出参数

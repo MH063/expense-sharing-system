@@ -181,6 +181,14 @@ export const userApi = {
   },
 
   /**
+   * 获取用户所属房间
+   * @returns {Promise} 用户房间列表
+   */
+  getUserRooms() {
+    return http.get('/users/rooms');
+  },
+
+  /**
    * 获取用户会话列表
    * @returns {Promise} 会话列表
    */

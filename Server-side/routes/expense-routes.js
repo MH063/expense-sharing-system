@@ -86,6 +86,9 @@ router.get('/:expenseId/payment-status', authenticateToken, expenseController.ge
 router.get('/payments/user', authenticateToken, expenseController.getUserExpensePayments);
 
 // 获取费用统计 - 需要认证
+  router.get('/statistics', authenticateToken, expenseController.getExpenseStatistics);
+
+  // 获取费用统计 - 需要认证
   router.get('/stats/room/:roomId', authenticateToken, expenseController.getExpenseStats);
 
   // 获取费用趋势数据 - 需要认证

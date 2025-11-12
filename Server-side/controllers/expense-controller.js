@@ -136,7 +136,7 @@ class ExpenseController {
 
       // 验证用户是否是寝室成员
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [creatorId, room_id]
       );
 
@@ -172,20 +172,15 @@ class ExpenseController {
         await client.query('BEGIN');
 
         // 插入费用记录
-        // 将前端传入的split_type映射到数据库中的split_algorithm
-        let splitAlgorithm = split_type;
-        if (split_type === 'percentage') {
-          splitAlgorithm = 'by_area';
-        }
-        
+        // 直接使用前端传入的split_type
         const expenseResult = await client.query(
           `INSERT INTO expenses 
-           (title, description, amount, expense_type_id, room_id, payer_id, split_algorithm, 
-            expense_date, split_parameters, status, created_by, created_at, updated_at,
+           (title, description, amount, expense_type_id, room_id, payer_id, split_type, 
+            expense_date, status, created_at, updated_at,
             calculation_method, meter_type, current_reading, previous_reading, unit_price) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW(), $12, $13, $14, $15, $16) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), $10, $11, $12, $13, $14) 
            RETURNING id, title, description, amount, expense_type_id, room_id, payer_id, 
-                    split_algorithm, expense_date, split_parameters, status, created_by, created_at,
+                    split_type, expense_date, status, created_at,
                     calculation_method, meter_type, current_reading, previous_reading, unit_price`,
           [
             title, 
@@ -194,11 +189,9 @@ class ExpenseController {
             expense_type_id, 
             room_id, 
             payer_id, 
-            splitAlgorithm, 
+            split_type, 
             expense_date || new Date().toISOString().split('T')[0], 
-            JSON.stringify({}), 
-            'pending', 
-            creatorId,
+            'pending',
             calculation_method,
             meter_type,
             current_reading,
@@ -220,7 +213,7 @@ class ExpenseController {
         
         if (split_type === 'equal') {
           // 平均分摊
-          let membersQuery = `SELECT user_id FROM user_room_relations WHERE room_id = $1 AND is_active = TRUE`;
+          let membersQuery = `SELECT user_id FROM room_members WHERE room_id = $1`;
           let membersParams = [room_id];
           
           // 如果指定了selected_members，只分摊给选中的成员
@@ -254,10 +247,10 @@ class ExpenseController {
           for (let i = 0; i < members.length; i++) {
             const splitRecord = await client.query(
               `INSERT INTO expense_splits 
-               (expense_id, user_id, amount, split_type, split_ratio, created_at) 
-               VALUES ($1, $2, $3, $4, 1.0, NOW()) 
-               RETURNING id, expense_id, user_id, amount, split_type`,
-              [expense.id, members[i].user_id, splitAmounts[i], 'equal']
+               (expense_id, user_id, amount, percentage, created_at) 
+               VALUES ($1, $2, $3, 1.0, NOW()) 
+               RETURNING id, expense_id, user_id, amount`,
+              [expense.id, members[i].user_id, splitAmounts[i]]
             );
             splitRecords.push(splitRecord.rows[0]);
           }
@@ -299,10 +292,10 @@ class ExpenseController {
           for (let i = 0; i < split_details.length; i++) {
             const splitRecord = await client.query(
               `INSERT INTO expense_splits 
-               (expense_id, user_id, amount, split_type, split_ratio, created_at) 
-               VALUES ($1, $2, $3, $4, 1.0, NOW()) 
-               RETURNING id, expense_id, user_id, amount, split_type`,
-              [expense.id, split_details[i].user_id, splitAmounts[i], 'custom']
+               (expense_id, user_id, amount, percentage, created_at) 
+               VALUES ($1, $2, $3, 1.0, NOW()) 
+               RETURNING id, expense_id, user_id, amount`,
+              [expense.id, split_details[i].user_id, splitAmounts[i]]
             );
             splitRecords.push(splitRecord.rows[0]);
           }
@@ -345,10 +338,10 @@ class ExpenseController {
           for (let i = 0; i < split_details.length; i++) {
             const splitRecord = await client.query(
               `INSERT INTO expense_splits 
-               (expense_id, user_id, amount, split_type, split_ratio, created_at) 
-               VALUES ($1, $2, $3, $4, 1.0, NOW()) 
-               RETURNING id, expense_id, user_id, amount, split_type`,
-              [expense.id, split_details[i].user_id, splitAmounts[i], 'by_area']
+               (expense_id, user_id, amount, percentage, created_at) 
+               VALUES ($1, $2, $3, 1.0, NOW()) 
+               RETURNING id, expense_id, user_id, amount`,
+              [expense.id, split_details[i].user_id, splitAmounts[i]]
             );
             splitRecords.push(splitRecord.rows[0]);
           }
@@ -447,7 +440,7 @@ class ExpenseController {
 
       // 只能查看自己所在寝室的费用
       const userRoomsResult = await pool.query(
-        'SELECT room_id FROM user_room_relations WHERE user_id = $1 AND is_active = TRUE',
+        'SELECT room_id FROM room_members WHERE user_id = $1',
         [userId]
       );
       
@@ -531,7 +524,7 @@ class ExpenseController {
       if (expenses.length > 0) {
         const expenseIds = expenses.map(expense => expense.id);
         const splitsQuery = `
-          SELECT es.id, es.user_id, es.amount, es.split_type, es.is_paid, es.paid_date, es.created_at,
+          SELECT es.id, es.user_id, es.amount, es.is_paid, es.paid_date, es.created_at,
                  es.expense_id,
                  u.username, u.name
           FROM expense_splits es
@@ -605,7 +598,7 @@ class ExpenseController {
 
       // 验证用户是否有权限查看该费用（必须是寝室成员）
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, expense.room_id]
       );
 
@@ -615,7 +608,7 @@ class ExpenseController {
 
       // 查询分摊详情
       const splitsResult = await pool.query(
-        `SELECT es.id, es.user_id, es.amount, es.split_type, es.is_paid, es.paid_date, es.created_at,
+        `SELECT es.id, es.user_id, es.amount, es.is_paid, es.paid_date, es.created_at,
                 u.username, u.name
          FROM expense_splits es
          JOIN users u ON es.user_id = u.id
@@ -705,7 +698,7 @@ class ExpenseController {
 
       // 验证用户是否是寝室成员
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, expense.room_id]
       );
 
@@ -910,7 +903,7 @@ class ExpenseController {
           
           if (finalSplitType === 'equal') {
             // 平均分摊 - 使用尾差处理机制确保分摊总额等于实际金额
-            let membersQuery = `SELECT user_id FROM user_room_relations WHERE room_id = $1 AND is_active = TRUE`;
+            let membersQuery = `SELECT user_id FROM room_members WHERE room_id = $1`;
             let membersParams = [expense.room_id];
             
             // 如果指定了selected_members，只分摊给选中的成员
@@ -947,10 +940,10 @@ class ExpenseController {
             for (let i = 0; i < members.length; i++) {
               const splitRecord = await client.query(
                 `INSERT INTO expense_splits 
-                 (expense_id, user_id, amount, split_type, created_at, updated_at) 
-                 VALUES ($1, $2, $3, $4, NOW(), NOW()) 
-                 RETURNING id, expense_id, user_id, amount, split_type`,
-                [id, members[i].user_id, splitAmounts[i], finalSplitType]
+                 (expense_id, user_id, amount, created_at, updated_at) 
+                 VALUES ($1, $2, $3, NOW(), NOW()) 
+                 RETURNING id, expense_id, user_id, amount`,
+                [id, members[i].user_id, splitAmounts[i]]
               );
               splitRecords.push(splitRecord.rows[0]);
             }
@@ -992,10 +985,10 @@ class ExpenseController {
             for (let i = 0; i < split_details.length; i++) {
               const splitRecord = await client.query(
                 `INSERT INTO expense_splits 
-                 (expense_id, user_id, amount, split_type, created_at, updated_at) 
-                 VALUES ($1, $2, $3, $4, NOW(), NOW()) 
-                 RETURNING id, expense_id, user_id, amount, split_type`,
-                [id, split_details[i].user_id, splitAmounts[i], finalSplitType]
+                 (expense_id, user_id, amount, created_at, updated_at) 
+                 VALUES ($1, $2, $3, NOW(), NOW()) 
+                 RETURNING id, expense_id, user_id, amount`,
+                [id, split_details[i].user_id, splitAmounts[i]]
               );
               splitRecords.push(splitRecord.rows[0]);
             }
@@ -1038,10 +1031,10 @@ class ExpenseController {
             for (let i = 0; i < split_details.length; i++) {
               const splitRecord = await client.query(
                 `INSERT INTO expense_splits 
-                 (expense_id, user_id, amount, split_type, created_at, updated_at) 
-                 VALUES ($1, $2, $3, $4, NOW(), NOW()) 
-                 RETURNING id, expense_id, user_id, amount, split_type`,
-                [id, split_details[i].user_id, splitAmounts[i], finalSplitType]
+                 (expense_id, user_id, amount, created_at, updated_at) 
+                 VALUES ($1, $2, $3, NOW(), NOW()) 
+                 RETURNING id, expense_id, user_id, amount`,
+                [id, split_details[i].user_id, splitAmounts[i]]
               );
               splitRecords.push(splitRecord.rows[0]);
             }
@@ -1280,7 +1273,7 @@ class ExpenseController {
 
       // 验证用户是否是寝室成员
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, split.room_id]
       );
 
@@ -1312,7 +1305,7 @@ class ExpenseController {
         `UPDATE expense_splits 
          SET is_paid = TRUE, paid_date = $1, updated_at = NOW() 
          WHERE id = $2 
-         RETURNING id, expense_id, user_id, amount, split_type, is_paid, paid_date`,
+         RETURNING id, expense_id, user_id, amount, is_paid, paid_date`,
         [paid_date || new Date().toISOString().split('T')[0], id]
       );
 
@@ -1393,7 +1386,7 @@ class ExpenseController {
 
       // 验证用户是否是寝室成员
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, room_id]
       );
 
@@ -1410,9 +1403,9 @@ class ExpenseController {
       // 获取寝室成员
       const membersResult = await pool.query(
         `SELECT u.id, u.username, u.name 
-         FROM user_room_relations urr
-         JOIN users u ON urr.user_id = u.id
-         WHERE urr.room_id = $1 AND urr.is_active = TRUE
+         FROM room_members rm
+         JOIN users u ON rm.user_id = u.id
+         WHERE rm.room_id = $1
          ORDER BY u.username`,
         [room_id]
       );
@@ -1686,8 +1679,8 @@ class ExpenseController {
 
       // 检查用户是否有权限查看此费用
       const permissionCheck = await client.query(
-        `SELECT 1 FROM user_room_relations 
-         WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE`,
+        `SELECT 1 FROM room_members 
+         WHERE room_id = $1 AND user_id = $2`,
         [expense.room_id, userId]
       );
 
@@ -1874,8 +1867,8 @@ class ExpenseController {
 
       // 检查用户是否有权限支付此费用
       const permissionCheck = await client.query(
-        `SELECT 1 FROM user_room_relations 
-         WHERE room_id = $1 AND user_id = $2 AND is_active = TRUE`,
+        `SELECT 1 FROM room_members 
+         WHERE room_id = $1 AND user_id = $2`,
         [expense.room_id, userId]
       );
 
@@ -2297,7 +2290,7 @@ class ExpenseController {
 
       // 验证用户是否是寝室成员
       const membershipResult = await client.query(
-        'SELECT 1 FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT 1 FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, roomId]
       );
 
@@ -2554,9 +2547,9 @@ class ExpenseController {
           for (const detail of splitDetails.rows) {
             await client.query(
               `INSERT INTO expense_splits 
-               (expense_id, user_id, amount, split_type, created_at, updated_at) 
-               VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-              [id, detail.user_id, detail.amount, detail.split_type]
+               (expense_id, user_id, amount, created_at, updated_at) 
+               VALUES ($1, $2, $3, NOW(), NOW())`,
+              [id, detail.user_id, detail.amount]
             );
           }
 
@@ -2667,7 +2660,7 @@ class ExpenseController {
 
       // 验证用户是否属于该寝室
       const roomMemberResult = await client.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, room_id]
       );
 
@@ -2683,11 +2676,11 @@ class ExpenseController {
 
       // 获取寝室所有活跃成员
       const membersResult = await client.query(
-        `SELECT u.id, u.username, u.name, u.avatar_url, urr.created_at as joined_at
+        `SELECT u.id, u.username, u.name, u.avatar_url, rm.created_at as joined_at
          FROM users u
-         JOIN user_room_relations urr ON u.id = urr.user_id
-         WHERE urr.room_id = $1 AND urr.is_active = TRUE
-         ORDER BY urr.created_at`,
+         JOIN room_members rm ON u.id = rm.user_id
+         WHERE rm.room_id = $1
+         ORDER BY rm.created_at`,
         [room_id]
       );
       
@@ -2829,6 +2822,212 @@ class ExpenseController {
       logger.error(`[${requestId}] 获取费用趋势数据失败`, {
         requestId,
         period: req.query.period,
+        roomId: req.query.roomId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 获取费用统计
+  async getExpenseStatistics(req, res) {
+    const startTime = Date.now();
+    const requestId = `get-expense-statistics-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { 
+        roomId, 
+        startDate, 
+        endDate,
+        period = 'month'
+      } = req.query;
+      
+      logger.info(`[${requestId}] 开始获取费用统计数据`, {
+        requestId,
+        roomId,
+        startDate,
+        endDate,
+        period
+      });
+
+      // 构建查询条件
+      let dateFilter = '';
+      const queryParams = [];
+      
+      if (startDate) {
+        dateFilter += ` AND expense_date >= $${queryParams.length + 1}`;
+        queryParams.push(startDate);
+      }
+      
+      if (endDate) {
+        dateFilter += ` AND expense_date <= $${queryParams.length + 1}`;
+        queryParams.push(endDate);
+      }
+
+      let roomFilter = '';
+      if (roomId) {
+        roomFilter += ` AND room_id = $${queryParams.length + 1}`;
+        queryParams.push(roomId);
+      }
+
+      // 获取总览统计
+      const overviewQuery = `
+        SELECT 
+          COUNT(*) as total_expenses,
+          SUM(amount) as total_amount,
+          AVG(amount) as avg_amount,
+          MIN(amount) as min_amount,
+          MAX(amount) as max_amount,
+          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
+          COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+          COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count
+        FROM expenses
+        WHERE status != 'deleted'
+        ${dateFilter}
+        ${roomFilter}
+      `;
+
+      const overviewResult = await pool.query(overviewQuery, queryParams);
+      const overview = overviewResult.rows[0];
+
+      // 获取按类型统计的数据
+      const categoryStatsQuery = `
+        SELECT 
+          COALESCE(category, '未分类') as category,
+          COUNT(*) as expense_count,
+          SUM(amount) as total_amount,
+          AVG(amount) as avg_amount
+        FROM expenses
+        WHERE status != 'deleted'
+        ${dateFilter}
+        ${roomFilter}
+        GROUP BY category
+        ORDER BY total_amount DESC
+        LIMIT 10
+      `;
+
+      const categoryStatsResult = await pool.query(categoryStatsQuery, queryParams);
+      const categoryStats = categoryStatsResult.rows.map(row => ({
+        category: row.category,
+        expenseCount: parseInt(row.expense_count),
+        totalAmount: parseFloat(row.total_amount),
+        avgAmount: parseFloat(row.avg_amount)
+      }));
+
+      // 获取趋势数据
+      let dateGroupBy = '';
+      switch (period) {
+        case 'week':
+          dateGroupBy = "DATE_TRUNC('week', expense_date)";
+          break;
+        case 'month':
+          dateGroupBy = "DATE_TRUNC('month', expense_date)";
+          break;
+        case 'quarter':
+          dateGroupBy = "DATE_TRUNC('quarter', expense_date)";
+          break;
+        case 'year':
+          dateGroupBy = "DATE_TRUNC('year', expense_date)";
+          break;
+        default:
+          dateGroupBy = "DATE_TRUNC('month', expense_date)";
+      }
+
+      const trendsQuery = `
+        SELECT 
+          ${dateGroupBy} as period,
+          SUM(amount) as total_amount,
+          COUNT(*) as expense_count,
+          AVG(amount) as avg_amount
+        FROM expenses
+        WHERE status != 'deleted'
+        ${dateFilter}
+        ${roomFilter}
+        GROUP BY ${dateGroupBy}
+        ORDER BY period ASC
+        LIMIT 12
+      `;
+
+      const trendsResult = await pool.query(trendsQuery, queryParams);
+      const trends = trendsResult.rows.map(row => ({
+        period: row.period,
+        totalAmount: parseFloat(row.total_amount),
+        expenseCount: parseInt(row.expense_count),
+        avgAmount: parseFloat(row.avg_amount)
+      }));
+
+      // 获取用户消费排行
+      const userStatsQuery = `
+        SELECT 
+          u.id,
+          u.username,
+          u.name,
+          COUNT(e.id) as expense_count,
+          COALESCE(SUM(e.amount), 0) as total_amount,
+          COALESCE(AVG(e.amount), 0) as avg_amount
+        FROM users u
+        LEFT JOIN expenses e ON u.id = e.payer_id
+        WHERE e.status != 'deleted' OR e.status IS NULL
+        ${dateFilter.replace('AND', 'AND e.id IS NOT NULL AND')}
+        ${roomFilter.replace('AND', 'AND e.id IS NOT NULL AND')}
+        GROUP BY u.id, u.username, u.name
+        HAVING COUNT(e.id) > 0
+        ORDER BY total_amount DESC
+        LIMIT 10
+      `;
+
+      const userStatsResult = await pool.query(userStatsQuery, queryParams);
+      const userStats = userStatsResult.rows.map(row => ({
+        id: row.id,
+        username: row.username,
+        name: row.name,
+        expenseCount: parseInt(row.expense_count),
+        totalAmount: parseFloat(row.total_amount),
+        avgAmount: parseFloat(row.avg_amount)
+      }));
+
+      const response = {
+        overview: {
+          totalExpenses: parseInt(overview.total_expenses),
+          totalAmount: parseFloat(overview.total_amount) || 0,
+          avgAmount: parseFloat(overview.avg_amount) || 0,
+          minAmount: parseFloat(overview.min_amount) || 0,
+          maxAmount: parseFloat(overview.max_amount) || 0,
+          completedCount: parseInt(overview.completed_count),
+          pendingCount: parseInt(overview.pending_count),
+          cancelledCount: parseInt(overview.cancelled_count)
+        },
+        categoryStats,
+        trends,
+        userStats,
+        filters: {
+          roomId,
+          startDate,
+          endDate,
+          period
+        }
+      };
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用统计数据成功`, {
+        requestId,
+        roomId,
+        totalExpenses: response.overview.totalExpenses,
+        totalAmount: response.overview.totalAmount,
+        duration
+      });
+
+      res.success(200, '获取费用统计数据成功', response);
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用统计数据失败`, {
+        requestId,
         roomId: req.query.roomId,
         error: error.message,
         stack: error.stack,
@@ -3067,7 +3266,7 @@ class ExpenseController {
 
       // 验证用户是否是该寝室的成员
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, roomId]
       );
 
@@ -3336,7 +3535,7 @@ class ExpenseController {
 
       // 验证用户权限
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, expense.room_id]
       );
 
@@ -3476,7 +3675,7 @@ class ExpenseController {
 
       // 验证用户权限
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, expense.room_id]
       );
 
@@ -3625,10 +3824,10 @@ class ExpenseController {
       for (const split of splits) {
         const result = await client.query(
           `INSERT INTO expense_splits 
-           (expense_id, user_id, amount, split_type, is_paid, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, FALSE, NOW(), NOW())
+           (expense_id, user_id, amount, is_paid, created_at, updated_at)
+           VALUES ($1, $2, $3, FALSE, NOW(), NOW())
            RETURNING *`,
-          [expenseId, split.user_id, split.amount, split.split_type || 'equal']
+          [expenseId, split.user_id, split.amount]
         );
         createdSplits.push(result.rows[0]);
       }
@@ -3708,7 +3907,7 @@ class ExpenseController {
 
       // 验证用户权限
       const membershipResult = await pool.query(
-        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        'SELECT * FROM room_members WHERE user_id = $1 AND room_id = $2',
         [userId, expense.room_id]
       );
 
@@ -3740,7 +3939,6 @@ class ExpenseController {
         userName: row.user_name,
         avatarUrl: row.avatar_url,
         amount: parseFloat(row.amount),
-        splitType: row.split_type,
         isPaid: row.is_paid,
         paidDate: row.paid_date,
         paymentMethod: row.payment_method,
@@ -3867,7 +4065,6 @@ class ExpenseController {
           userName: split.user_name,
           avatarUrl: split.avatar_url,
           amount: parseFloat(split.amount),
-          splitType: split.split_type,
           isPaid: split.is_paid,
           paidDate: split.paid_date,
           paymentMethod: split.payment_method,
@@ -3985,7 +4182,6 @@ class ExpenseController {
           expenseId: updatedSplit.expense_id,
           userId: updatedSplit.user_id,
           amount: parseFloat(updatedSplit.amount),
-          splitType: updatedSplit.split_type,
           isPaid: updatedSplit.is_paid,
           paidDate: updatedSplit.paid_date,
           createdAt: updatedSplit.created_at,
@@ -4120,7 +4316,6 @@ class ExpenseController {
           expenseId: updatedSplit.expense_id,
           userId: updatedSplit.user_id,
           amount: parseFloat(updatedSplit.amount),
-          splitType: updatedSplit.split_type,
           isPaid: updatedSplit.is_paid,
           isSettled: updatedSplit.is_settled,
           paidDate: updatedSplit.paid_date,

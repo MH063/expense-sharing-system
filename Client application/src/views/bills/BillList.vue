@@ -558,6 +558,7 @@ const loadBills = async () => {
     console.log('开始加载账单数据...')
     
     // 调用真实后端接口获取账单列表
+    // 后端会自动获取用户房间，不需要前端传递roomId
     const resp = await (await import('@/api/bills')).billApi.getBills({
       page: currentPage.value,
       limit: itemsPerPage.value,
@@ -568,8 +569,10 @@ const loadBills = async () => {
       minAmount: filters.value.minAmount || undefined,
       maxAmount: filters.value.maxAmount || undefined
     })
+    
     if (resp.success && resp.data) {
-      bills.value = Array.isArray(resp.data) ? resp.data : (resp.data.data || [])
+      // 处理后端返回的双层嵌套数据结构 {success: true, data: {xxx: []}}
+      bills.value = Array.isArray(resp.data.data) ? resp.data.data : []
     } else {
       bills.value = []
       console.error('账单列表加载失败:', resp.message || '未知错误')
@@ -587,6 +590,7 @@ const loadBills = async () => {
     
   } catch (error) {
     console.error('加载账单失败:', error)
+    bills.value = []
   } finally {
     loading.value = false
   }

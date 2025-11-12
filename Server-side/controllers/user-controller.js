@@ -104,7 +104,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.username = $1 AND r.name IN ('sysadmin', 'admin')`,
+         WHERE u.username = $1 AND r.name IN ('系统管理员', '管理员')`,
         [username]
       );
       
@@ -175,7 +175,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.username = $1 AND r.name IN ('sysadmin', 'admin')`,
+         WHERE u.username = $1 AND r.name IN ('系统管理员', '管理员')`,
         [username]
       );
       

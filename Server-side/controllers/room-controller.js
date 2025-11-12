@@ -53,18 +53,18 @@ class RoomController {
 
         // 插入寝室记录
         const roomResult = await client.query(
-          `INSERT INTO rooms (name, description, code, max_members, creator_id, created_at, updated_at) 
-           VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, name, description, code, max_members, creator_id, created_at`,
-          [name, description || '', roomCode, max_members || 6, creatorId]
+          `INSERT INTO rooms (name, description, creator_id, created_at, updated_at) 
+           VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id, name, description, creator_id, created_at`,
+          [name, description || '', creatorId]
         );
 
         const room = roomResult.rows[0];
 
         // 创建者自动加入寝室，角色为owner
         await client.query(
-          `INSERT INTO user_room_relations (user_id, room_id, relation_type, join_date, is_active, created_at, updated_at) 
-           VALUES ($1, $2, 'owner', CURRENT_DATE, TRUE, NOW(), NOW())`,
-          [creatorId, room.id]
+          `INSERT INTO room_members (room_id, user_id, role, joined_at) 
+           VALUES ($1, $2, 'owner', CURRENT_TIMESTAMP)`,
+          [room.id, creatorId]
         );
 
         // 将创建者的角色设置为寝室长（通过user_roles关联表）
@@ -91,10 +91,10 @@ class RoomController {
 
         // 获取完整的寝室信息
         const fullRoomResult = await pool.query(
-          `SELECT r.id, r.name, r.description, r.avatar_url, r.created_at,
+          `SELECT r.id, r.name, r.description, r.created_at,
                   u.username as creator_username
            FROM rooms r
-           LEFT JOIN users u ON r.created_by = u.id
+           LEFT JOIN users u ON r.creator_id = u.id
            WHERE r.id = $1`,
           [room.id]
         );
@@ -138,9 +138,9 @@ class RoomController {
 
       // 查询寝室列表
       const roomsQuery = `
-        SELECT r.id, r.name, r.description, r.code, r.max_members, r.status, r.created_at,
+        SELECT r.id, r.name, r.description, r.created_at,
                u.username as creator_username, u.name as creator_name,
-               (SELECT COUNT(*) FROM user_room_relations urr WHERE urr.room_id = r.id AND urr.is_active = TRUE) as current_members
+               (SELECT COUNT(*) FROM room_members rm WHERE rm.room_id = r.id) as current_members
         FROM rooms r
         JOIN users u ON r.creator_id = u.id
         ${whereClause}
@@ -202,15 +202,15 @@ class RoomController {
 
       // 查询用户所属的寝室
       const roomsQuery = `
-        SELECT r.id, r.name, r.description, r.code, r.max_members, r.status, r.created_at,
-               u.username as creator_username, u.name as creator_name,
-               urr.relation_type as user_relation_type,
-               (SELECT COUNT(*) FROM user_room_relations urr2 WHERE urr2.room_id = r.id AND urr2.is_active = TRUE) as current_members
+        SELECT r.id, r.name, r.description, r.created_at,
+               u.username as creator_username,
+               rm.role as user_relation_type,
+               (SELECT COUNT(*) FROM room_members rm2 WHERE rm2.room_id = r.id) as current_members
         FROM rooms r
         JOIN users u ON r.creator_id = u.id
-        JOIN user_room_relations urr ON r.id = urr.room_id
-        WHERE urr.user_id = $1 AND urr.is_active = TRUE
-        ORDER BY urr.join_date
+        JOIN room_members rm ON r.id = rm.room_id
+        WHERE rm.user_id = $1
+        ORDER BY rm.joined_at
       `;
 
       const roomsResult = await pool.query(roomsQuery, [userId]);
@@ -233,7 +233,7 @@ class RoomController {
 
       // 查询寝室基本信息
       const roomResult = await pool.query(
-        `SELECT r.id, r.name, r.description, r.code, r.max_members, r.status, r.created_at, r.updated_at,
+        `SELECT r.id, r.name, r.description, r.created_at, r.updated_at,
                 u.username as creator_username, u.name as creator_name
          FROM rooms r
          JOIN users u ON r.creator_id = u.id
@@ -250,14 +250,12 @@ class RoomController {
       // 查询寝室成员
       const membersResult = await pool.query(
         `SELECT u.id, u.username, u.name, u.email, u.avatar_url,
-                COALESCE(r.name, '普通用户') as user_role,
-                urr.relation_type, urr.join_date, urr.leave_date, urr.is_active
-         FROM user_room_relations urr
-         JOIN users u ON urr.user_id = u.id
-         LEFT JOIN user_roles ur ON u.id = ur.user_id
-         LEFT JOIN roles r ON ur.role_id = r.id
-         WHERE urr.room_id = $1
-         ORDER BY urr.join_date`,
+                rm.role as user_role,
+                rm.joined_at
+         FROM room_members rm
+         JOIN users u ON rm.user_id = u.id
+         WHERE rm.room_id = $1
+         ORDER BY rm.joined_at`,
         [id]
       );
 
@@ -291,14 +289,14 @@ class RoomController {
 
       // 验证用户是否有权限更新寝室（创建者或寝室长）
       const permissionResult = await pool.query(
-        `SELECT urr.relation_type FROM user_room_relations urr
-         JOIN users u ON urr.user_id = u.id
-         WHERE urr.room_id = $1 AND urr.user_id = $2 AND urr.is_active = TRUE`,
+        `SELECT rm.role FROM room_members rm
+         JOIN users u ON rm.user_id = u.id
+         WHERE rm.room_id = $1 AND rm.user_id = $2`,
         [id, userId]
       );
 
       if (permissionResult.rows.length === 0 || 
-          (permissionResult.rows[0].relation_type !== 'owner' && room.creator_id !== userId)) {
+          (permissionResult.rows[0].role !== 'owner' && room.creator_id !== userId)) {
         return res.error(403, '权限不足');
       }
 

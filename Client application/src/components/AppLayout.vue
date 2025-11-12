@@ -184,20 +184,31 @@ const userRoleText = computed(() => {
   
   // 使用认证store的角色信息
   const role = currentRole.value
-  // 完整的角色映射表
+  // 完整的角色映射表 - 支持中文和英文角色名
   const roleMap = {
+    // 英文角色名
     'admin': '管理员',
     'sysadmin': '系统管理员',
     'system_admin': '系统管理员', 
-    'room_leader': '寝室长',
-    'room_owner': '寝室长',
+    'room_leader': '寑室长',
+    'room_owner': '寑室长',
+    'dormleader': '寑室长',
+    'dorm_leader': '寑室长',
     'payer': '缴费人',
-    'user': '用户',
+    'user': '普通用户',
     'member': '成员',
-    'guest': '访客'
+    'guest': '访客',
+    // 中文角色名（直接返回）
+    '系统管理员': '系统管理员',
+    '管理员': '管理员',
+    '寑室长': '寑室长',
+    '缴费人': '缴费人',
+    '普通用户': '普通用户',
+    '成员': '成员',
+    '访客': '访客'
   }
   
-  const displayText = roleMap[role] || '未知角色'
+  const displayText = roleMap[role] || role || '未知角色'
   console.log(`角色 ${role} 显示为: ${displayText}`)
   return displayText
 })

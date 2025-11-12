@@ -1,6 +1,7 @@
 const { Activity, Room, User, ActivityParticipant } = require('../models');
 const { Op } = require('sequelize');
 const { logger } = require('../config/logger');
+const { RBACService } = require('../services/rbac-service');
 
 /**
  * 获取活动列表
@@ -255,7 +256,7 @@ exports.updateActivity = async (req, res) => {
     }
 
     // 检查权限
-    if (activity.creatorId !== req.user.id && req.user.role !== 'admin') {
+    if (activity.creatorId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
       return res.status(403).json({
         success: false,
         message: '没有权限修改此活动'
@@ -344,7 +345,7 @@ exports.deleteActivity = async (req, res) => {
     }
 
     // 检查权限
-    if (activity.creatorId !== req.user.id && req.user.role !== 'admin') {
+    if (activity.creatorId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
       return res.status(403).json({
         success: false,
         message: '没有权限删除此活动'
@@ -384,7 +385,7 @@ exports.toggleActivityStatus = async (req, res) => {
     }
 
     // 检查权限
-    if (activity.creatorId !== req.user.id && req.user.role !== 'admin') {
+    if (activity.creatorId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
       return res.status(403).json({
         success: false,
         message: '没有权限修改此活动状态'
@@ -674,7 +675,7 @@ exports.copyActivity = async (req, res) => {
     }
 
     // 检查权限
-    if (originalActivity.creatorId !== req.user.id && req.user.role !== 'admin') {
+    if (originalActivity.creatorId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
       return res.status(403).json({
         success: false,
         message: '没有权限复制此活动'

@@ -21,6 +21,7 @@ const { sendEmail } = require('../utils/notification-service');
 const { validatePassword } = require('../utils/password-validator');
 const { Op } = require('sequelize');
 const logger = require('../config/logger').logger;
+const { RBACService } = require('../services/rbac-service');
 
 class PasswordResetController {
   /**
@@ -410,7 +411,7 @@ class PasswordResetController {
       }
       
       // 检查权限
-      if (resetToken.userId !== req.user.sub && req.user.role !== 'admin') {
+      if (resetToken.userId !== req.user.sub && !(await RBACService.hasRole(req.user.sub, ['admin']))) {
         return res.status(403).json({
           success: false,
           message: '没有权限取消此密码重置请求'

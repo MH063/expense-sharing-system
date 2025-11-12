@@ -7,7 +7,8 @@ import pinia from './stores'
 import { setRouterStore } from './router'
 import { useAuthStore } from './stores/auth'
 import { useNotificationStore } from './stores/notifications'
-import { permissionDirective } from './utils/permissions'
+import { registerPermissionDirectives } from './directives/permission'
+import { initPermissionService } from './utils/permissionToast'
 
 const app = createApp(App)
 
@@ -15,8 +16,11 @@ app.use(ElementPlus)
 app.use(pinia)
 app.use(router)
 
-// 注册权限指令
-app.directive('permission', permissionDirective)
+// 注册权限相关指令
+registerPermissionDirectives(app)
+
+// 初始化权限提示服务
+initPermissionService(app)
 
 // 获取store实例并设置到路由中
 const authStore = useAuthStore()

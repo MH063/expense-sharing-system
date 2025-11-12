@@ -82,9 +82,13 @@ const userValidationRules = {
  */
 const loginValidationRules = [
   body('username')
-    .exists({ checkFalsy: true }).withMessage('username 为必填项'),
+    .exists({ checkFalsy: true }).withMessage('username 为必填项')
+    .isString().withMessage('username 必须是字符串')
+    .isLength({ min: 3, max: 50 }).withMessage('username 长度需在 3-50 之间'),
   body('password')
     .exists({ checkFalsy: true }).withMessage('password 为必填项')
+    .isString().withMessage('password 必须是字符串')
+    .isLength({ min: 8 }).withMessage('password 长度至少 8 位')
 ];
 
 /**

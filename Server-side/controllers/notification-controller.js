@@ -690,10 +690,12 @@ class NotificationController {
         );
         userIds = roomMembersResult.rows.map(row => row.user_id);
       } else if (target_type === 'role') {
-        const roleUsersResult = await client.query(
-          'SELECT id FROM users WHERE role = ANY($1) AND is_active = true',
-          [target_ids]
-        );
+        const roleUsersResult = await client.query(`
+          SELECT u.id FROM users u 
+          JOIN user_roles ur ON u.id = ur.user_id 
+          JOIN roles r ON ur.role_id = r.id 
+          WHERE r.name = ANY($1) AND u.is_active = true
+        `, [target_ids]);
         userIds = roleUsersResult.rows.map(row => row.id);
       }
 
@@ -1236,7 +1238,10 @@ class NotificationController {
           userIds = roomMembersResult.rows.map(row => row.user_id);
         } else if (target_type === 'role') {
           const roleUsersResult = await client.query(
-            'SELECT id FROM users WHERE role = ANY($1) AND is_active = true',
+            `SELECT DISTINCT u.id FROM users u
+             JOIN user_roles ur ON u.id = ur.user_id
+             JOIN roles r ON ur.role_id = r.id
+             WHERE r.name = ANY($1) AND u.is_active = true`,
             [target_ids]
           );
           userIds = roleUsersResult.rows.map(row => row.id);

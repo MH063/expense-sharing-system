@@ -1,7 +1,7 @@
 const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const winston = require('winston');
+const { logger } = require('../config/logger');
 const { TokenManager } = require('../middleware/tokenManager');
 const TokenService = require('../services/token-service');
 const crypto = require('crypto');
@@ -11,19 +11,6 @@ const { recordLoginFailure, recordLoginSuccess } = require('../middleware/bruteF
 const { newResponseMiddleware } = require('../middleware/newResponseHandler');
 const { enhancedAuditLogger, logUserActivity, logSystemEvent, logSecurityEvent } = require('../middleware/enhanced-audit-logger');
 const { recordLoginResult } = require('../middleware/enhancedBruteForceProtection');
-
-// 创建日志记录器
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/user-controller.log' })
-  ]
-});
 
 // 用户控制器
 class UserController {
@@ -598,7 +585,7 @@ class UserController {
       
       // 查询用户信息
       const userResult = await pool.query(
-        'SELECT id, username, email, display_name as name, avatar_url, is_active as status, created_at, updated_at FROM users WHERE id = $1',
+        'SELECT id, username, email, name, avatar_url, status, created_at, updated_at FROM users WHERE id = $1',
         [id]
       );
       
@@ -742,7 +729,7 @@ class UserController {
       let paramIndex = 1;
       
       if (name !== undefined) {
-        updateFields.push(`display_name = $${paramIndex++}`);
+        updateFields.push(`name = $${paramIndex++}`);
         updateValues.push(name);
       }
       
@@ -776,7 +763,7 @@ class UserController {
         UPDATE users 
         SET ${updateFields.join(', ')}
         WHERE id = $${paramIndex}
-        RETURNING id, username, email, display_name, avatar_url, is_active, updated_at
+        RETURNING id, username, email, name, avatar_url, is_active, updated_at
       `;
       
       const result = await pool.query(updateQuery, updateValues);
@@ -1487,7 +1474,7 @@ class UserController {
       let user;
       try {
         const userResult = await pool.query(
-          `SELECT id, username, email, display_name, avatar_url, is_active, created_at, updated_at
+          `SELECT id, username, email, name, avatar_url, is_active, created_at, updated_at
            FROM users WHERE id = $1`,
           [userId]
         );
@@ -1675,7 +1662,7 @@ class UserController {
       let paramIndex = 1;
       
       if (displayName !== undefined) {
-        updateFields.push(`display_name = $${paramIndex++}`);
+        updateFields.push(`name = $${paramIndex++}`);
         updateValues.push(displayName);
       }
       
@@ -1710,7 +1697,7 @@ class UserController {
           UPDATE users 
           SET ${updateFields.join(', ')}
           WHERE id = $${paramIndex}
-          RETURNING id, username, email, display_name, avatar_url, is_active, updated_at
+          RETURNING id, username, email, name, avatar_url, is_active, updated_at
         `;
         
         const result = await pool.query(updateQuery, updateValues);
@@ -2508,14 +2495,75 @@ class UserController {
     }
   }
 
+  // 获取当前用户信息
+  async getCurrentUser(req, res) {
+    try {
+      console.log('=== getCurrentUser 方法被调用 ===');
+      console.log('req.user:', JSON.stringify(req.user, null, 2));
+      
+      // 尝试从多个可能的字段获取用户ID
+      const userId = req.user?.sub || req.user?.id || req.user?.userId || req.userId;
+      
+      logger.info('getCurrentUser - 获取用户ID', { 
+        userId, 
+        userFields: {
+          sub: req.user?.sub,
+          id: req.user?.id,
+          userId: req.user?.userId,
+          reqUserId: req.userId
+        }
+      });
+      
+      if (!userId) {
+        logger.error('无法从请求中获取用户ID', { user: req.user });
+        return res.error(400, '无法识别用户身份');
+      }
+      
+      logger.info(`开始查询用户信息，用户ID: ${userId}`);
+      
+      // 查询用户信息
+      const userResult = await pool.query(
+        `SELECT id, username, email, name, avatar_url, role, created_at, updated_at
+         FROM users 
+         WHERE id = $1`,
+        [userId]
+      );
+      
+      logger.info(`查询结果，行数: ${userResult.rows.length}`);
+      
+      if (userResult.rows.length === 0) {
+        return res.error(404, '用户不存在');
+      }
+      
+      const user = userResult.rows[0];
+      
+      logger.info(`获取用户信息成功，用户ID: ${userId}`);
+      
+      res.success(200, '获取用户信息成功', user);
+      
+    } catch (error) {
+      logger.error('获取用户信息失败:', {
+        error: error.message,
+        stack: error.stack,
+        user: req.user
+      });
+      res.error(500, '服务器内部错误');
+    }
+  }
+
   // 获取当前用户角色
   async getCurrentUserRoles(req, res) {
     // 生成请求ID用于日志追踪
     const requestId = req.headers['x-request-id'] || `get_roles_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const startTime = Date.now();
     
-    // 从JWT token中获取用户ID
-    const userId = req.user.sub;
+    // 尝试从多个可能的字段获取用户ID
+    const userId = req.user?.sub || req.user?.id || req.user?.userId || req.userId;
+    
+    if (!userId) {
+      logger.error('无法从请求中获取用户ID', { user: req.user });
+      return res.error(400, '无法识别用户身份');
+    }
     
     // 记录请求开始
     logger.info(`[Request:${requestId}] 开始获取当前用户角色`, {
@@ -2531,7 +2579,7 @@ class UserController {
       let rolesResult;
       try {
         rolesResult = await pool.query(
-          `SELECT r.id, r.name, r.description, r.level, ur.assigned_at
+          `SELECT r.id, r.name, r.description, r.role_type, ur.assigned_at
            FROM user_roles ur
            JOIN roles r ON ur.role_id = r.id
            WHERE ur.user_id = $1`,
@@ -2586,8 +2634,13 @@ class UserController {
     const requestId = req.headers['x-request-id'] || `get_perms_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const startTime = Date.now();
     
-    // 从JWT token中获取用户ID
-    const userId = req.user.sub;
+    // 尝试从多个可能的字段获取用户ID
+    const userId = req.user?.sub || req.user?.id || req.user?.userId || req.userId;
+    
+    if (!userId) {
+      logger.error('无法从请求中获取用户ID', { user: req.user });
+      return res.error(400, '无法识别用户身份');
+    }
     
     // 记录请求开始
     logger.info(`[Request:${requestId}] 开始获取当前用户权限`, {
@@ -2603,7 +2656,7 @@ class UserController {
       let permissionsResult;
       try {
         permissionsResult = await pool.query(
-          `SELECT DISTINCT p.id, p.name, p.code, p.description, p.resource, p.action
+          `SELECT DISTINCT p.id, p.name, p.code, p.description, p.module
            FROM user_roles ur
            JOIN role_permissions rp ON ur.role_id = rp.role_id
            JOIN permissions p ON rp.permission_id = p.id
@@ -6127,7 +6180,7 @@ class UserController {
         
         // 插入用户记录并返回ID
         const result = await client.query(
-          `INSERT INTO users (username, password_hash, email, display_name, created_at, updated_at) 
+          `INSERT INTO users (username, password_hash, email, name, created_at, updated_at) 
            VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id`,
           [username, hashedPassword, email, displayName || username]
         );
@@ -6165,7 +6218,7 @@ class UserController {
         
         // 获取创建的用户记录
         const userRowsResult = await pool.query(
-          'SELECT id, username, email, display_name, is_active, created_at FROM users WHERE id = $1',
+          'SELECT id, username, email, name, is_active, created_at FROM users WHERE id = $1',
           [userId]
         );
         const userRows = userRowsResult.rows;
@@ -6188,7 +6241,7 @@ class UserController {
             id: user.id,
             username: user.username,
             email: user.email,
-            displayName: user.display_name,
+            displayName: user.name,
             isActive: user.is_active,
             role: role || 'user',
             createdAt: user.created_at
@@ -6241,7 +6294,7 @@ class UserController {
       let user;
       try {
         const userResult = await pool.query(
-          'SELECT id, username, email, display_name FROM users WHERE id = $1',
+          'SELECT id, username, email, name FROM users WHERE id = $1',
           [id]
         );
         
@@ -6351,7 +6404,7 @@ class UserController {
       }
       
       if (displayName !== undefined) {
-        updateFields.push(`display_name = $${paramIndex++}`);
+        updateFields.push(`name = $${paramIndex++}`);
         updateValues.push(displayName);
       }
       
@@ -6377,7 +6430,7 @@ class UserController {
           UPDATE users 
           SET ${updateFields.join(', ')} 
           WHERE id = $${paramIndex}
-          RETURNING id, username, email, display_name, is_active, updated_at
+          RETURNING id, username, email, name, is_active, updated_at
         `;
         
         const updateResult = await pool.query(updateQuery, updateValues);
@@ -6398,7 +6451,7 @@ class UserController {
             id: updatedUser.id,
             username: updatedUser.username,
             email: updatedUser.email,
-            displayName: updatedUser.display_name,
+            displayName: updatedUser.name,
             isActive: updatedUser.is_active,
             updatedAt: updatedUser.updated_at
           }

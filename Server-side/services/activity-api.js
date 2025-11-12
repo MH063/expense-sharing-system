@@ -3,7 +3,7 @@
  * 提供活动管理相关的API调用方法
  */
 
-import axios from 'axios';
+const axios = require('axios');
 
 // 创建axios实例
 const api = axios.create({
@@ -272,4 +272,4 @@ const activityApi = {
   }
 };
 
-export default activityApi;
+module.exports = activityApi;

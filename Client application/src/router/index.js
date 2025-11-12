@@ -38,6 +38,7 @@ import Settings from '@/views/Settings.vue'
 import ActivitiesList from '@/views/activities/ActivitiesList.vue'
 import Forbidden from '@/views/Forbidden.vue'
 import PermissionTest from '@/views/admin/PermissionTest.vue'
+import PermissionMappingManager from '@/views/admin/PermissionMappingManager.vue'
 
 import { createAuthGuard } from './guards'
 import { createPermissionGuard } from './permissionGuard'
@@ -379,6 +380,16 @@ const routes = [
     component: PermissionTest,
     meta: {
       title: '权限测试',
+      requiresAuth: true,
+      requiresPermission: PERMISSIONS.ADMIN_ACCESS
+    }
+  },
+  {
+    path: '/admin/permission-mapping',
+    name: 'PermissionMappingManager',
+    component: PermissionMappingManager,
+    meta: {
+      title: '权限映射管理',
       requiresAuth: true,
       requiresPermission: PERMISSIONS.ADMIN_ACCESS
     }

@@ -1374,8 +1374,17 @@ CREATE TABLE system_resource_usage (
 -- ========================================
 
 -- 创建请假类型枚举
-CREATE TYPE IF NOT EXISTS leave_type AS ENUM ('leave', 'checkout');
-CREATE TYPE IF NOT EXISTS leave_status AS ENUM ('pending', 'approved', 'verified', 'settled', 'cancelled');
+DO $$ BEGIN
+    CREATE TYPE leave_type AS ENUM ('leave', 'checkout');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE leave_status AS ENUM ('pending', 'approved', 'verified', 'settled', 'cancelled');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- 请假记录表
 CREATE TABLE IF NOT EXISTS leave_records (

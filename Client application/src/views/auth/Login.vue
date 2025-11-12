@@ -3,7 +3,7 @@
     <div class="login-card">
       <div class="login-header">
         <h1 class="login-title">登录</h1>
-        <p class="login-subtitle">欢迎回到寝室记账系统</p>
+        <p class="login-subtitle">欢迎回到记账系统</p>
       </div>
       
       <form @submit.prevent="handleLogin" class="login-form">
@@ -146,10 +146,21 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import tokenManager from '@/utils/jwt-token-manager'
+import { ElMessage } from 'element-plus'
 
 // 路由和状态管理
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 定义showToast函数，使用ElementPlus的消息提示
+const showToast = (message, type = 'info') => {
+  ElMessage({
+    message,
+    type: type === 'error' ? 'error' : type === 'success' ? 'success' : 'info',
+    duration: 3000,
+    showClose: true
+  })
+}
 
 // 响应式数据
 const isLoading = ref(false)
@@ -393,16 +404,77 @@ const validateForm = () => {
     isValid = false
   }
   
-  // 验证密码
+  // 验证密码 - 修改为与后端一致的验证规则
   if (!loginForm.password) {
     errors.password = '请输入密码'
     isValid = false
-  } else if (loginForm.password.length < 6) {
-    errors.password = '密码至少需要6个字符'
+  } else if (loginForm.password.length < 8) {
+    errors.password = '密码至少需要8个字符'
+    isValid = false
+  } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/.test(loginForm.password)) {
+    errors.password = '密码需包含大小写、数字、特殊字符且至少8位'
     isValid = false
   }
   
   return isValid
+}
+
+// 处理登录成功
+const handleLoginSuccess = async (user) => {
+  try {
+    console.log('登录成功，用户数据:', user);
+    
+    // 处理记住我功能：如果用户勾选了记住我，保存用户名到本地存储
+    if (loginForm.remember) {
+      // 添加用户到记住列表
+      addToRememberedUsers(loginForm.username)
+      localStorage.setItem('remember_me', 'true') // 设置记住我标志，供Token管理器使用
+      console.log('已记住用户名:', loginForm.username)
+    } else {
+      // 如果用户没有勾选记住我，从记住列表中移除该用户
+      removeFromRememberedUsers(loginForm.username)
+      localStorage.setItem('remember_me', 'false') // 设置记住我标志，供Token管理器使用
+      console.log('已从记住列表中移除用户名:', loginForm.username)
+    }
+    
+    // 设置当前用户（用于Token管理）
+    tokenManager.setCurrentUser(loginForm.username)
+    
+    // 添加登录成功反馈
+    console.log(`用户 ${loginForm.username} 登录成功`)
+    
+    // 显示成功提示
+    showToast('登录成功！正在跳转...', 'success');
+    
+    // 根据用户角色决定重定向路径
+    const getRoleBasedRedirectPath = (userRole) => {
+      switch (userRole) {
+        case 'admin':
+          return '/admin/dashboard'
+        case 'manager':
+          return '/manager/dashboard'
+        case 'user':
+        default:
+          return '/dashboard'
+      }
+    }
+    
+    // 获取用户角色并决定重定向路径
+    const userRole = user?.role || 'user'
+    const roleBasedPath = getRoleBasedRedirectPath(userRole)
+    const redirectPath = router.currentRoute.value.query.redirect || roleBasedPath
+    
+    console.log('用户角色:', userRole, '重定向路径:', redirectPath)
+    
+    // 延迟跳转，让用户看到成功提示
+    setTimeout(() => {
+      router.push(redirectPath)
+    }, 1000)
+  } catch (error) {
+    console.error('处理登录成功时出错:', error)
+    errorMessage.value = '处理登录成功时出错，请重试'
+    showToast('登录失败，请重试', 'error')
+  }
 }
 
 // 处理登录
@@ -435,31 +507,12 @@ const handleLogin = async () => {
     
     console.log('登录响应:', response)
     
-    // 处理记住我功能：如果用户勾选了记住我，保存用户名到本地存储
-    if (loginForm.remember) {
-      // 添加用户到记住列表
-      addToRememberedUsers(loginForm.username)
-      localStorage.setItem('remember_me', 'true') // 设置记住我标志，供Token管理器使用
-      console.log('已记住用户名:', loginForm.username)
-    } else {
-      // 如果用户没有勾选记住我，从记住列表中移除该用户
-      removeFromRememberedUsers(loginForm.username)
-      localStorage.setItem('remember_me', 'false') // 设置记住我标志，供Token管理器使用
-      console.log('已从记住列表中移除用户名:', loginForm.username)
-    }
-    
-    // 设置当前用户（用于Token管理）
-    tokenManager.setCurrentUser(loginForm.username)
-    
-    // 添加登录成功反馈
-    console.log(`用户 ${loginForm.username} 登录成功`)
-    
-    // 登录成功，跳转到仪表盘或之前访问的页面
-    const redirectPath = router.currentRoute.value.query.redirect || '/dashboard'
-    router.push(redirectPath)
+    // 处理登录成功 - 直接传递用户信息
+    await handleLoginSuccess(response.user)
   } catch (error) {
     console.error('登录失败:', error)
     errorMessage.value = error.message || '登录失败，请检查用户名和密码'
+    showToast(error.message || '登录失败，请检查用户名和密码', 'error')
   } finally {
     isLoading.value = false
   }

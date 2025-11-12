@@ -217,7 +217,20 @@ class UserService extends BaseService {
     // 使用增强版缓存的getOrSet方法实现缓存穿透保护
     return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `
-        SELECT r.*, rm.role, rm.joined_at
+        SELECT 
+          r.id,
+          r.uuid,
+          r.name,
+          r.description,
+          r.cover_image as avatar_url,
+          r.creator_id,
+          r.invite_code,
+          r.status,
+          r.settings,
+          r.created_at,
+          r.updated_at,
+          rm.role,
+          rm.joined_at
         FROM rooms r
         JOIN room_members rm ON r.id = rm.room_id
         WHERE rm.user_id = $1 AND r.status = $2
@@ -376,6 +389,47 @@ class UserService extends BaseService {
       const result = await this.query(sql, [userId, true]);
       return result.rows.length > 0 ? result.rows[0] : null;
     }, enhancedCacheService.getDefaultTTL('user'), ['user']);
+  }
+
+  /**
+   * 获取用户角色
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>} 用户角色列表
+   */
+  async getUserRoles(userId) {
+    const cacheKey = `user:roles:${userId}`;
+    
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      const sql = `
+        SELECT r.name, r.description
+        FROM roles r
+        JOIN user_roles ur ON r.id = ur.role_id
+        WHERE ur.user_id = $1
+      `;
+      const result = await this.query(sql, [userId]);
+      return result.rows.map(row => row.name);
+    }, enhancedCacheService.getDefaultTTL('user'), ['user', 'role']);
+  }
+
+  /**
+   * 获取用户权限
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>} 用户权限列表
+   */
+  async getUserPermissions(userId) {
+    const cacheKey = `user:permissions:${userId}`;
+    
+    return await enhancedCacheService.getOrSet(cacheKey, async () => {
+      const sql = `
+        SELECT DISTINCT p.name, p.description
+        FROM permissions p
+        JOIN role_permissions rp ON p.id = rp.permission_id
+        JOIN user_roles ur ON rp.role_id = ur.role_id
+        WHERE ur.user_id = $1
+      `;
+      const result = await this.query(sql, [userId]);
+      return result.rows.map(row => row.name);
+    }, enhancedCacheService.getDefaultTTL('user'), ['user', 'permission']);
   }
 }
 

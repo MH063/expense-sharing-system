@@ -13,6 +13,7 @@ const {
   User
 } = require('../models');
 const { sequelize } = require('../models');
+const { RBACService } = require('../services/rbac-service');
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -842,7 +843,7 @@ exports.getFeedbackDetail = async (req, res) => {
     }
     
     // 检查权限：只有提交者和管理员可以查看
-    if (feedback.submittedBy !== req.user.id && req.user.role !== 'admin') {
+    if (feedback.submittedBy !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
       return res.status(403).json({
         success: false,
         message: '没有权限查看此反馈'

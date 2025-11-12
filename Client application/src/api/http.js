@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { createHttpClient } from '@/utils/token-interceptor'
 import { useAuthStore } from '@/stores'
+import { handleRequestPermissionError } from '@/utils/permissionErrorHandler'
 
 // 创建基础HTTP客户端
 const http = axios.create({
@@ -57,10 +58,20 @@ httpClient.interceptors.response.use(
     // 处理错误响应
     console.error('HTTP请求错误:', error)
     
-    // 如果有响应数据，返回标准错误格式
-    if (error.response && error.response.data) {
+    // 处理权限相关错误
+    if (error.response) {
+      const status = error.response.status
       const errorData = error.response.data
       
+      // 处理权限错误 (401, 403)
+      if (status === 401 || status === 403) {
+        const handled = handleRequestPermissionError(error)
+        if (handled) {
+          return Promise.reject(handled)
+        }
+      }
+      
+      // 如果有响应数据，返回标准错误格式
       if (errorData && typeof errorData === 'object' && 'success' in errorData) {
         return Promise.reject(errorData)
       }
@@ -68,7 +79,8 @@ httpClient.interceptors.response.use(
       return Promise.reject({
         success: false,
         data: null,
-        message: errorData.message || error.message || '请求失败'
+        message: errorData.message || error.message || '请求失败',
+        status: status
       })
     }
     

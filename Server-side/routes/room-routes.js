@@ -22,6 +22,12 @@ router.get('/', authenticateToken, roomController.getRooms);
 // 获取用户所属的寝室列表
 router.get('/my-rooms', authenticateToken, roomController.getMyRooms);
 
+// 获取用户当前房间
+router.get('/current', authenticateToken, roomController.getCurrentRoom);
+
+// 获取用户收到的邀请
+router.get('/invitations', authenticateToken, roomController.getInvitations);
+
 // 获取寝室详情 - 需要认证
 router.get('/:id', authenticateToken, roomController.getRoomById);
 

@@ -67,11 +67,25 @@ class RoomController {
           [creatorId, room.id]
         );
 
-        // 更新创建者的角色为寝室长
-        await client.query(
-          'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
-          ['room_leader', creatorId]
+        // 将创建者的角色设置为寝室长（通过user_roles关联表）
+        const roomLeaderRoleResult = await client.query(
+          'SELECT id FROM roles WHERE name = $1',
+          ['寝室长']
         );
+        
+        if (roomLeaderRoleResult.rows.length > 0) {
+          // 删除原有的角色关联
+          await client.query(
+            'DELETE FROM user_roles WHERE user_id = $1',
+            [creatorId]
+          );
+          
+          // 添加新的角色关联
+          await client.query(
+            'INSERT INTO user_roles (user_id, role_id, assigned_at) VALUES ($1, $2, NOW())',
+            [creatorId, roomLeaderRoleResult.rows[0].id]
+          );
+        }
 
         await client.query('COMMIT');
 
@@ -235,10 +249,13 @@ class RoomController {
 
       // 查询寝室成员
       const membersResult = await pool.query(
-        `SELECT u.id, u.username, u.name, u.email, u.avatar_url, u.role as user_role,
+        `SELECT u.id, u.username, u.name, u.email, u.avatar_url,
+                COALESCE(r.name, '普通用户') as user_role,
                 urr.relation_type, urr.join_date, urr.leave_date, urr.is_active
          FROM user_room_relations urr
          JOIN users u ON urr.user_id = u.id
+         LEFT JOIN user_roles ur ON u.id = ur.user_id
+         LEFT JOIN roles r ON ur.role_id = r.id
          WHERE urr.room_id = $1
          ORDER BY urr.join_date`,
         [id]
@@ -1046,6 +1063,73 @@ class RoomController {
 
     } catch (error) {
       logger.error('邀请码删除失败:', error);
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取用户当前房间
+  async getCurrentRoom(req, res) {
+    try {
+      const userId = req.user.sub; // 从认证中间件获取用户ID
+
+      // 查询用户当前所在的房间（假设用户只能同时在一个房间中）
+      const currentRoomQuery = `
+        SELECT r.id, r.name, r.description, r.code, r.max_members, r.status, r.created_at,
+               u.username as creator_username, u.name as creator_name,
+               urr.relation_type as user_relation_type,
+               (SELECT COUNT(*) FROM user_room_relations urr2 WHERE urr2.room_id = r.id AND urr2.is_active = TRUE) as current_members
+        FROM rooms r
+        JOIN users u ON r.creator_id = u.id
+        JOIN user_room_relations urr ON r.id = urr.room_id
+        WHERE urr.user_id = $1 AND urr.is_active = TRUE
+        ORDER BY urr.join_date DESC
+        LIMIT 1
+      `;
+
+      const currentRoomResult = await pool.query(currentRoomQuery, [userId]);
+
+      if (currentRoomResult.rows.length === 0) {
+        return res.success(200, '用户未加入任何房间', null);
+      }
+
+      const currentRoom = currentRoomResult.rows[0];
+
+      logger.info(`获取用户当前房间成功，用户ID: ${userId}, 房间ID: ${currentRoom.id}`);
+
+      res.success(200, '获取用户当前房间成功', currentRoom);
+
+    } catch (error) {
+      logger.error('获取用户当前房间失败:', error);
+      res.error(500, '服务器内部错误');
+    }
+  }
+
+  // 获取用户收到的邀请
+  async getInvitations(req, res) {
+    try {
+      const userId = req.user.sub; // 从认证中间件获取用户ID
+
+      // 查询用户收到的邀请
+      const invitationsQuery = `
+        SELECT i.id, i.room_id, i.inviter_id, i.invitee_id, i.message, i.status, i.created_at, i.updated_at,
+               r.name as room_name, r.description as room_description,
+               u.username as inviter_username, u.name as inviter_name
+        FROM invitations i
+        JOIN rooms r ON i.room_id = r.id
+        JOIN users u ON i.inviter_id = u.id
+        WHERE i.invitee_id = $1 AND i.status = 'pending'
+        ORDER BY i.created_at DESC
+      `;
+
+      const invitationsResult = await pool.query(invitationsQuery, [userId]);
+      const invitations = invitationsResult.rows;
+
+      logger.info(`获取用户邀请列表成功，用户ID: ${userId}, 共 ${invitations.length} 条记录`);
+
+      res.success(200, '获取用户邀请列表成功', invitations);
+
+    } catch (error) {
+      logger.error('获取用户邀请列表失败:', error);
       res.error(500, '服务器内部错误');
     }
   }

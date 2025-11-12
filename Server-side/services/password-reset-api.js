@@ -3,7 +3,7 @@
  * 提供用户密码重置相关的API调用功能
  */
 
-import api from './api';
+const api = require('./api');
 
 /**
  * 密码重置API服务类
@@ -2155,4 +2155,4 @@ class PasswordResetApiService {
 
 // 创建并导出单例实例
 const passwordResetApiService = new PasswordResetApiService();
-export default passwordResetApiService;
+module.exports = passwordResetApiService;

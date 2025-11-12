@@ -7,6 +7,7 @@ const { validationResult } = require('express-validator');
 const logger = require('../config/logger');
 const { getEnvironmentConfig } = require('../config/environment');
 const config = getEnvironmentConfig();
+const permissionService = require('../services/permission-service');
 const { 
   User, 
   UserProfile, 
@@ -1896,24 +1897,31 @@ class UserProfileController {
    */
   async getUserRoles(req, res) {
     try {
-      const userId = req.user.id;
+      // JWT中的用户ID存储在sub字段中，不是id字段
+      const userId = req.user.sub;
+      console.log('🔍 getUserRoles - req.user:', req.user);
+      console.log('🆔 getUserRoles - userId:', userId);
       
-      // 获取用户信息，包括角色
-      const user = await User.findByPk(userId, {
-        include: ['roles'] // 假设User模型有关联的角色关系
-      });
+      // 获取真实的用户角色
+      const roleNames = await permissionService.getUserRoles(userId);
+      console.log('🔐 getUserRoles - roleNames:', roleNames);
       
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
-      }
-
-      // 由于这是一个示例，我们返回模拟的角色数据
-      const roles = [
-        { id: 1, name: 'user', description: '用户' }
-      ];
+      // 转换为前端期望的格式，根据真实数据库角色定义
+       const descriptions = { 
+         '系统管理员': '系统内置账号，用于系统维护和全局管理', 
+         '管理员': '具有角色分配、权限管理和角色申请审批权限', 
+         '寝室长': '具有本寝室相关功能的完全控制权限', 
+         '缴费人': '具有本寝室费用记录的完全控制权限', 
+         '用户': '具有基础查看权限', 
+         '访客': '未登录用户，只能访问公开页面' 
+       };
+      
+      const roles = roleNames.map(name => ({
+        name,
+        description: descriptions[name] || '未知角色'
+      }));
+      
+      console.log('📋 getUserRoles - 返回的roles:', roles);
 
       return res.json({
         success: true,
@@ -1921,6 +1929,30 @@ class UserProfileController {
       });
     } catch (error) {
       logger.error('获取用户角色失败:', error);
+      return res.status(500).json({
+        success: false,
+        message: '服务器内部错误'
+      });
+    }
+  }
+
+  /**
+   * 获取用户权限
+   */
+  async getUserPermissions(req, res) {
+    try {
+      // JWT中的用户ID存储在sub字段中，不是id字段
+      const userId = req.user.sub;
+      
+      // 获取真实的用户权限
+      const permissions = await permissionService.getUserPermissions(userId);
+
+      return res.json({
+        success: true,
+        data: permissions
+      });
+    } catch (error) {
+      logger.error('获取用户权限失败:', error);
       return res.status(500).json({
         success: false,
         message: '服务器内部错误'

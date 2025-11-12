@@ -24,32 +24,20 @@ router.get('/me',
   ipLimiter,  // IP速率限制
   basicValidation,  // 先进行参数验证
   authenticateToken,  // 再进行身份认证
-  enhancedCacheMiddleware.smartUserCache.getUser, 
   async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const user = await userService.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({
+    try {
+      const userController = require('../controllers/user-controller');
+      return userController.getCurrentUser(req, res);
+    } catch (error) {
+      console.error('获取用户信息失败:', error);
+      res.status(500).json({
         success: false,
-        message: '用户不存在'
+        message: '获取用户信息失败',
+        error: error.message
       });
     }
-    
-    res.json({
-      success: true,
-      data: user
-    });
-  } catch (error) {
-    console.error('获取用户信息失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取用户信息失败',
-      error: error.message
-    });
   }
-});
+);
 
 /**
  * 更新当前用户信息
@@ -269,6 +257,64 @@ router.post('/batch',
     res.status(500).json({
       success: false,
       message: '批量获取用户信息失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取用户角色信息
+ * GET /api/users/roles
+ */
+router.get('/roles', 
+  ipLimiter,  // IP速率限制
+  basicValidation,  // 先进行参数验证
+  authenticateToken,  // 再进行身份认证
+  async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRoles = await userService.getUserRoles(userId);
+    
+    res.json({
+      success: true,
+      data: {
+        roles: userRoles
+      }
+    });
+  } catch (error) {
+    console.error('获取用户角色失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取用户角色失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取用户权限信息
+ * GET /api/users/permissions
+ */
+router.get('/permissions', 
+  ipLimiter,  // IP速率限制
+  basicValidation,  // 先进行参数验证
+  authenticateToken,  // 再进行身份认证
+  async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userPermissions = await userService.getUserPermissions(userId);
+    
+    res.json({
+      success: true,
+      data: {
+        permissions: userPermissions
+      }
+    });
+  } catch (error) {
+    console.error('获取用户权限失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取用户权限失败',
       error: error.message
     });
   }

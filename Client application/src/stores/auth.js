@@ -48,7 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
    * 初始化认证状态
    * 从Token管理器恢复Token和用户信息
    */
-  const initializeAuth = () => {
+  const initializeAuth = async () => {
     try {
       console.log('=== 认证状态初始化开始 ===')
       // 初始化Token管理器
@@ -84,6 +84,9 @@ export const useAuthStore = defineStore('auth', () => {
           permissions.value = Array.isArray(payload.permissions) ? payload.permissions : []
           console.log('标准Token解析，设置currentUser:', currentUser.value)
           console.log('设置roles数组:', roles.value)
+          
+          // 同步最新角色信息
+          await syncUserRoles()
         } else {
           console.log('Token解析失败，检查是否为模拟Token')
           // 如果是模拟Token，创建默认用户信息
@@ -292,12 +295,72 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * 用户登录
-   * @param {Object} credentials - 登录凭据
+   * @param {Object} credentials - 登录凭据或包含token和user的对象
    * @param {string} username - 用户名，用于多用户Token管理
    * @returns {Promise} 登录结果
    */
   const login = async (credentials, username) => {
     try {
+      // 检查是否已经处理过的登录结果（直接包含token和user）
+      if (credentials.token && credentials.user) {
+        console.log('使用已处理的登录结果:', credentials)
+        
+        const { token: accessToken, refreshToken: refreshTkn, user: userData } = credentials
+        
+        console.log('登录成功，收到Token:', {
+          hasToken: !!accessToken,
+          hasRefreshToken: !!refreshTkn,
+          userData,
+        })
+        
+        // 存储Token到Token管理器，支持多用户
+        tokenManager.setTokens(accessToken, refreshTkn, null, username || userData?.username)
+        
+        // 更新状态
+        accessToken.value = accessToken
+        refreshToken.value = refreshTkn
+        currentUser.value = userData
+        
+        // 确保角色信息正确设置 - 优先从roles数组获取
+        if (Array.isArray(userData?.roles) && userData.roles.length > 0) {
+          roles.value = userData.roles
+        } else if (userData?.role) {
+          roles.value = [userData.role]
+        } else {
+          roles.value = []
+        }
+        
+        // 确保权限信息正确设置
+        if (Array.isArray(userData?.permissions)) {
+          permissions.value = userData.permissions
+        } else {
+          permissions.value = []
+        }
+        
+        // 设置Token管理器的刷新回调
+        tokenManager.setRefreshCallback(refreshTokens)
+        
+        // 同步最新角色信息
+        await syncUserRoles()
+        
+        // 连接WebSocket
+        connectWebSocket()
+        
+        console.log('登录状态设置完成:', {
+          isAuthenticated: isAuthenticated.value,
+          currentUser: currentUser.value,
+          hasAccessToken: !!accessToken.value,
+          hasRefreshToken: !!refreshToken.value
+        })
+        
+        // 返回完整的响应信息给前端组件
+        return { 
+          success: true, 
+          user: userData,
+          message: '登录成功'
+        }
+      }
+      
       // 调用登录API
       console.log('调用登录API:', credentials)
       
@@ -352,6 +415,9 @@ export const useAuthStore = defineStore('auth', () => {
         
         // 设置Token管理器的刷新回调
         tokenManager.setRefreshCallback(refreshTokens)
+        
+        // 同步最新角色信息
+        await syncUserRoles()
         
         // 连接WebSocket
         connectWebSocket()
@@ -490,6 +556,71 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   /**
+   * 同步用户角色信息
+   * 从后端获取最新的用户角色和权限信息
+   * @returns {Promise<void>}
+   */
+  const syncUserRoles = async () => {
+    try {
+      console.log('开始同步用户角色信息...')
+      
+      // 获取最新角色信息
+      const rolesResponse = await http.get('/users/roles')
+      console.log('获取角色响应:', rolesResponse)
+      
+      // 处理后端返回的数据结构 {success: true, data: {roles: []}}
+      let rolesData = rolesResponse.data
+      
+      // 如果数据是双层嵌套，尝试访问 res.data.data
+      if (rolesData && rolesData.data) {
+        rolesData = rolesData.data
+        console.log('检测到双层嵌套数据结构，使用res.data.data')
+      }
+      
+      if (rolesData && Array.isArray(rolesData.roles)) {
+        roles.value = rolesData.roles
+        console.log('成功同步角色信息:', roles.value)
+      } else {
+        console.warn('角色信息格式异常或为空:', rolesData)
+      }
+      
+      // 获取最新权限信息
+      const permissionsResponse = await http.get('/users/permissions')
+      console.log('获取权限响应:', permissionsResponse)
+      
+      // 处理后端返回的数据结构 {success: true, data: {permissions: []}}
+      let permissionsData = permissionsResponse.data
+      
+      // 如果数据是双层嵌套，尝试访问 res.data.data
+      if (permissionsData && permissionsData.data) {
+        permissionsData = permissionsData.data
+        console.log('检测到双层嵌套数据结构，使用res.data.data')
+      }
+      
+      if (permissionsData && Array.isArray(permissionsData.permissions)) {
+        permissions.value = permissionsData.permissions
+        console.log('成功同步权限信息:', permissions.value)
+      } else {
+        console.warn('权限信息格式异常或为空:', permissionsData)
+      }
+      
+      // 同时更新currentUser中的角色和权限信息
+      if (currentUser.value) {
+        currentUser.value = {
+          ...currentUser.value,
+          roles: roles.value,
+          permissions: permissions.value
+        }
+        console.log('更新currentUser角色权限信息:', currentUser.value)
+      }
+      
+    } catch (error) {
+      console.error('同步用户角色信息失败:', error)
+      // 同步失败不影响主流程，记录错误信息即可
+    }
+  }
+
+  /**
    * 获取Token状态信息
    * @returns {Object} Token状态信息
    */
@@ -534,6 +665,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasRole,
     hasPermission,
     checkPermission, // 添加checkPermission到导出对象
+    syncUserRoles,
     getTokenStatus
   }
 })

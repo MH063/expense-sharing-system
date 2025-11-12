@@ -5,6 +5,7 @@
 
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission, canAccessRoom, ROLES } from '@/utils/permissions'
+import { showNoPermission, showLoginRequired, showInsufficientRole, showRoomPermissionDenied } from '@/utils/permissionToast'
 
 /**
  * 检查路由权限
@@ -20,6 +21,10 @@ export function checkRoutePermission(to, from, next, store) {
   // 检查是否需要登录
   if (to.meta.requiresAuth && !user) {
     console.log('路由需要登录，重定向到登录页')
+    showLoginRequired({
+      showBackButton: false,
+      autoClose: false
+    })
     next({
       path: '/auth/login',
       query: { redirect: to.fullPath }
@@ -33,15 +38,27 @@ export function checkRoutePermission(to, from, next, store) {
     const userRoles = store?.roles || []
     const userRole = userRoles.length > 0 ? userRoles[0] : (user.role || 'guest')
     
+    let hasRequiredRole = false
+    
     if (Array.isArray(to.meta.requiresRole)) {
-      if (!to.meta.requiresRole.includes(userRole)) {
-        console.log(`路由需要角色 ${to.meta.requiresRole.join(' 或 ')}，当前角色: ${userRole}`)
-        next({ path: '/403' }) // 403 Forbidden
-        return
-      }
-    } else if (to.meta.requiresRole !== userRole) {
-      console.log(`路由需要角色 ${to.meta.requiresRole}，当前角色: ${userRole}`)
-      next({ path: '/403' })
+      hasRequiredRole = to.meta.requiresRole.includes(userRole)
+    } else {
+      hasRequiredRole = to.meta.requiresRole === userRole
+    }
+    
+    if (!hasRequiredRole) {
+      const requiredRoles = Array.isArray(to.meta.requiresRole) 
+        ? to.meta.requiresRole.join(' 或 ') 
+        : to.meta.requiresRole
+        
+      console.log(`路由需要角色 ${requiredRoles}，当前角色: ${userRole}`)
+      
+      showInsufficientRole(requiredRoles, userRole, {
+        showBackButton: true,
+        autoClose: false
+      })
+      
+      next({ path: '/forbidden' })
       return
     }
   }
@@ -76,9 +93,19 @@ export function checkRoutePermission(to, from, next, store) {
     }
     
     if (!hasRequiredPermission) {
-      console.log(`路由需要权限 ${to.meta.requiresPermission}，权限不足`)
+      const requiredPermissions = Array.isArray(to.meta.requiresPermission) 
+        ? to.meta.requiresPermission.join(' 或 ') 
+        : to.meta.requiresPermission
+        
+      console.log(`路由需要权限 ${requiredPermissions}，权限不足`)
       console.log('当前用户权限:', userPermissions)
-      next({ path: '/403' })
+      
+      showNoPermission(to.meta.title || '此页面', '访问', {
+        showBackButton: true,
+        autoClose: false
+      })
+      
+      next({ path: '/forbidden' })
       return
     }
   }
@@ -89,7 +116,11 @@ export function checkRoutePermission(to, from, next, store) {
     
     if (!roomId) {
       console.log('路由需要寝室权限，但未提供寝室ID')
-      next({ path: '/403' })
+      showNoPermission('寝室相关功能', '访问', {
+        showBackButton: true,
+        autoClose: false
+      })
+      next({ path: '/forbidden' })
       return
     }
     
@@ -106,7 +137,13 @@ export function checkRoutePermission(to, from, next, store) {
     
     if (!canAccess) {
       console.log(`路由需要寝室权限 ${permission}，权限不足`)
-      next({ path: '/403' })
+      
+      showRoomPermissionDenied(`寝室 ${roomId}`, permission, {
+        showBackButton: true,
+        autoClose: false
+      })
+      
+      next({ path: '/forbidden' })
       return
     }
   }
@@ -133,6 +170,10 @@ export function createPermissionGuard(router, store) {
         console.error('无法获取auth store:', error)
         // 如果无法获取store，只进行基本的认证检查
         if (to.meta.requiresAuth) {
+          showLoginRequired({
+            showBackButton: false,
+            autoClose: false
+          })
           next({ path: '/auth/login', query: { redirect: to.fullPath } })
           return
         }
@@ -151,7 +192,11 @@ export function createPermissionGuard(router, store) {
     
     // 如果是权限相关错误，重定向到403页面
     if (error.message && error.message.includes('权限')) {
-      router.push('/403')
+      showNoPermission('请求的路由', '访问', {
+        showBackButton: true,
+        autoClose: false
+      })
+      router.push('/forbidden')
     }
   })
 }
@@ -203,7 +248,9 @@ export const permissionMixin = {
         permissions: authStore.permissions || []
       }
       
-      return permissions.some(permission => hasPermission(userWithPermissions, permission, resource))
+      return permissions.some(permission => 
+        hasPermission(userWithPermissions, permission, resource)
+      )
     },
     
     /**
@@ -225,16 +272,18 @@ export const permissionMixin = {
         permissions: authStore.permissions || []
       }
       
-      return permissions.every(permission => hasPermission(userWithPermissions, permission, resource))
+      return permissions.every(permission => 
+        hasPermission(userWithPermissions, permission, resource)
+      )
     },
     
     /**
      * 检查用户是否可以访问指定寝室
      * @param {string} roomId - 寝室ID
-     * @param {string} permission - 权限标识
+     * @param {string} permission - 寝室权限
      * @returns {boolean} 是否可以访问
      */
-    checkRoomAccess(roomId, permission) {
+    checkRoomAccess(roomId, permission = 'read') {
       const authStore = useAuthStore()
       const user = authStore.currentUser
       
@@ -251,76 +300,85 @@ export const permissionMixin = {
     },
     
     /**
-     * 检查用户角色
-     * @param {string} role - 角色标识
-     * @returns {boolean} 是否是指定角色
+     * 检查用户是否具有指定角色
+     * @param {string|Array} roles - 角色或角色数组
+     * @returns {boolean} 是否具有角色
      */
-    checkRole(role) {
+    checkRole(roles) {
       const authStore = useAuthStore()
       const userRoles = authStore.roles || []
-      const userRole = userRoles.length > 0 ? userRoles[0] : (authStore.currentUser?.role || 'guest')
-      return userRole === role
+      const userRole = userRoles.length > 0 ? userRoles[0] : (authStore.user?.role || 'guest')
+      
+      if (Array.isArray(roles)) {
+        return roles.includes(userRole)
+      }
+      
+      return userRole === roles
     }
   }
 }
 
 /**
  * 权限检查指令
- * 使用方式：v-permission="'room:edit'"
+ * 用于在模板中根据权限控制元素显示
  */
 export const permissionDirective = {
-  mounted(el, binding, vnode) {
-    checkPermission(el, binding, vnode)
+  mounted(el, binding) {
+    const { value } = binding
+    const authStore = useAuthStore()
+    const user = authStore.currentUser
+    
+    if (!user) {
+      el.style.display = 'none'
+      return
+    }
+    
+    // 创建用户对象,包含角色和权限信息
+    const userWithPermissions = {
+      ...user,
+      role: authStore.roles?.length > 0 ? authStore.roles[0] : (user.role || 'guest'),
+      permissions: authStore.permissions || []
+    }
+    
+    let hasRequiredPermission = false
+    
+    if (Array.isArray(value)) {
+      hasRequiredPermission = value.some(permission => hasPermission(userWithPermissions, permission))
+    } else {
+      hasRequiredPermission = hasPermission(userWithPermissions, value)
+    }
+    
+    if (!hasRequiredPermission) {
+      el.style.display = 'none'
+    }
   },
   
-  updated(el, binding, vnode) {
-    checkPermission(el, binding, vnode)
-  }
-}
-
-/**
- * 检查元素权限
- * @param {Element} el - DOM元素
- * @param {Object} binding - 指令绑定对象
- * @param {Object} vnode - Vue虚拟节点
- */
-function checkPermission(el, binding, vnode) {
-  const { value, modifiers } = binding
-  
-  // 尝试从组件实例获取用户信息
-  let user = null
-  try {
+  updated(el, binding) {
+    // 重新检查权限
+    const { value } = binding
     const authStore = useAuthStore()
-    user = authStore.currentUser
-  } catch (error) {
-    console.error('无法获取用户信息:', error)
-    // 如果无法获取用户信息，隐藏元素
-    el.style.display = 'none'
-    return
-  }
-  
-  if (!user) {
-    // 用户未登录，隐藏元素
-    el.style.display = 'none'
-    return
-  }
-  
-  let hasRequiredPermission = false
-  
-  if (Array.isArray(value)) {
-    // 检查是否具有任一权限
-    hasRequiredPermission = value.some(permission => hasPermission(user, permission))
-  } else {
-    // 检查是否具有指定权限
-    hasRequiredPermission = hasPermission(user, value)
-  }
-  
-  // 根据权限和修饰符决定元素显示状态
-  if (modifiers.hide) {
-    // hide修饰符：有权限时隐藏，无权限时显示
-    el.style.display = hasRequiredPermission ? 'none' : ''
-  } else {
-    // 默认：有权限时显示，无权限时隐藏
+    const user = authStore.currentUser
+    
+    if (!user) {
+      el.style.display = 'none'
+      return
+    }
+    
+    // 创建用户对象,包含角色和权限信息
+    const userWithPermissions = {
+      ...user,
+      role: authStore.roles?.length > 0 ? authStore.roles[0] : (user.role || 'guest'),
+      permissions: authStore.permissions || []
+    }
+    
+    let hasRequiredPermission = false
+    
+    if (Array.isArray(value)) {
+      hasRequiredPermission = value.some(permission => hasPermission(userWithPermissions, permission))
+    } else {
+      hasRequiredPermission = hasPermission(userWithPermissions, value)
+    }
+    
     el.style.display = hasRequiredPermission ? '' : 'none'
   }
 }

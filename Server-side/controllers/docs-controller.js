@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const { logger } = require('../config/logger');
+const { RBACService } = require('../services/rbac-service');
 
 /**
  * 文档管理控制器
@@ -226,7 +227,7 @@ class DocsController {
       }
       
       // 检查权限
-      if (doc.authorId !== req.user.id && !req.user.roles.includes('admin')) {
+      if (doc.authorId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
         return res.status(403).json({
           success: false,
           message: '没有权限修改此文档'
@@ -309,7 +310,7 @@ class DocsController {
       }
       
       // 检查权限
-      if (doc.authorId !== req.user.id && !req.user.roles.includes('admin')) {
+      if (doc.authorId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
         return res.status(403).json({
           success: false,
           message: '没有权限删除此文档'
@@ -463,7 +464,7 @@ class DocsController {
       }
       
       // 检查权限
-      if (doc.authorId !== req.user.id && !req.user.roles.includes('admin')) {
+      if (doc.authorId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
         return res.status(403).json({
           success: false,
           message: '没有权限恢复此文档'
@@ -641,7 +642,7 @@ class DocsController {
       }
       
       // 检查权限
-      if (comment.userId !== req.user.id && !req.user.roles.includes('admin')) {
+      if (comment.userId !== req.user.id && !(await RBACService.hasRole(req.user.id, ['admin']))) {
         return res.status(403).json({
           success: false,
           message: '没有权限删除此评论'

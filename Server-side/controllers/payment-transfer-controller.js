@@ -6,6 +6,7 @@
 const pool = require('../config/db');
 const { validationResult } = require('express-validator');
 const { logger } = require('../config/logger');
+const { RBACService } = require('../services/rbac-service');
 
 /**
  * 获取支付转移记录列表
@@ -339,7 +340,7 @@ const confirmPaymentTransfer = async (req, res) => {
     
     // 检查权限：只有收款人或管理员可以确认
     const currentUserId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = await RBACService.hasRole(currentUserId, ['admin']);
     
     if (transfer.to_user_id !== currentUserId && !isAdmin) {
       return res.error(403, '没有权限确认此转移记录');
@@ -471,7 +472,7 @@ const cancelPaymentTransfer = async (req, res) => {
     
     // 检查权限：只有付款人、收款人或管理员可以取消
     const currentUserId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = await checkUserHasRole(currentUserId, 'admin');
     
     if (transfer.from_user_id !== currentUserId && 
         transfer.to_user_id !== currentUserId && 

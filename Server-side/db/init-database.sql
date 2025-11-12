@@ -1850,7 +1850,7 @@ INSERT INTO roles (name, description, role_type, is_system) VALUES
 ('管理员', '具有角色分配、权限管理和角色申请审批权限', 'admin', true),
 ('寝室长', '具有本寝室相关功能的完全控制权限', 'user', true),
 ('缴费人', '具有本寝室费用记录的完全控制权限', 'user', true),
-('普通用户', '具有基础查看权限', 'user', true);
+('用户', '具有基础查看权限', 'user', true);
 
 -- 插入系统权限初始数据
 INSERT INTO permissions (code, name, description, module) VALUES 
@@ -2028,7 +2028,7 @@ AND p.code IN (
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r, permissions p
-WHERE r.name = '普通用户'
+WHERE r.name = '用户'
 AND p.code IN (
   -- 用户基础权限
   'user.login', 'user.logout', 'user.profile.view', 'user.profile.edit', 'user.password.change',

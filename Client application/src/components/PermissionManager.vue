@@ -206,7 +206,7 @@ export default {
         [ROLES.ADMIN]: '管理员',
         [ROLES.ROOM_OWNER]: '寝室长',
         [ROLES.PAYER]: '缴费人',
-        [ROLES.USER]: '普通用户',
+        [ROLES.USER]: '用户',
         [ROLES.GUEST]: '访客'
       }
       return roleLabels[role] || '未知角色'

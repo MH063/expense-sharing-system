@@ -5,12 +5,12 @@
 
 // 角色定义（根据需求文档标准）
 export const ROLES = {
-  SYSTEM_ADMIN: '系统管理员',  // 系统管理员
-  ADMIN: '管理员',            // 管理员
-  ROOM_OWNER: '寝室长',       // 寝室长
-  PAYER: '缴费人',           // 缴费人
-  USER: '普通用户',          // 普通用户
-  GUEST: '访客'             // 访客/未登录用户
+  SYSTEM_ADMIN: 'sysadmin',  // 系统管理员
+  ADMIN: 'admin',            // 管理员
+  ROOM_OWNER: 'room_leader',       // 寝室长
+  PAYER: 'payer',           // 缴费人
+  USER: 'user',          // 用户
+  GUEST: 'guest'             // 访客/未登录用户
 }
 
 // 权限定义
@@ -63,7 +63,7 @@ export const PERMISSIONS = {
 
 // 角色权限映射
 export const ROLE_PERMISSIONS = {
-  [ROLES.SUPER_ADMIN]: [
+  [ROLES.SYSTEM_ADMIN]: [
     // 超级管理员拥有所有权限
     ...Object.values(PERMISSIONS)
   ],
@@ -188,7 +188,7 @@ export const ROLE_PERMISSIONS = {
   ],
   
   [ROLES.USER]: [
-    // 普通用户权限
+    // 用户权限
     PERMISSIONS.ROOM_VIEW,
     
     // 费用权限

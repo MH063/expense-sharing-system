@@ -117,7 +117,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.username = $1 AND r.name IN ('系统管理员', 'admin')`,
+         WHERE u.username = $1 AND r.name IN ('sysadmin', 'admin')`,
         [username]
       );
       
@@ -188,7 +188,7 @@ class UserController {
          FROM users u 
          JOIN user_roles ur ON u.id = ur.user_id 
          JOIN roles r ON ur.role_id = r.id 
-         WHERE u.username = $1 AND r.name IN ('系统管理员', 'admin')`,
+         WHERE u.username = $1 AND r.name IN ('sysadmin', 'admin')`,
         [username]
       );
       
@@ -964,7 +964,7 @@ class UserController {
       });
       
       // 验证角色值
-      const validRoles = ['system_admin', 'admin', '寝室长', 'payer', 'user'];
+      const validRoles = ['system_admin', 'admin', 'room_leader', 'payer', 'user'];
       if (!validRoles.includes(role)) {
         logger.warn(`分配用户角色失败：无效的角色值 [${requestId}]`, {
           requestId,
@@ -1523,7 +1523,7 @@ class UserController {
       }
       
       // 查询用户角色
-      let userRole = '普通用户'; // 默认角色（根据需求文档标准）
+      let userRole = '用户'; // 默认角色（根据需求文档标准）
       try {
         const roleResult = await pool.query(
           `SELECT r.name as role 

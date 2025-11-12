@@ -260,7 +260,7 @@ const getActivityType = (type) => {
  * 查看全部活动
  */
 const viewAllActivities = () => {
-  router.push('/activities')
+  router.push('/notifications/center')
 }
 
 // 监听刷新事件

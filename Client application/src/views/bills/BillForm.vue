@@ -431,10 +431,10 @@ const categories = ref([
 
 // 寝室成员
 const roomMembers = ref([
-  { id: 'user-1', name: '张三', role: '寝室长' },
-  { id: 'user-2', name: '李四', role: '成员' },
-  { id: 'user-3', name: '王五', role: '成员' },
-  { id: 'user-4', name: '赵六', role: '成员' }
+  { id: 'user-1', name: '张三', role: 'room_leader' },
+  { id: 'user-2', name: '李四', role: 'member' },
+  { id: 'user-3', name: '王五', role: 'member' },
+  { id: 'user-4', name: '赵六', role: 'member' }
 ])
 
 // 选中的参与者

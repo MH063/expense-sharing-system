@@ -261,7 +261,7 @@ export const useUserStore = defineStore('user', () => {
     if (!user.value) return false
     
     // 管理员和系统管理员拥有所有权限
-    if (user.value.role === '管理员' || user.value.role === '系统管理员') return true
+    if (user.value.role === 'admin' || user.value.role === 'sysadmin') return true
     
     // 检查用户权限列表
     return user.value.permissions?.includes(permission) || false

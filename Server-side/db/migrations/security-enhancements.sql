@@ -140,7 +140,7 @@ INSERT INTO roles (name, description, level, is_system) VALUES
   ('管理员', '具有角色分配、权限管理和角色申请审批权限', 90, true),
   ('寝室长', '具有本寝室相关功能的完全控制权限', 50, true),
   ('缴费人', '具有本寝室费用记录的完全控制权限', 40, true),
-  ('普通用户', '具有基础查看权限', 10, true)
+  ('用户', '具有基础查看权限', 10, true)
 ON CONFLICT (name) DO NOTHING;
 
 -- ==================== 插入默认权限 ====================
@@ -323,11 +323,11 @@ AND p.code IN (
 )
 ON CONFLICT DO NOTHING;
 
--- 普通用户:基础权限
+-- 用户:基础权限
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r, permissions p
-WHERE r.name = '普通用户'
+WHERE r.name = '用户'
 AND p.code IN (
   -- 用户基础权限
   'user.login', 'user.logout', 'user.profile.view', 'user.profile.edit', 'user.password.change',

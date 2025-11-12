@@ -565,7 +565,7 @@ const formatTime = (timestamp) => {
  * 查看所有活动
  */
 const viewAllActivities = () => {
-  router.push('/notifications')
+  router.push('/notifications/center')
 }
 
 /**

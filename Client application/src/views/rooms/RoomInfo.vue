@@ -474,14 +474,17 @@ const canDeleteRoom = computed(() => {
 })
 
 // 获取角色显示名称
-const getRoleDisplayName = (role) => {
-  const roleMap = {
-    admin: '管理员',
-    room_leader: '寝室长',
-    member: '成员'
+  const getRoleDisplayName = (role) => {
+    const roleMap = {
+      admin: '管理员',
+      sysadmin: '系统管理员',
+      room_leader: '寝室长',
+      room_owner: '寝室长',
+      payer: '缴费人',
+      member: '成员'
+    }
+    return roleMap[role] || '成员'
   }
-  return roleMap[role] || '成员'
-}
 
 // 格式化日期
 const formatDate = (timestamp) => {

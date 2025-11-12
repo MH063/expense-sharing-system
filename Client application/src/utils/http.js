@@ -114,6 +114,18 @@ http.interceptors.request.use(
   }
 )
 
+// Token刷新函数定义
+const refreshTokenFunction = async () => {
+  const response = await http.post('/auth/refresh-token')
+  const res = response.data
+  if (res.success && res.data) {
+    tokenManager.setToken(res.data.accessToken)
+    tokenManager.setRefreshToken(res.data.refreshToken)
+    return res.data
+  }
+  throw new Error('刷新token失败')
+}
+
 // 响应拦截器
 http.interceptors.response.use(
   (response) => {
@@ -163,7 +175,7 @@ http.interceptors.response.use(
     }
     return { ...normalized, data: envelope }
   },
-  (error) => {
+  async (error) => {
     console.error('[HTTP响应错误]', error)
 
     if (error.response) {
@@ -175,11 +187,25 @@ http.interceptors.response.use(
           if (error.config && error.config.url === '/auth/login') {
             break
           }
-          // 未授权，尝试刷新token
-          tokenManager.refreshToken().catch(() => {
+          // 未授权，尝试刷新token并重试原请求
+          if (!error.config._retry) {
+            error.config._retry = true
+            try {
+              await tokenManager.refreshToken(refreshTokenFunction)
+              // 更新请求头中的token
+              error.config.headers.Authorization = `Bearer ${tokenManager.getToken()}`
+              // 重试原请求
+              return http(error.config)
+            } catch (refreshError) {
+              console.error('Token刷新失败:', refreshError)
+              tokenManager.removeToken()
+              window.location.href = '/login'
+            }
+          } else {
+            // 已经重试过一次，直接跳转登录
             tokenManager.removeToken()
             window.location.href = '/login'
-          })
+          }
           break
         case 403:
           ElMessage.error('您没有权限执行此操作')

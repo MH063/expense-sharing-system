@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import http from '@/api/http'
 import websocketClient from '@/utils/websocket-client'
-import tokenManager from '@/utils/jwt-token-manager'
+import tokenManager from '@/utils/token-manager'
 
 export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref(null)
@@ -50,21 +50,28 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const initializeAuth = () => {
     try {
+      console.log('=== 认证状态初始化开始 ===')
       // 初始化Token管理器
       tokenManager.init()
       
       // 获取当前用户名
       const currentUsername = tokenManager.getCurrentUser()
+      console.log('当前用户名:', currentUsername)
       
       // 从Token管理器获取Token
       const token = tokenManager.getToken()
       const refreshTkn = tokenManager.getRefreshToken()
+      console.log('获取到的Token:', !!token, '获取到的RefreshToken:', !!refreshTkn)
+      console.log('Token内容:', token)
       
       if (token) {
         accessToken.value = token
+        console.log('设置accessToken完成')
         
         // 解析Token获取用户信息
         const payload = tokenManager.parseToken(token)
+        console.log('Token解析结果:', payload)
+        
         if (payload) {
           currentUser.value = {
             id: payload.sub,
@@ -75,9 +82,13 @@ export const useAuthStore = defineStore('auth', () => {
           }
           roles.value = Array.isArray(payload.roles) ? payload.roles : []
           permissions.value = Array.isArray(payload.permissions) ? payload.permissions : []
+          console.log('标准Token解析，设置currentUser:', currentUser.value)
+          console.log('设置roles数组:', roles.value)
         } else {
+          console.log('Token解析失败，检查是否为模拟Token')
           // 如果是模拟Token，创建默认用户信息
           if (token.startsWith('mock-jwt-token-')) {
+            console.log('检测到模拟Token，设置默认管理员用户信息')
             currentUser.value = {
               id: 1,
               username: currentUsername || 'user',
@@ -98,6 +109,10 @@ export const useAuthStore = defineStore('auth', () => {
             }
             roles.value = ['admin']
             permissions.value = ['all']
+            console.log('模拟Token设置完成:', currentUser.value)
+            console.log('设置roles数组:', roles.value)
+          } else {
+            console.log('非模拟Token且解析失败')
           }
         }
         
@@ -182,10 +197,7 @@ export const useAuthStore = defineStore('auth', () => {
         const currentUsername = tokenManager.getCurrentUser()
         
         // 更新Token管理器，支持多用户
-        tokenManager.setTokens({
-          token: newAccessToken,
-          refreshToken: newRefreshToken
-        }, currentUsername)
+        tokenManager.setTokens(newAccessToken, newRefreshToken, null, currentUsername)
         
         // 更新状态
         accessToken.value = newAccessToken
@@ -234,8 +246,8 @@ export const useAuthStore = defineStore('auth', () => {
         })
         
         // 处理后端返回的数据结构 {success: true, data: {xxx: []}}
-        if (res.success && res.payload) {
-          return response.data.data
+        if (res.success && res.data) {
+          return res.data
         } else {
           throw new Error(res.message || '刷新令牌失败')
         }
@@ -321,8 +333,22 @@ export const useAuthStore = defineStore('auth', () => {
         accessToken.value = token
         refreshToken.value = refreshTkn
         currentUser.value = userData
-        roles.value = Array.isArray(userData?.roles) ? userData.roles : []
-        permissions.value = Array.isArray(userData?.permissions) ? userData.permissions : []
+        
+        // 确保角色信息正确设置 - 优先从roles数组获取
+        if (Array.isArray(userData?.roles) && userData.roles.length > 0) {
+          roles.value = userData.roles
+        } else if (userData?.role) {
+          roles.value = [userData.role]
+        } else {
+          roles.value = []
+        }
+        
+        // 确保权限信息正确设置
+        if (Array.isArray(userData?.permissions)) {
+          permissions.value = userData.permissions
+        } else {
+          permissions.value = []
+        }
         
         // 设置Token管理器的刷新回调
         tokenManager.setRefreshCallback(refreshTokens)

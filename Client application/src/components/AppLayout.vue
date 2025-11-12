@@ -35,9 +35,7 @@
             <li class="nav-item" v-if="isAuthenticated">
               <router-link to="/rooms" class="nav-link">寝室</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated">
-              <router-link to="/notifications" class="nav-link">通知</router-link>
-            </li>
+
             <li class="nav-item" v-if="isAuthenticated">
               <router-link to="/notifications/center" class="nav-link">通知中心</router-link>
             </li>
@@ -54,7 +52,7 @@
           <!-- 用户菜单 -->
           <div class="user-menu" v-if="isAuthenticated">
             <div class="user-avatar" @click="toggleUserMenu">
-              <img :src="userAvatar" alt="用户头像" />
+              <img :src="userAvatarUrl" alt="用户头像" />
             </div>
             
             <div v-if="showUserMenu" class="user-dropdown">
@@ -137,6 +135,9 @@ import { useAuthStore } from '@/stores/auth'
 import NotificationsContainer from '@/components/NotificationsContainer.vue'
 import NotificationConnectionStatus from '@/components/NotificationConnectionStatus.vue'
 
+// 导入测试工具
+import { runFullRoleTest } from '@/utils/role-test'
+
 // 响应式数据
 const showUserMenu = ref(false)
 const authStore = useAuthStore()
@@ -145,24 +146,60 @@ const router = useRouter()
 // 计算属性
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const currentUser = computed(() => authStore.currentUser)
-const currentRole = computed(() => authStore.roles?.[0] || 'guest')
-const userAvatar = computed(() => {
-  return currentUser.value?.avatar || `https://picsum.photos/seed/${currentUser.value?.id || 'default'}/40/40.jpg`
-})
-const userRoleText = computed(() => {
-  // 使用认证store的角色信息
-  const role = currentRole.value
-  // 角色映射表
-  const roleMap = {
-    'admin': '管理员',
-    'system_admin': '系统管理员',
-    'super_admin': '超级管理员',
-    '寝室长': '寝室长',
-    'payer': '付款人',
-    'user': '普通用户'
+
+// 用户角色信息
+const currentRole = computed(() => {
+  console.log('=== 角色识别调试 ===')
+  console.log('authStore.roles:', authStore.roles)
+  console.log('authStore.currentUser:', authStore.currentUser)
+  console.log('authStore.currentUser?.role:', authStore.currentUser?.role)
+  
+  // 优先从认证store的roles获取
+  if (authStore.roles && authStore.roles.length > 0) {
+    const role = authStore.roles[0] // 取第一个角色
+    console.log('从roles数组获取角色:', role)
+    return role
   }
   
-  return roleMap[role] || '未知角色'
+  // 如果没有roles，尝试从currentUser获取
+  if (authStore.currentUser && authStore.currentUser.role) {
+    const role = authStore.currentUser.role
+    console.log('从currentUser.role获取角色:', role)
+    return role
+  }
+  
+  console.log('使用默认角色: user')
+  return 'user' // 默认角色
+})
+
+// 用户头像
+const userAvatarUrl = computed(() => {
+  return currentUser.value?.avatar || `https://picsum.photos/seed/${currentUser.value?.id || 'default'}/40/40.jpg`
+})
+
+// 用户角色文本
+const userRoleText = computed(() => {
+  console.log('=== 角色显示调试 ===')
+  console.log('currentRole.value:', currentRole.value)
+  
+  // 使用认证store的角色信息
+  const role = currentRole.value
+  // 完整的角色映射表
+  const roleMap = {
+    'admin': '管理员',
+    'sysadmin': '系统管理员',
+    'system_admin': '系统管理员', 
+    'room_leader': '寝室长',
+    'room_owner': '寝室长',
+    'payer': '缴费人',
+    'user': '用户',
+    'member': '成员',
+    'guest': '访客'
+  }
+  
+  const displayText = roleMap[role] || '未知角色'
+  console.log(`角色 ${role} 显示为: ${displayText}`)
+  return displayText
 })
 
 // 权限检查
@@ -194,6 +231,12 @@ const handleClickOutside = (event) => {
 // 生命周期
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  console.log('AppLayout组件已挂载，角色测试开始...')
+  // 进行角色识别测试
+  setTimeout(() => {
+    console.log('=== 执行角色识别测试 ===')
+    runFullRoleTest(authStore)
+  }, 1000) // 等待1秒后执行，确保认证状态已加载
 })
 
 onUnmounted(() => {

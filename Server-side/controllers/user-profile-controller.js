@@ -1912,8 +1912,7 @@ class UserProfileController {
 
       // 由于这是一个示例，我们返回模拟的角色数据
       const roles = [
-        { id: 1, name: 'user', description: '普通用户' },
-        { id: 2, name: 'premium', description: '高级用户' }
+        { id: 1, name: 'user', description: '用户' }
       ];
 
       return res.json({

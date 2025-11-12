@@ -202,7 +202,7 @@
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="inviteForm.role" placeholder="选择角色">
-            <el-option label="普通成员" value="member" />
+            <el-option label="成员" value="member" />
             <el-option label="管理员" value="admin" />
           </el-select>
         </el-form-item>
@@ -600,7 +600,7 @@ const changeMemberRole = async (member) => {
       cancelButtonText: '取消',
       inputType: 'select',
       inputOptions: [
-        { value: 'member', label: '普通成员' },
+        { value: 'member', label: '成员' },
         { value: 'admin', label: '管理员' }
       ],
       inputValue: member.role

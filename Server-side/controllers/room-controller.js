@@ -70,7 +70,7 @@ class RoomController {
         // 更新创建者的角色为寝室长
         await client.query(
           'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
-          ['寝室长', creatorId]
+          ['room_leader', creatorId]
         );
 
         await client.query('COMMIT');

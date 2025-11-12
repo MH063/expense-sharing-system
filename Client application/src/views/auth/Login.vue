@@ -16,16 +16,32 @@
               <div v-if="rememberedUsers.length > 0 && shouldShowQuickSelect" class="quick-select-bar">
                 <span class="quick-select-label">快速选择:</span>
                 <div class="quick-select-buttons">
-                  <button 
+                  <div 
                     v-for="user in rememberedUsers" 
                     :key="user.username"
-                    type="button"
-                    class="quick-select-btn"
-                    @click="selectRememberedUser(user.username)"
-                    :class="{ 'active': loginForm.username === user.username }"
+                    class="quick-select-item"
                   >
-                    {{ user.username }}
-                  </button>
+                    <button 
+                      type="button"
+                      class="quick-select-btn"
+                      @click="selectRememberedUser(user.username)"
+                      :class="{ 'active': loginForm.username === user.username }"
+                      :title="`最后登录: ${formatDate(user.lastLogin)}`"
+                    >
+                      {{ user.username }}
+                    </button>
+                    <button 
+                      type="button"
+                      class="delete-user-btn"
+                      @click.stop="removeUserFromRemembered(user.username)"
+                      :title="`删除记住的用户: ${user.username}`"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -35,13 +51,14 @@
                   id="username"
                   v-model="loginForm.username"
                   type="text"
-                  class="form-input"
+                  class="form-input with-icon"
                   :class="{ 'error': errors.username }"
                   placeholder="请输入用户名（可选择下方已记住的用户或手动输入）"
                   @input="onUsernameInput"
                   @focus="onUsernameFocus"
                   required
                 />
+                <i class="input-icon">👤</i>
                 <div v-if="rememberedUsers.length > 0" class="input-actions">
                   <button 
                     type="button"
@@ -70,11 +87,12 @@
                 id="password"
                 v-model="loginForm.password"
                 :type="showPassword ? 'text' : 'password'"
-                class="form-input"
+                class="form-input with-icon"
                 :class="{ 'error': errors.password }"
                 placeholder="请输入密码"
                 required
               />
+              <i class="input-icon">🔒</i>
               <button
                 type="button"
                 class="password-toggle"
@@ -85,8 +103,8 @@
                   <circle cx="12" cy="12" r="3"></circle>
                 </svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
                 </svg>
               </button>
             </div>
@@ -264,6 +282,40 @@ const addToRememberedUsers = (username) => {
     console.log('已更新记住的用户列表:', rememberedUsers.value)
   } catch (error) {
     console.error('更新记住的用户列表失败:', error)
+  }
+}
+
+// 删除记住的用户
+const removeUserFromRemembered = (username) => {
+  try {
+    // 从记住列表中移除用户
+    rememberedUsers.value = rememberedUsers.value.filter(user => user.username !== username)
+    
+    // 保存到本地存储
+    localStorage.setItem('remembered_users', JSON.stringify(rememberedUsers.value))
+    
+    // 如果移除的是当前选中的用户，清空用户名
+    if (loginForm.username === username) {
+      loginForm.username = ''
+      loginForm.remember = false
+    }
+    
+    // 显示删除成功反馈
+    console.log(`已删除记住的用户: ${username}`)
+    
+    // 可以添加一个临时提示
+    const toast = document.createElement('div')
+    toast.className = 'delete-toast'
+    toast.textContent = `已删除记住的用户: ${username}`
+    document.body.appendChild(toast)
+    
+    // 2秒后移除提示
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 2000)
+    
+  } catch (error) {
+    console.error('删除记住的用户失败:', error)
   }
 }
 
@@ -467,48 +519,235 @@ const handleLogin = async () => {
 .quick-select-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 8px 12px;
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid rgba(106, 17, 203, 0.1);
+  border-radius: 8px;
   flex-wrap: wrap;
+  box-shadow: 0 2px 8px rgba(106, 17, 203, 0.08);
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.quick-select-bar:hover {
+  box-shadow: 0 4px 16px rgba(106, 17, 203, 0.12);
+  transform: translateY(-1px);
 }
 
 .quick-select-label {
-  font-size: 12px;
-  color: #6c757d;
-  font-weight: 500;
+  font-size: 13px;
+  color: #6a11cb;
+  font-weight: 600;
   white-space: nowrap;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .quick-select-buttons {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
+/* 渐入动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 快速选择项目容器 */
+.quick-select-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  animation: slideInRight 0.4s ease-out;
+}
+
 .quick-select-btn {
+  display: flex;
+  align-items: center;
   padding: 6px 12px;
-  background-color: white;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  font-size: 13px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border: 1px solid rgba(106, 17, 203, 0.1);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   color: #495057;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(106, 17, 203, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 用户头像占位符 */
+.quick-select-btn .user-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #6a11cb, #2575fc);
+  color: white;
+  border-radius: 50%;
+  font-size: 8px;
+  font-weight: bold;
+  margin-right: 6px;
+  box-shadow: 0 1px 3px rgba(106, 17, 203, 0.2);
+}
+
+.quick-select-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.5s ease;
+}
+
+.quick-select-btn:hover:before {
+  left: 100%;
 }
 
 .quick-select-btn:hover {
-  background-color: #e9ecef;
-  border-color: #adb5bd;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  border-color: #6a11cb;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(106, 17, 203, 0.25);
 }
 
 .quick-select-btn.active {
-  background-color: #6a11cb;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
   border-color: #6a11cb;
   color: white;
+  box-shadow: 0 2px 8px rgba(106, 17, 203, 0.3);
+}
+
+/* 按钮动画 */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 删除用户按钮样式 */
+.delete-user-btn {
+  margin-left: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 6px;
+  color: #dc3545;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: scale(0.8);
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.15);
+}
+
+.quick-select-item:hover .delete-user-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.delete-user-btn:hover {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  border-color: #dc3545;
+  color: white;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  animation: pulse 0.6s ease-in-out;
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+  0% {
+    transform: scale(1.1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+/* 删除成功提示样式 */
+.delete-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3);
+  z-index: 9999;
+  animation: slideInRight 0.4s ease, fadeOut 0.4s ease 1.6s forwards;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 4px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 添加成功图标 */
+.delete-toast:before {
+  content: '✓';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* 淡出动画 */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* 动画样式 */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* 输入框容器样式 */
@@ -516,25 +755,66 @@ const handleLogin = async () => {
   position: relative;
   display: flex;
   align-items: center;
+  margin-bottom: 20px;
 }
 
+/* 输入框图标样式 */
+.input-container .input-icon,
+.password-input .input-icon {
+  position: absolute;
+  left: 16px;
+  z-index: 2;
+  color: #6a11cb;
+  font-size: 18px;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+/* 带图标的美化输入框样式 */
+.input-container .form-input.with-icon,
+.password-input .form-input.with-icon {
+  padding-left: 50px;
+}
+
+/* 焦点时图标效果 */
+.form-input.with-icon:focus + .input-icon,
+.form-input.with-icon:focus ~ .input-icon {
+  color: #2575fc;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(37, 117, 252, 0.3));
+}
+
+/* 美化的输入框样式 */
 .form-input {
   width: 100%;
-  padding: 12px 40px 12px 15px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  padding: 16px 50px 16px 20px;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
   font-size: 16px;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  font-weight: 500;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(106, 17, 203, 0.08);
+  color: #333;
+}
+
+.form-input::placeholder {
+  color: #adb5bd;
+  font-weight: 400;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #6a11cb;
-  box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.1);
+  background: linear-gradient(135deg, #ffffff 0%, #fff5f5 100%);
+  box-shadow: 0 6px 20px rgba(106, 17, 203, 0.15);
+  transform: translateY(-2px);
 }
 
 .form-input.error {
   border-color: #e74c3c;
+  background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
 }
 
 /* 输入框操作按钮样式 */
@@ -590,6 +870,7 @@ const handleLogin = async () => {
   margin-top: 5px;
 }
 
+/* 密码输入框样式 */
 .password-input {
   position: relative;
   display: flex;

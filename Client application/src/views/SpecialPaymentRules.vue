@@ -157,9 +157,9 @@ export default {
         ]
       },
       ruleTypes: [
-        { value: 'self_only', label: '仅缴费人本人支付' },
+        { value: 'self_only', label: '仅payer本人支付' },
         { value: 'multiple_payers', label: '多人支付' },
-        { value: 'payer_to_payer', label: '缴费人之间支付' }
+        { value: 'payer_to_payer', label: 'payer之间支付' }
       ]
     };
   },
@@ -193,7 +193,7 @@ export default {
             id: 1,
             name: '电费仅本人支付',
             rule_type: 'self_only',
-            description: '电费只能由缴费人本人支付',
+            description: '电费只能由payer本人支付',
             priority: 1,
             is_active: true,
             creator_name: '张三',
@@ -221,7 +221,7 @@ export default {
             id: 3,
             name: '大额费用可转移',
             rule_type: 'payer_to_payer',
-            description: '超过200元的费用允许缴费人之间转移',
+            description: '超过200元的费用允许payer之间转移',
             priority: 3,
             is_active: false,
             creator_name: '王五',

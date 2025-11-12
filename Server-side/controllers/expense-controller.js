@@ -2719,6 +2719,1456 @@ class ExpenseController {
       client.release();
     }
   }
+
+  // 获取费用趋势数据
+  async getExpenseTrends(req, res) {
+    const startTime = Date.now();
+    const requestId = `expense-trends-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { 
+        period = 'month', 
+        roomId, 
+        startDate, 
+        endDate 
+      } = req.query;
+      
+      logger.info(`[${requestId}] 开始获取费用趋势数据`, {
+        requestId,
+        period,
+        roomId,
+        startDate,
+        endDate
+      });
+
+      // 构建日期范围查询条件
+      let dateFilter = '';
+      const queryParams = [];
+      
+      if (startDate) {
+        dateFilter += ` AND expense_date >= $${queryParams.length + 1}`;
+        queryParams.push(startDate);
+      }
+      
+      if (endDate) {
+        dateFilter += ` AND expense_date <= $${queryParams.length + 1}`;
+        queryParams.push(endDate);
+      }
+
+      // 如果指定了roomId，只查询该寝室的数据
+      let roomFilter = '';
+      if (roomId) {
+        roomFilter += ` AND room_id = $${queryParams.length + 1}`;
+        queryParams.push(roomId);
+      }
+
+      // 根据时间周期分组
+      let dateGroupBy = '';
+      switch (period) {
+        case 'week':
+          dateGroupBy = "DATE_TRUNC('week', expense_date)";
+          break;
+        case 'month':
+          dateGroupBy = "DATE_TRUNC('month', expense_date)";
+          break;
+        case 'quarter':
+          dateGroupBy = "DATE_TRUNC('quarter', expense_date)";
+          break;
+        case 'year':
+          dateGroupBy = "DATE_TRUNC('year', expense_date)";
+          break;
+        default:
+          dateGroupBy = "DATE_TRUNC('month', expense_date)";
+      }
+
+      const query = `
+        SELECT 
+          ${dateGroupBy} as period,
+          SUM(amount) as total_amount,
+          COUNT(*) as expense_count,
+          AVG(amount) as avg_amount
+        FROM expenses
+        WHERE status != 'deleted'
+        ${dateFilter}
+        ${roomFilter}
+        GROUP BY ${dateGroupBy}
+        ORDER BY period ASC
+      `;
+
+      const result = await pool.query(query, queryParams);
+
+      // 处理趋势数据，转换为前端需要的格式
+      const trends = result.rows.map(row => ({
+        period: row.period,
+        totalAmount: parseFloat(row.total_amount),
+        expenseCount: parseInt(row.expense_count),
+        avgAmount: parseFloat(row.avg_amount)
+      }));
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用趋势数据成功`, {
+        requestId,
+        period,
+        roomId,
+        dataPoints: trends.length,
+        duration
+      });
+
+      res.success(200, '获取费用趋势数据成功', {
+        trends,
+        period,
+        roomId,
+        startDate,
+        endDate
+      });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用趋势数据失败`, {
+        requestId,
+        period: req.query.period,
+        roomId: req.query.roomId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 获取费用分类统计
+  async getExpenseCategoryStats(req, res) {
+    const startTime = Date.now();
+    const requestId = `expense-category-stats-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { 
+        roomId, 
+        startDate, 
+        endDate 
+      } = req.query;
+      
+      logger.info(`[${requestId}] 开始获取费用分类统计`, {
+        requestId,
+        roomId,
+        startDate,
+        endDate
+      });
+
+      // 构建查询条件
+      let dateFilter = '';
+      const queryParams = [];
+      
+      if (startDate) {
+        dateFilter += ` AND expense_date >= $${queryParams.length + 1}`;
+        queryParams.push(startDate);
+      }
+      
+      if (endDate) {
+        dateFilter += ` AND expense_date <= $${queryParams.length + 1}`;
+        queryParams.push(endDate);
+      }
+
+      let roomFilter = '';
+      if (roomId) {
+        roomFilter += ` AND room_id = $${queryParams.length + 1}`;
+        queryParams.push(roomId);
+      }
+
+      // 统计各分类的数据
+      const query = `
+        SELECT 
+          COALESCE(category, '未分类') as category,
+          SUM(amount) as total_amount,
+          COUNT(*) as expense_count,
+          AVG(amount) as avg_amount,
+          MIN(amount) as min_amount,
+          MAX(amount) as max_amount
+        FROM expenses
+        WHERE status != 'deleted'
+        ${dateFilter}
+        ${roomFilter}
+        GROUP BY category
+        ORDER BY total_amount DESC
+      `;
+
+      const result = await pool.query(query, queryParams);
+
+      // 处理统计数据，转换为前端需要的格式
+      const categories = result.rows.map(row => ({
+        category: row.category,
+        totalAmount: parseFloat(row.total_amount),
+        expenseCount: parseInt(row.expense_count),
+        avgAmount: parseFloat(row.avg_amount),
+        minAmount: parseFloat(row.min_amount),
+        maxAmount: parseFloat(row.max_amount),
+        percentage: 0 // 将在后面计算
+      }));
+
+      // 计算总金额和百分比
+      const totalAmount = categories.reduce((sum, cat) => sum + cat.totalAmount, 0);
+      categories.forEach(cat => {
+        cat.percentage = totalAmount > 0 ? (cat.totalAmount / totalAmount * 100) : 0;
+      });
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用分类统计成功`, {
+        requestId,
+        roomId,
+        categoryCount: categories.length,
+        totalAmount,
+        duration
+      });
+
+      res.success(200, '获取费用分类统计成功', {
+        categories,
+        summary: {
+          totalAmount,
+          totalCount: categories.reduce((sum, cat) => sum + cat.expenseCount, 0),
+          categoryCount: categories.length
+        },
+        roomId,
+        startDate,
+        endDate
+      });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用分类统计失败`, {
+        requestId,
+        roomId: req.query.roomId,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 获取寝室成员列表
+  async getRoomMembers(req, res) {
+    const startTime = Date.now();
+    const requestId = `get-room-members-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { room_id } = req.params;
+      const userId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始获取寝室成员列表`, {
+        requestId,
+        roomId: room_id,
+        userId
+      });
+
+      // 验证用户是否是该寝室的成员
+      const membershipResult = await pool.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, room_id]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取寝室成员列表失败: 用户不是该寝室的成员`, {
+          requestId,
+          roomId: room_id,
+          userId
+        });
+        
+        return res.error(403, '您不是该寝室的成员');
+      }
+
+      // 获取寝室成员列表
+      const membersResult = await pool.query(
+        `SELECT u.id, u.username, u.name, u.email, u.phone, 
+                r.role as room_role, r.joined_at,
+                COALESCE(es.paid_count, 0) as expense_count,
+                COALESCE(es.total_paid, 0) as total_paid
+         FROM users u
+         JOIN user_room_relations r ON u.id = r.user_id
+         LEFT JOIN (
+           SELECT 
+             user_id,
+             COUNT(*) as paid_count,
+             SUM(amount) as total_paid
+           FROM expense_splits 
+           WHERE is_paid = TRUE
+           GROUP BY user_id
+         ) es ON u.id = es.user_id
+         WHERE r.room_id = $1 AND r.is_active = TRUE
+         ORDER BY r.joined_at ASC`,
+        [room_id]
+      );
+
+      const members = membersResult.rows.map(row => ({
+        id: row.id,
+        username: row.username,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        roomRole: row.room_role,
+        joinedAt: row.joined_at,
+        expenseCount: parseInt(row.expense_count),
+        totalPaid: parseFloat(row.total_paid)
+      }));
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取寝室成员列表成功`, {
+        requestId,
+        roomId: room_id,
+        memberCount: members.length,
+        duration
+      });
+
+      res.success(200, '获取寝室成员列表成功', {
+        members,
+        roomId: room_id,
+        totalMembers: members.length
+      });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取寝室成员列表失败`, {
+        requestId,
+        roomId: req.params.room_id,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 获取费用统计
+  async getExpenseStats(req, res) {
+    const startTime = Date.now();
+    const requestId = `get-expense-stats-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { roomId } = req.params;
+      const userId = req.user.sub;
+      const { start_date, end_date } = req.query;
+      
+      logger.info(`[${requestId}] 开始获取费用统计`, {
+        requestId,
+        roomId,
+        userId,
+        start_date,
+        end_date
+      });
+
+      // 验证用户是否是该寝室的成员
+      const membershipResult = await pool.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, roomId]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用统计失败: 用户不是该寝室的成员`, {
+          requestId,
+          roomId,
+          userId
+        });
+        
+        return res.error(403, '您不是该寝室的成员');
+      }
+
+      // 构建日期过滤条件
+      let dateFilter = '';
+      const queryParams = [roomId];
+      
+      if (start_date) {
+        dateFilter += ` AND expense_date >= $${queryParams.length + 1}`;
+        queryParams.push(start_date);
+      }
+      
+      if (end_date) {
+        dateFilter += ` AND expense_date <= $${queryParams.length + 1}`;
+        queryParams.push(end_date);
+      }
+
+      // 获取费用统计
+      const statsQuery = `
+        SELECT 
+          COUNT(*) as total_expenses,
+          SUM(amount) as total_amount,
+          AVG(amount) as avg_amount,
+          MIN(amount) as min_amount,
+          MAX(amount) as max_amount,
+          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
+          COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+          COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count
+        FROM expenses
+        WHERE room_id = $1 ${dateFilter}
+      `;
+
+      const result = await pool.query(statsQuery, queryParams);
+      const stats = result.rows[0];
+
+      // 获取按类型统计的数据
+      const typeStatsQuery = `
+        SELECT 
+          et.name as type_name,
+          COUNT(*) as expense_count,
+          SUM(e.amount) as total_amount,
+          AVG(e.amount) as avg_amount
+        FROM expenses e
+        JOIN expense_types et ON e.expense_type_id = et.id
+        WHERE e.room_id = $1 ${dateFilter}
+        GROUP BY et.id, et.name
+        ORDER BY total_amount DESC
+      `;
+
+      const typeStatsResult = await pool.query(typeStatsQuery, [roomId]);
+      const typeStats = typeStatsResult.rows.map(row => ({
+        typeName: row.type_name,
+        expenseCount: parseInt(row.expense_count),
+        totalAmount: parseFloat(row.total_amount),
+        avgAmount: parseFloat(row.avg_amount)
+      }));
+
+      const response = {
+        overview: {
+          totalExpenses: parseInt(stats.total_expenses),
+          totalAmount: parseFloat(stats.total_amount) || 0,
+          avgAmount: parseFloat(stats.avg_amount) || 0,
+          minAmount: parseFloat(stats.min_amount) || 0,
+          maxAmount: parseFloat(stats.max_amount) || 0,
+          completedCount: parseInt(stats.completed_count),
+          pendingCount: parseInt(stats.pending_count),
+          cancelledCount: parseInt(stats.cancelled_count)
+        },
+        byType: typeStats,
+        roomId,
+        startDate: start_date,
+        endDate: end_date
+      };
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用统计成功`, {
+        requestId,
+        roomId,
+        totalExpenses: response.overview.totalExpenses,
+        totalAmount: response.overview.totalAmount,
+        duration
+      });
+
+      res.success(200, '获取费用统计成功', response);
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用统计失败`, {
+        requestId,
+        roomId: req.params.roomId,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 确认分摊
+  async confirmSplitPayment(req, res) {
+    const startTime = Date.now();
+    const requestId = `confirm-split-payment-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await pool.connect();
+    
+    try {
+      const { expenseId } = req.params;
+      const userId = req.user.sub;
+      const { split_id, payment_method, transaction_id } = req.body;
+      
+      logger.info(`[${requestId}] 开始确认分摊支付`, {
+        requestId,
+        expenseId,
+        splitId: split_id,
+        userId,
+        payment_method,
+        transaction_id
+      });
+
+      // 验证必填字段
+      if (!payment_method || !transaction_id) {
+        logger.warn(`[${requestId}] 确认分摊支付失败: 缺少必填字段`, {
+          requestId,
+          expenseId,
+          splitId: split_id,
+          userId
+        });
+        
+        return res.error(400, '请提供支付方式和交易ID');
+      }
+
+      // 开始事务
+      await client.query('BEGIN');
+
+      // 验证分摊记录是否存在且属于当前用户
+      const splitCheck = await client.query(
+        `SELECT es.*, e.title, e.amount as expense_amount
+         FROM expense_splits es
+         JOIN expenses e ON es.expense_id = e.id
+         WHERE es.id = $1 AND es.expense_id = $2 AND es.user_id = $3`,
+        [split_id, expenseId, userId]
+      );
+
+      if (splitCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        logger.warn(`[${requestId}] 确认分摊支付失败: 分摊记录不存在或无权操作`, {
+          requestId,
+          expenseId,
+          splitId: split_id,
+          userId
+        });
+        
+        return res.error(404, '分摊记录不存在或无权操作');
+      }
+
+      const split = splitCheck.rows[0];
+
+      // 更新分摊记录状态
+      const updateResult = await client.query(
+        `UPDATE expense_splits 
+         SET is_paid = TRUE, 
+             paid_date = NOW(), 
+             payment_method = $1, 
+             transaction_id = $2,
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [payment_method, transaction_id, split_id]
+      );
+
+      // 记录支付信息
+      const paymentResult = await client.query(
+        `INSERT INTO expense_payments 
+         (expense_id, user_id, split_id, amount, payment_method, transaction_id, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'completed', NOW(), NOW())
+         RETURNING *`,
+        [expenseId, userId, split_id, split.amount, payment_method, transaction_id]
+      );
+
+      await client.query('COMMIT');
+
+      const response = {
+        split: updateResult.rows[0],
+        payment: paymentResult.rows[0]
+      };
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 确认分摊支付成功`, {
+        requestId,
+        expenseId,
+        splitId: split_id,
+        amount: split.amount,
+        duration
+      });
+
+      res.success(200, '确认分摊支付成功', response);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 确认分摊支付失败`, {
+        requestId,
+        expenseId: req.params.expenseId,
+        splitId: req.body.split_id,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  // 智能计算分摊
+  async calculateSmartSplit(req, res) {
+    const startTime = Date.now();
+    const requestId = `calculate-smart-split-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { expenseId } = req.params;
+      const userId = req.user.sub;
+      const { split_method, members, preferences } = req.body;
+      
+      logger.info(`[${requestId}] 开始智能计算分摊`, {
+        requestId,
+        expenseId,
+        userId,
+        split_method,
+        members
+      });
+
+      // 验证费用是否存在
+      const expenseResult = await pool.query(
+        'SELECT * FROM expenses WHERE id = $1',
+        [expenseId]
+      );
+
+      if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 智能计算分摊失败: 费用不存在`, {
+          requestId,
+          expenseId
+        });
+        
+        return res.error(404, '费用不存在');
+      }
+
+      const expense = expenseResult.rows[0];
+
+      // 验证用户权限
+      const membershipResult = await pool.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, expense.room_id]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 智能计算分摊失败: 用户无权操作此费用`, {
+          requestId,
+          expenseId,
+          userId
+        });
+        
+        return res.error(403, '您无权操作此费用');
+      }
+
+      // 智能分摊计算逻辑
+      let splitResult = [];
+      const totalAmount = parseFloat(expense.amount);
+      
+      if (split_method === 'equal') {
+        // 平均分摊
+        const memberCount = members.length;
+        const baseAmount = Math.floor(totalAmount / memberCount * 100) / 100; // 保留两位小数
+        let remainingAmount = totalAmount;
+        
+        for (let i = 0; i < memberCount; i++) {
+          const amount = i === memberCount - 1 ? 
+            remainingAmount : baseAmount;
+          splitResult.push({
+            user_id: members[i],
+            amount: amount,
+            percentage: (amount / totalAmount * 100).toFixed(2)
+          });
+          remainingAmount -= amount;
+        }
+      } else if (split_method === 'by_area') {
+        // 按面积分摊（需要用户体重数据）
+        // 这里简化处理，实际应该从用户配置中获取
+        const memberCount = members.length;
+        const avgAmount = totalAmount / memberCount;
+        
+        for (const memberId of members) {
+          splitResult.push({
+            user_id: memberId,
+            amount: avgAmount,
+            percentage: (avgAmount / totalAmount * 100).toFixed(2)
+          });
+        }
+      } else if (split_method === 'percentage') {
+        // 按百分比分摊
+        let totalPercentage = 0;
+        
+        for (const member of members) {
+          const percentage = parseFloat(member.percentage);
+          const amount = (totalAmount * percentage / 100);
+          splitResult.push({
+            user_id: member.user_id,
+            amount: amount,
+            percentage: percentage.toFixed(2)
+          });
+          totalPercentage += percentage;
+        }
+        
+        // 调整误差，确保总和等于总金额
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+          const lastItem = splitResult[splitResult.length - 1];
+          lastItem.amount = totalAmount - splitResult
+            .slice(0, -1)
+            .reduce((sum, item) => sum + item.amount, 0);
+          lastItem.percentage = ((lastItem.amount / totalAmount) * 100).toFixed(2);
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 智能计算分摊成功`, {
+        requestId,
+        expenseId,
+        method: split_method,
+        memberCount: splitResult.length,
+        duration
+      });
+
+      res.success(200, '智能计算分摊成功', {
+        expense_id: expenseId,
+        split_method,
+        splits: splitResult,
+        total_amount: totalAmount,
+        calculated_at: new Date().toISOString()
+      });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 智能计算分摊失败`, {
+        requestId,
+        expenseId: req.params.expenseId,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 获取费用二维码
+  async getExpenseQrCode(req, res) {
+    const startTime = Date.now();
+    const requestId = `get-expense-qrcode-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { expenseId } = req.params;
+      const userId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始生成费用二维码`, {
+        requestId,
+        expenseId,
+        userId
+      });
+
+      // 验证费用是否存在
+      const expenseResult = await pool.query(
+        'SELECT * FROM expenses WHERE id = $1',
+        [expenseId]
+      );
+
+      if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 生成费用二维码失败: 费用不存在`, {
+          requestId,
+          expenseId
+        });
+        
+        return res.error(404, '费用不存在');
+      }
+
+      const expense = expenseResult.rows[0];
+
+      // 验证用户权限
+      const membershipResult = await pool.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, expense.room_id]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 生成费用二维码失败: 用户无权查看此费用`, {
+          requestId,
+          expenseId,
+          userId
+        });
+        
+        return res.error(403, '您无权查看此费用');
+      }
+
+      // 生成二维码内容（简化处理）
+      const qrData = {
+        expense_id: expenseId,
+        title: expense.title,
+        amount: expense.amount,
+        room_id: expense.room_id,
+        payer_id: expense.payer_id,
+        expense_date: expense.expense_date,
+        status: expense.status
+      };
+
+      // 将数据编码为URL参数（实际项目中应该使用专门的二维码库）
+      const qrContent = JSON.stringify(qrData);
+      const encodedData = Buffer.from(qrContent).toString('base64');
+      const qrUrl = `expense://pay?data=${encodedData}`;
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 生成费用二维码成功`, {
+        requestId,
+        expenseId,
+        userId,
+        duration
+      });
+
+      res.success(200, '获取费用二维码成功', {
+        expenseId,
+        qr_code_url: qrUrl,
+        qr_data: qrData,
+        expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24小时有效期
+      });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 生成费用二维码失败`, {
+        requestId,
+        expenseId: req.params.expenseId,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 创建费用分摊
+  async createExpenseSplit(req, res) {
+    const startTime = Date.now();
+    const requestId = `create-expense-split-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await pool.connect();
+    
+    try {
+      const { id: expenseId } = req.params;
+      const { splits } = req.body;
+      const userId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始创建费用分摊`, {
+        requestId,
+        expenseId,
+        userId,
+        splits
+      });
+
+      // 验证费用是否存在
+      const expenseResult = await client.query(
+        'SELECT * FROM expenses WHERE id = $1',
+        [expenseId]
+      );
+
+      if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 创建费用分摊失败: 费用不存在`, {
+          requestId,
+          expenseId
+        });
+        
+        return res.error(404, '费用不存在');
+      }
+
+      const expense = expenseResult.rows[0];
+
+      // 验证用户权限
+      const membershipResult = await client.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, expense.room_id]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 创建费用分摊失败: 用户无权操作此费用`, {
+          requestId,
+          expenseId,
+          userId
+        });
+        
+        return res.error(403, '您无权操作此费用');
+      }
+
+      // 验证分摊参数
+      if (!splits || !Array.isArray(splits) || splits.length === 0) {
+        logger.warn(`[${requestId}] 创建费用分摊失败: 无效的分摊参数`, {
+          requestId,
+          expenseId,
+          splits
+        });
+        
+        return res.error(400, '请提供有效的分摊参数');
+      }
+
+      // 开始事务
+      await client.query('BEGIN');
+
+      // 验证总金额
+      const totalAmount = splits.reduce((sum, split) => sum + parseFloat(split.amount), 0);
+      if (Math.abs(totalAmount - expense.amount) > 0.01) {
+        await client.query('ROLLBACK');
+        logger.warn(`[${requestId}] 创建费用分摊失败: 分摊金额不匹配`, {
+          requestId,
+          expenseId,
+          expenseAmount: expense.amount,
+          splitTotal: totalAmount
+        });
+        
+        return res.error(400, `分摊金额总和(${totalAmount})与费用金额(${expense.amount})不匹配`);
+      }
+
+      // 删除现有的分摊记录
+      await client.query('DELETE FROM expense_splits WHERE expense_id = $1', [expenseId]);
+
+      // 创建新的分摊记录
+      const createdSplits = [];
+      for (const split of splits) {
+        const result = await client.query(
+          `INSERT INTO expense_splits 
+           (expense_id, user_id, amount, split_type, is_paid, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, FALSE, NOW(), NOW())
+           RETURNING *`,
+          [expenseId, split.user_id, split.amount, split.split_type || 'equal']
+        );
+        createdSplits.push(result.rows[0]);
+      }
+
+      // 更新费用状态
+      await client.query(
+        'UPDATE expenses SET status = $1, updated_at = NOW() WHERE id = $2',
+        ['pending', expenseId]
+      );
+
+      await client.query('COMMIT');
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 创建费用分摊成功`, {
+        requestId,
+        expenseId,
+        splitCount: createdSplits.length,
+        duration
+      });
+
+      res.success(200, '创建费用分摊成功', {
+        expense_id: expenseId,
+        splits: createdSplits
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 创建费用分摊失败`, {
+        requestId,
+        expenseId: req.params.id,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  // 获取费用分摊记录
+  async getExpenseSplits(req, res) {
+    const startTime = Date.now();
+    const requestId = `get-expense-splits-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { expenseId } = req.params;
+      const userId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始获取费用分摊记录`, {
+        requestId,
+        expenseId,
+        userId
+      });
+
+      // 验证费用是否存在
+      const expenseResult = await pool.query(
+        'SELECT * FROM expenses WHERE id = $1',
+        [expenseId]
+      );
+
+      if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用分摊记录失败: 费用不存在`, {
+          requestId,
+          expenseId
+        });
+        
+        return res.error(404, '费用不存在');
+      }
+
+      const expense = expenseResult.rows[0];
+
+      // 验证用户权限
+      const membershipResult = await pool.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [userId, expense.room_id]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取费用分摊记录失败: 用户无权查看此费用`, {
+          requestId,
+          expenseId,
+          userId
+        });
+        
+        return res.error(403, '您无权查看此费用');
+      }
+
+      // 获取分摊记录
+      const splitsResult = await pool.query(
+        `SELECT es.*, u.username, u.name as user_name, u.avatar_url
+         FROM expense_splits es
+         JOIN users u ON es.user_id = u.id
+         WHERE es.expense_id = $1
+         ORDER BY es.created_at ASC`,
+        [expenseId]
+      );
+
+      const splits = splitsResult.rows.map(row => ({
+        id: row.id,
+        expenseId: row.expense_id,
+        userId: row.user_id,
+        username: row.username,
+        userName: row.user_name,
+        avatarUrl: row.avatar_url,
+        amount: parseFloat(row.amount),
+        splitType: row.split_type,
+        isPaid: row.is_paid,
+        paidDate: row.paid_date,
+        paymentMethod: row.payment_method,
+        transactionId: row.transaction_id,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取费用分摊记录成功`, {
+        requestId,
+        expenseId,
+        splitCount: splits.length,
+        duration
+      });
+
+      res.success(200, '获取费用分摊记录成功', {
+        expense: {
+          id: expense.id,
+          title: expense.title,
+          amount: parseFloat(expense.amount),
+          status: expense.status
+        },
+        splits,
+        totalSplits: splits.length,
+        paidSplits: splits.filter(s => s.isPaid).length
+      });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取费用分摊记录失败`, {
+        requestId,
+        expenseId: req.params.expenseId,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 获取用户费用分摊记录
+  async getUserExpenseSplit(req, res) {
+    const startTime = Date.now();
+    const requestId = `get-user-expense-split-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    try {
+      const { expenseId, userId: targetUserId } = req.params;
+      const currentUserId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始获取用户费用分摊记录`, {
+        requestId,
+        expenseId,
+        targetUserId,
+        currentUserId
+      });
+
+      // 验证费用是否存在
+      const expenseResult = await pool.query(
+        'SELECT * FROM expenses WHERE id = $1',
+        [expenseId]
+      );
+
+      if (expenseResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取用户费用分摊记录失败: 费用不存在`, {
+          requestId,
+          expenseId
+        });
+        
+        return res.error(404, '费用不存在');
+      }
+
+      const expense = expenseResult.rows[0];
+
+      // 验证当前用户权限
+      const membershipResult = await pool.query(
+        'SELECT * FROM user_room_relations WHERE user_id = $1 AND room_id = $2 AND is_active = TRUE',
+        [currentUserId, expense.room_id]
+      );
+
+      if (membershipResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取用户费用分摊记录失败: 当前用户无权查看此费用`, {
+          requestId,
+          expenseId,
+          currentUserId
+        });
+        
+        return res.error(403, '您无权查看此费用');
+      }
+
+      // 获取指定用户的分摊记录
+      const splitResult = await pool.query(
+        `SELECT es.*, u.username, u.name as user_name, u.avatar_url,
+                p.title as expense_title, p.amount as expense_amount
+         FROM expense_splits es
+         JOIN users u ON es.user_id = u.id
+         JOIN expenses p ON es.expense_id = p.id
+         WHERE es.expense_id = $1 AND es.user_id = $2`,
+        [expenseId, targetUserId]
+      );
+
+      if (splitResult.rows.length === 0) {
+        logger.warn(`[${requestId}] 获取用户费用分摊记录失败: 分摊记录不存在`, {
+          requestId,
+          expenseId,
+          targetUserId
+        });
+        
+        return res.error(404, '用户分摊记录不存在');
+      }
+
+      const split = splitResult.rows[0];
+
+      const response = {
+        split: {
+          id: split.id,
+          expenseId: split.expense_id,
+          userId: split.user_id,
+          username: split.username,
+          userName: split.user_name,
+          avatarUrl: split.avatar_url,
+          amount: parseFloat(split.amount),
+          splitType: split.split_type,
+          isPaid: split.is_paid,
+          paidDate: split.paid_date,
+          paymentMethod: split.payment_method,
+          transactionId: split.transaction_id,
+          createdAt: split.created_at,
+          updatedAt: split.updated_at
+        },
+        expense: {
+          id: split.expense_id,
+          title: split.expense_title,
+          amount: parseFloat(split.expense_amount)
+        }
+      };
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 获取用户费用分摊记录成功`, {
+        requestId,
+        expenseId,
+        targetUserId,
+        amount: split.amount,
+        isPaid: split.is_paid,
+        duration
+      });
+
+      res.success(200, '获取用户费用分摊记录成功', response);
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 获取用户费用分摊记录失败`, {
+        requestId,
+        expenseId: req.params.expenseId,
+        targetUserId: req.params.userId,
+        currentUserId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    }
+  }
+
+  // 确认分摊
+  async confirmSplit(req, res) {
+    const startTime = Date.now();
+    const requestId = `confirm-split-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await pool.connect();
+    
+    try {
+      const { splitId } = req.params;
+      const userId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始确认分摊`, {
+        requestId,
+        splitId,
+        userId
+      });
+
+      // 开始事务
+      await client.query('BEGIN');
+
+      // 验证分摊记录是否存在且属于当前用户
+      const splitCheck = await client.query(
+        `SELECT es.*, e.title, e.room_id, e.status as expense_status
+         FROM expense_splits es
+         JOIN expenses e ON es.expense_id = e.id
+         WHERE es.id = $1 AND es.user_id = $2`,
+        [splitId, userId]
+      );
+
+      if (splitCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        logger.warn(`[${requestId}] 确认分摊失败: 分摊记录不存在或无权操作`, {
+          requestId,
+          splitId,
+          userId
+        });
+        
+        return res.error(404, '分摊记录不存在或无权操作');
+      }
+
+      const split = splitCheck.rows[0];
+
+      // 如果已经确认过，返回错误
+      if (split.is_paid) {
+        await client.query('ROLLBACK');
+        logger.warn(`[${requestId}] 确认分摊失败: 分摊已经确认`, {
+          requestId,
+          splitId,
+          userId
+        });
+        
+        return res.error(400, '分摊已经确认');
+      }
+
+      // 更新分摊状态
+      const updateResult = await client.query(
+        `UPDATE expense_splits 
+         SET is_paid = TRUE, 
+             paid_date = NOW(),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [splitId]
+      );
+
+      await client.query('COMMIT');
+
+      const updatedSplit = updateResult.rows[0];
+      const response = {
+        split: {
+          id: updatedSplit.id,
+          expenseId: updatedSplit.expense_id,
+          userId: updatedSplit.user_id,
+          amount: parseFloat(updatedSplit.amount),
+          splitType: updatedSplit.split_type,
+          isPaid: updatedSplit.is_paid,
+          paidDate: updatedSplit.paid_date,
+          createdAt: updatedSplit.created_at,
+          updatedAt: updatedSplit.updated_at
+        },
+        expense: {
+          id: split.expense_id,
+          title: split.title,
+          status: split.expense_status
+        }
+      };
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 确认分摊成功`, {
+        requestId,
+        splitId,
+        userId,
+        amount: split.amount,
+        duration
+      });
+
+      res.success(200, '确认分摊成功', response);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 确认分摊失败`, {
+        requestId,
+        splitId: req.params.splitId,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    } finally {
+      client.release();
+    }
+  }
+
+  // 结算分摊
+  async settleSplit(req, res) {
+    const startTime = Date.now();
+    const requestId = `settle-split-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await pool.connect();
+    
+    try {
+      const { splitId } = req.params;
+      const { settlement_method, notes } = req.body;
+      const userId = req.user.sub;
+      
+      logger.info(`[${requestId}] 开始结算分摊`, {
+        requestId,
+        splitId,
+        userId,
+        settlement_method,
+        notes
+      });
+
+      // 验证必填字段
+      if (!settlement_method) {
+        logger.warn(`[${requestId}] 结算分摊失败: 缺少必填字段`, {
+          requestId,
+          splitId,
+          userId
+        });
+        
+        return res.error(400, '请提供结算方式');
+      }
+
+      // 开始事务
+      await client.query('BEGIN');
+
+      // 验证分摊记录是否存在且属于当前用户
+      const splitCheck = await client.query(
+        `SELECT es.*, e.title, e.room_id, e.status as expense_status,
+                payer.name as payer_name
+         FROM expense_splits es
+         JOIN expenses e ON es.expense_id = e.id
+         JOIN users payer ON e.payer_id = payer.id
+         WHERE es.id = $1 AND es.user_id = $2`,
+        [splitId, userId]
+      );
+
+      if (splitCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        logger.warn(`[${requestId}] 结算分摊失败: 分摊记录不存在或无权操作`, {
+          requestId,
+          splitId,
+          userId
+        });
+        
+        return res.error(404, '分摊记录不存在或无权操作');
+      }
+
+      const split = splitCheck.rows[0];
+
+      // 验证分摊状态
+      if (!split.is_paid) {
+        await client.query('ROLLBACK');
+        logger.warn(`[${requestId}] 结算分摊失败: 分摊未确认支付`, {
+          requestId,
+          splitId,
+          userId
+        });
+        
+        return res.error(400, '请先确认支付再进行结算');
+      }
+
+      // 更新分摊记录状态为已结算
+      const updateResult = await client.query(
+        `UPDATE expense_splits 
+         SET is_settled = TRUE,
+             settlement_method = $1,
+             settlement_notes = $2,
+             settled_date = NOW(),
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [settlement_method, notes || '', splitId]
+      );
+
+      await client.query('COMMIT');
+
+      const updatedSplit = updateResult.rows[0];
+      const response = {
+        split: {
+          id: updatedSplit.id,
+          expenseId: updatedSplit.expense_id,
+          userId: updatedSplit.user_id,
+          amount: parseFloat(updatedSplit.amount),
+          splitType: updatedSplit.split_type,
+          isPaid: updatedSplit.is_paid,
+          isSettled: updatedSplit.is_settled,
+          paidDate: updatedSplit.paid_date,
+          settlementMethod: updatedSplit.settlement_method,
+          settlementNotes: updatedSplit.settlement_notes,
+          settledDate: updatedSplit.settled_date,
+          createdAt: updatedSplit.created_at,
+          updatedAt: updatedSplit.updated_at
+        },
+        expense: {
+          id: split.expense_id,
+          title: split.title,
+          status: split.expense_status,
+          payerName: split.payer_name
+        }
+      };
+
+      const duration = Date.now() - startTime;
+      
+      logger.info(`[${requestId}] 结算分摊成功`, {
+        requestId,
+        splitId,
+        userId,
+        amount: split.amount,
+        settlement_method,
+        duration
+      });
+
+      res.success(200, '结算分摊成功', response);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      const duration = Date.now() - startTime;
+      
+      logger.error(`[${requestId}] 结算分摊失败`, {
+        requestId,
+        splitId: req.params.splitId,
+        userId: req.user.sub,
+        error: error.message,
+        stack: error.stack,
+        duration
+      });
+      
+      res.error(500, '服务器内部错误', error.message);
+    } finally {
+      client.release();
+    }
+  }
 }
 
 module.exports = new ExpenseController();

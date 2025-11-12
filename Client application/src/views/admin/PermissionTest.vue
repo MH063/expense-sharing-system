@@ -252,7 +252,7 @@ export default {
       const roleLabels = {
         [ROLES.ADMIN]: '管理员',
         [ROLES.ROOM_OWNER]: '寝室长',
-        [ROLES.ROOM_MEMBER]: '寝室成员',
+        [ROLES.ROOM_MEMBER]: '成员',
         [ROLES.GUEST]: '访客'
       }
       return roleLabels[role] || '未知角色'

@@ -184,7 +184,7 @@ const adminValidationRules = {
     body('role')
       .exists({ checkFalsy: true }).withMessage('角色为必填项')
       .isString().withMessage('角色必须是字符串')
-      .isIn(['system_admin', 'admin', '寝室长', 'payer', 'user']).withMessage('角色值无效')
+      .isIn(['system_admin', 'admin', 'room_leader', 'payer', 'user']).withMessage('角色值无效')
   ],
   
   // 获取用户详情验证规则
@@ -214,7 +214,7 @@ const adminValidationRules = {
       .isLength({ max: 100 }).withMessage('显示名称不能超过100个字符'),
     body('role')
       .optional()
-      .isIn(['system_admin', 'admin', '寝室长', 'payer', 'user']).withMessage('角色值无效')
+      .isIn(['system_admin', 'admin', 'room_leader', 'payer', 'user']).withMessage('角色值无效')
   ],
   
   // 更新用户验证规则

@@ -393,10 +393,17 @@ const loginActivities = ref([])
 
 // 获取角色显示名称
 const getRoleDisplayName = (role) => {
+  // 统一的角色映射表
   const roleMap = {
     admin: '管理员',
+    system_admin: '系统管理员',
+    sysadmin: '系统管理员',
     room_leader: '寝室长',
-    member: '成员'
+    room_owner: '寝室长',
+    payer: '缴费人',
+    user: '用户',
+    member: '成员',
+    guest: '访客'
   }
   return roleMap[role] || '成员'
 }

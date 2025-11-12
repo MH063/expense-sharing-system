@@ -403,6 +403,8 @@ class UserController {
 
       // 添加角色信息到用户对象
       userWithoutPassword.role = userRole;
+      userWithoutPassword.roles = [userRole]; // 添加roles数组，供前端使用
+      userWithoutPassword.permissions = userPermissions; // 添加permissions数组，供前端使用
 
       // 使用TokenManager生成JWT token
       const { TokenManager } = require('../middleware/tokenManager');

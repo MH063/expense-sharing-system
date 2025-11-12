@@ -222,21 +222,28 @@ export function hasPermission(user, permission, resource = null) {
     return true;
   }
   
-  // 获取用户角色
-  const userRole = user.role || ROLES.GUEST;
-  
-  // 获取角色对应的权限列表
-  const rolePermissions = ROLE_PERMISSIONS[userRole] || [];
-  
-  // 检查是否具有该权限
-  if (!rolePermissions.includes(permission)) {
-    return false;
+  // 优先检查用户实际拥有的权限列表（从后端返回）
+  if (user.permissions && Array.isArray(user.permissions)) {
+    // 直接检查用户权限数组中是否包含所需权限
+    const hasDirectPermission = user.permissions.includes(permission);
+    
+    if (!hasDirectPermission) {
+      return false;
+    }
+  } else {
+    // 如果没有权限数组，使用角色权限映射作为后备
+    const userRole = user.role || ROLES.GUEST;
+    const rolePermissions = ROLE_PERMISSIONS[userRole] || [];
+    
+    if (!rolePermissions.includes(permission)) {
+      return false;
+    }
   }
   
   // 如果提供了资源对象，检查资源所有者权限
   if (resource) {
     // 系统管理员可以操作所有资源
-    if (userRole === ROLES.ADMIN) {
+    if (user.role === ROLES.ADMIN || user.role === ROLES.SYSTEM_ADMIN) {
       return true;
     }
     

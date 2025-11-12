@@ -416,8 +416,15 @@ export const useAuthStore = defineStore('auth', () => {
         // 设置Token管理器的刷新回调
         tokenManager.setRefreshCallback(refreshTokens)
         
-        // 同步最新角色信息
-        await syncUserRoles()
+        // 如果登录返回的权限数据为空，则异步同步
+        if (!permissions.value || permissions.value.length === 0) {
+          console.log('登录返回的权限为空，异步同步权限数据')
+          syncUserRoles().catch(error => {
+            console.error('同步用户角色信息失败:', error)
+          })
+        } else {
+          console.log('使用登录返回的权限数据:', permissions.value)
+        }
         
         // 连接WebSocket
         connectWebSocket()
@@ -563,6 +570,7 @@ export const useAuthStore = defineStore('auth', () => {
   const syncUserRoles = async () => {
     try {
       console.log('开始同步用户角色信息...')
+      console.log('同步前的角色信息:', roles.value)
       
       // 获取最新角色信息
       const rolesResponse = await http.get('/users/roles')
@@ -577,11 +585,12 @@ export const useAuthStore = defineStore('auth', () => {
         console.log('检测到双层嵌套数据结构，使用res.data.data')
       }
       
-      if (rolesData && Array.isArray(rolesData.roles)) {
+      if (rolesData && Array.isArray(rolesData.roles) && rolesData.roles.length > 0) {
         roles.value = rolesData.roles
         console.log('成功同步角色信息:', roles.value)
       } else {
-        console.warn('角色信息格式异常或为空:', rolesData)
+        console.warn('角色信息格式异常或为空，保持原有角色:', rolesData)
+        // 不清空 roles.value，保持原有值
       }
       
       // 获取最新权限信息
@@ -597,11 +606,12 @@ export const useAuthStore = defineStore('auth', () => {
         console.log('检测到双层嵌套数据结构，使用res.data.data')
       }
       
-      if (permissionsData && Array.isArray(permissionsData.permissions)) {
+      if (permissionsData && Array.isArray(permissionsData.permissions) && permissionsData.permissions.length > 0) {
         permissions.value = permissionsData.permissions
         console.log('成功同步权限信息:', permissions.value)
       } else {
-        console.warn('权限信息格式异常或为空:', permissionsData)
+        console.warn('权限信息格式异常或为空，保持原有权限:', permissionsData)
+        // 不清空 permissions.value，保持原有值
       }
       
       // 同时更新currentUser中的角色和权限信息
@@ -615,8 +625,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
       
     } catch (error) {
-      console.error('同步用户角色信息失败:', error)
-      // 同步失败不影响主流程，记录错误信息即可
+      console.error('同步用户角色信息失败，保持原有角色和权限:', error)
+      // 同步失败不影响主流程，记录错误信息即可，不清空现有数据
     }
   }
 

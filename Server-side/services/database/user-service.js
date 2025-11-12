@@ -421,14 +421,14 @@ class UserService extends BaseService {
     
     return await enhancedCacheService.getOrSet(cacheKey, async () => {
       const sql = `
-        SELECT DISTINCT p.name, p.description
+        SELECT DISTINCT p.code
         FROM permissions p
         JOIN role_permissions rp ON p.id = rp.permission_id
         JOIN user_roles ur ON rp.role_id = ur.role_id
         WHERE ur.user_id = $1
       `;
       const result = await this.query(sql, [userId]);
-      return result.rows.map(row => row.name);
+      return result.rows.map(row => row.code);
     }, enhancedCacheService.getDefaultTTL('user'), ['user', 'permission']);
   }
 }

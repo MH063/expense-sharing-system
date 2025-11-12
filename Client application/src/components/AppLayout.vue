@@ -14,25 +14,25 @@
             <li class="nav-item">
               <router-link to="/dashboard" class="nav-link">仪表盘</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('expense.view')">
               <router-link to="/expenses" class="nav-link">费用管理</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('bill.view')">
               <router-link to="/bills" class="nav-link">账单</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated && hasPermission('bill:pay')">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('payment.confirm')">
               <router-link to="/qr-codes" class="nav-link">收款码</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated && hasPermission('bill:pay')">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('payment.confirm')">
               <router-link to="/payments/history" class="nav-link">支付记录</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated && hasPermission('room:invite')">
+            <li class="nav-item" v-if="isAuthenticated && (hasPermission('room.edit') || hasPermission('room.members.manage'))">
               <router-link to="/invite-codes" class="nav-link">邀请码管理</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('expense.view')">
               <router-link to="/analytics" class="nav-link">统计</router-link>
             </li>
-            <li class="nav-item" v-if="isAuthenticated">
+            <li class="nav-item" v-if="isAuthenticated && hasPermission('room.view')">
               <router-link to="/rooms" class="nav-link">寝室</router-link>
             </li>
 
@@ -149,26 +149,18 @@ const currentUser = computed(() => authStore.currentUser)
 
 // 用户角色信息
 const currentRole = computed(() => {
-  console.log('=== 角色识别调试 ===')
-  console.log('authStore.roles:', authStore.roles)
-  console.log('authStore.currentUser:', authStore.currentUser)
-  console.log('authStore.currentUser?.role:', authStore.currentUser?.role)
-  
-  // 优先从认证store的roles获取
+  // 优先从auth Store的roles获取
   if (authStore.roles && authStore.roles.length > 0) {
     const role = authStore.roles[0] // 取第一个角色
-    console.log('从roles数组获取角色:', role)
     return role
   }
   
-  // 如果没有roles，尝试从currentUser获取
+  // 如果没有roles，尝试仌currentUser获取
   if (authStore.currentUser && authStore.currentUser.role) {
     const role = authStore.currentUser.role
-    console.log('从currentUser.role获取角色:', role)
     return role
   }
   
-  console.log('使用默认角色: user')
   return 'user' // 默认角色
 })
 
@@ -179,9 +171,6 @@ const userAvatarUrl = computed(() => {
 
 // 用户角色文本
 const userRoleText = computed(() => {
-  console.log('=== 角色显示调试 ===')
-  console.log('currentRole.value:', currentRole.value)
-  
   // 使用认证store的角色信息
   const role = currentRole.value
   // 完整的角色映射表 - 支持中文和英文角色名
@@ -190,10 +179,10 @@ const userRoleText = computed(() => {
     'admin': '管理员',
     'sysadmin': '系统管理员',
     'system_admin': '系统管理员', 
-    'room_leader': '寑室长',
-    'room_owner': '寑室长',
-    'dormleader': '寑室长',
-    'dorm_leader': '寑室长',
+    'room_leader': '寝室长',
+    'room_owner': '寝室长',
+    'dormleader': '寝室长',
+    'dorm_leader': '寝室长',
     'payer': '缴费人',
     'user': '普通用户',
     'member': '成员',
@@ -201,7 +190,7 @@ const userRoleText = computed(() => {
     // 中文角色名（直接返回）
     '系统管理员': '系统管理员',
     '管理员': '管理员',
-    '寑室长': '寑室长',
+    '寝室长': '寝室长',
     '缴费人': '缴费人',
     '普通用户': '普通用户',
     '成员': '成员',
@@ -209,7 +198,6 @@ const userRoleText = computed(() => {
   }
   
   const displayText = roleMap[role] || role || '未知角色'
-  console.log(`角色 ${role} 显示为: ${displayText}`)
   return displayText
 })
 
@@ -242,12 +230,6 @@ const handleClickOutside = (event) => {
 // 生命周期
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  console.log('AppLayout组件已挂载，角色测试开始...')
-  // 进行角色识别测试
-  setTimeout(() => {
-    console.log('=== 执行角色识别测试 ===')
-    runFullRoleTest(authStore)
-  }, 1000) // 等待1秒后执行，确保认证状态已加载
 })
 
 onUnmounted(() => {

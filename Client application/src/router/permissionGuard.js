@@ -58,7 +58,7 @@ export function checkRoutePermission(to, from, next, store) {
         autoClose: false
       })
       
-      next({ path: '/forbidden' })
+      next({ path: '/403' })
       return
     }
   }
@@ -105,7 +105,7 @@ export function checkRoutePermission(to, from, next, store) {
         autoClose: false
       })
       
-      next({ path: '/forbidden' })
+      next({ path: '/403' })
       return
     }
   }
@@ -120,7 +120,7 @@ export function checkRoutePermission(to, from, next, store) {
         showBackButton: true,
         autoClose: false
       })
-      next({ path: '/forbidden' })
+      next({ path: '/403' })
       return
     }
     
@@ -143,7 +143,7 @@ export function checkRoutePermission(to, from, next, store) {
         autoClose: false
       })
       
-      next({ path: '/forbidden' })
+      next({ path: '/403' })
       return
     }
   }
@@ -196,7 +196,7 @@ export function createPermissionGuard(router, store) {
         showBackButton: true,
         autoClose: false
       })
-      router.push('/forbidden')
+      router.push('/403')
     }
   })
 }
